@@ -48,6 +48,15 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      # generated/ is gitignored but uv sync needs it (path dependency).
+      # Scaffold a minimal Python package so uv can resolve the dep,
+      # then schema:generate overwrites with real generated content.
+      - name: Scaffold generated package for uv resolution
+        run: |
+          mkdir -p packages/module-schema/generated/module_schema
+          touch packages/module-schema/generated/module_schema/__init__.py
+          printf '[project]\nname = "module-schema"\nversion = "0.1.0"\nrequires-python = ">=3.12"\ndependencies = ["pydantic>=2.12.0"]\n[build-system]\nrequires = ["hatchling"]\nbuild-backend = "hatchling.build"\n' > packages/module-schema/generated/pyproject.toml
+
       - name: Install Python dependencies
         run: cd apps/backend && uv sync --frozen --extra dev
 
