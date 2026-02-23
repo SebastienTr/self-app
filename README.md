@@ -1,6 +1,10 @@
 # Self-App
 
-> A mobile app that builds itself entirely through conversation. An AI agent discovers APIs, creates module definitions, fetches data, and sends rendering instructions to the client. One million users should have one million different apps.
+[![CI](https://github.com/SebastienTr/self-app/actions/workflows/ci.yml/badge.svg)](https://github.com/SebastienTr/self-app/actions/workflows/ci.yml)
+
+> A mobile app that builds itself entirely through conversation. One million users should have one million different apps.
+
+Most apps decide what you can do before you even open them. Self-App starts empty — a blank canvas with an AI agent. You describe what you need in plain language, and the agent discovers APIs, creates modules, fetches live data, and renders a native UI on the fly. Over time, the app learns your habits and evolves into something uniquely yours.
 
 <p align="center">
   <img src="docs/images/01-empty-state.png" alt="Empty state — What's on your mind?" width="200">
@@ -29,7 +33,7 @@
 **Current focus:** Epic 1 — Project Bootstrap & Developer Connection
 **Next up:** Story 1.4 — Mobile App Shell & WebSocket Connection
 
-See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) and [Sprint Status](_bmad-output/implementation-artifacts/sprint-status.yaml) for details.
+See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
 
 ## Tech Stack
 
@@ -105,31 +109,6 @@ pnpm test:backend     # Python backend tests only
 pnpm typecheck        # TypeScript type checking
 ```
 
-## Planning Documents
-
-These documents define the product vision, architecture, and implementation plan:
-
-| Document | Description |
-|----------|-------------|
-| [Product Brief](_bmad-output/planning-artifacts/product-brief-self-app-2026-02-21.md) | Initial product vision and market analysis |
-| [PRD](_bmad-output/planning-artifacts/prd.md) | Full Product Requirements Document (61 FRs, 38 NFRs) |
-| [PRD Validation Report](_bmad-output/planning-artifacts/prd-validation-report.md) | Quality assessment of the PRD |
-| [Architecture](_bmad-output/planning-artifacts/architecture.md) | Technical architecture, ADRs, and consistency patterns |
-| [UX Design Specification](_bmad-output/planning-artifacts/ux-design-specification.md) | UX strategy, Twilight theme, Metamorphosis interface |
-| [Epics & Stories](_bmad-output/planning-artifacts/epics.md) | Complete breakdown: 15 epics, 56 stories |
-| [Implementation Readiness](_bmad-output/planning-artifacts/implementation-readiness-report-2026-02-23.md) | Cross-document alignment validation |
-
-## Implementation Artifacts
-
-| Document | Description |
-|----------|-------------|
-| [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) | Visual project roadmap with all phases |
-| [Sprint Status](_bmad-output/implementation-artifacts/sprint-status.yaml) | Current sprint tracking (machine-readable) |
-| [Story 1.1 — Monorepo & Schema](_bmad-output/implementation-artifacts/1-1-initialize-monorepo-and-module-definition-schema.md) | Done |
-| [Story 1.1b — CI Pipeline](_bmad-output/implementation-artifacts/1-1b-ci-pipeline.md) | Done |
-| [Story 1.2 — Backend Skeleton](_bmad-output/implementation-artifacts/1-2-backend-skeleton-and-single-command-deployment.md) | Done |
-| [Story 1.3 — LLM Provider Abstraction](_bmad-output/implementation-artifacts/1-3-llm-provider-abstraction-and-byok-configuration.md) | Done |
-
 ## Key Concepts
 
 - **Module** — A self-contained UI unit (weather widget, task list, etc.) created autonomously by the AI agent based on user conversation.
@@ -155,6 +134,39 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 | **Moss** | Soft greens, natural, calming. For the Tree persona. |
 | **Dawn** | Light mode, warm pastels. Same tokens, inverted luminance. |
 
+## Documentation
+
+<details>
+<summary><strong>Planning documents</strong> — product vision, architecture, UX</summary>
+
+| Document | Description |
+|----------|-------------|
+| [Product Brief](_bmad-output/planning-artifacts/product-brief-self-app-2026-02-21.md) | Initial product vision and market analysis |
+| [PRD](_bmad-output/planning-artifacts/prd.md) | Full Product Requirements Document (61 FRs, 38 NFRs) |
+| [PRD Validation Report](_bmad-output/planning-artifacts/prd-validation-report.md) | Quality assessment of the PRD |
+| [Architecture](_bmad-output/planning-artifacts/architecture.md) | Technical architecture, ADRs, and consistency patterns |
+| [UX Design Specification](_bmad-output/planning-artifacts/ux-design-specification.md) | UX strategy, Twilight theme, Metamorphosis interface |
+| [Epics & Stories](_bmad-output/planning-artifacts/epics.md) | Complete breakdown: 15 epics, 56 stories |
+| [Implementation Readiness](_bmad-output/planning-artifacts/implementation-readiness-report-2026-02-23.md) | Cross-document alignment validation |
+
+</details>
+
+<details>
+<summary><strong>Implementation artifacts</strong> — roadmap, sprint status, stories</summary>
+
+| Document | Description |
+|----------|-------------|
+| [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) | Visual project roadmap with all phases |
+| [Sprint Status](_bmad-output/implementation-artifacts/sprint-status.yaml) | Current sprint tracking (machine-readable) |
+| [Story 1.1 — Monorepo & Schema](_bmad-output/implementation-artifacts/1-1-initialize-monorepo-and-module-definition-schema.md) | Done |
+| [Story 1.1b — CI Pipeline](_bmad-output/implementation-artifacts/1-1b-ci-pipeline.md) | Done |
+| [Story 1.2 — Backend Skeleton](_bmad-output/implementation-artifacts/1-2-backend-skeleton-and-single-command-deployment.md) | Done |
+| [Story 1.3 — LLM Provider Abstraction](_bmad-output/implementation-artifacts/1-3-llm-provider-abstraction-and-byok-configuration.md) | Done |
+
+</details>
+
+This project uses the [BMAD](https://github.com/bmad-sim/bmad-ecosystem) framework for AI-driven product development — the `_bmad/` directory contains workflow definitions and agent configurations.
+
 ## License
 
-Private project.
+MIT — see [LICENSE](LICENSE).
