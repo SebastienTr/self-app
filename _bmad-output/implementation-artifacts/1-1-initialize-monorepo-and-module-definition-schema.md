@@ -1,6 +1,6 @@
 # Story 1.1: Initialize Monorepo & Module Definition Schema
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -20,44 +20,44 @@ So that I have type-safe contracts between mobile and backend from day one.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Scaffold monorepo structure (AC: #1)
-  - [ ] 1.1 Initialize pnpm workspace at repo root with `pnpm-workspace.yaml`
-  - [ ] 1.2 Create root `package.json` with workspace scripts (dev, build, schema:generate, test:mobile, test:backend)
-  - [ ] 1.3 Create root `tsconfig.json` with strict mode and path aliases
-  - [ ] 1.4 Scaffold `apps/mobile/` using `create-expo-app` (Expo SDK 54, New Architecture, TypeScript)
-  - [ ] 1.5 Configure Metro for pnpm monorepo symlink resolution (from byCedric pattern)
-  - [ ] 1.6 Scaffold `apps/backend/` with Python project (`pyproject.toml` using uv)
-  - [ ] 1.7 Scaffold `packages/module-schema/` with `package.json` and `tsconfig.json`
-  - [ ] 1.8 Configure TypeScript path aliases (`@self/module-schema`, `@/components/*`, `@/services/*`, etc.)
-  - [ ] 1.9 Verify `pnpm install` resolves all workspace dependencies clean
-  - [ ] 1.10 Create `.gitignore` covering node_modules, generated files, data/, .env, __pycache__, etc.
+- [x] Task 1: Scaffold monorepo structure (AC: #1)
+  - [x] 1.1 Initialize pnpm workspace at repo root with `pnpm-workspace.yaml`
+  - [x] 1.2 Create root `package.json` with workspace scripts (dev, build, schema:generate, test:mobile, test:backend)
+  - [x] 1.3 Create root `tsconfig.json` with strict mode and path aliases
+  - [x] 1.4 Scaffold `apps/mobile/` using `create-expo-app` (Expo SDK 54, New Architecture, TypeScript)
+  - [x] 1.5 Configure Metro for pnpm monorepo symlink resolution (from byCedric pattern)
+  - [x] 1.6 Scaffold `apps/backend/` with Python project (`pyproject.toml` using uv)
+  - [x] 1.7 Scaffold `packages/module-schema/` with `package.json` and `tsconfig.json`
+  - [x] 1.8 Configure TypeScript path aliases (`@self/module-schema`, `@/components/*`, `@/services/*`, etc.)
+  - [x] 1.9 Verify `pnpm install` resolves all workspace dependencies clean
+  - [x] 1.10 Create `.gitignore` covering node_modules, generated files, data/, .env, __pycache__, etc.
 
-- [ ] Task 2: Create Zod module definition schema (AC: #2, #3)
-  - [ ] 2.1 Create `packages/module-schema/src/moduleSpec.ts` with Zod 4 source-of-truth schema
-  - [ ] 2.2 Define all required fields: id, name, type, template, dataSources, refreshInterval, schemaVersion, accessibleLabel
-  - [ ] 2.3 Define enum/union types for `type` field (metric, list, text, status, table — First Light primitives)
-  - [ ] 2.4 Define template field with known template names (metric-dashboard, data-card, simple-list for First Light)
-  - [ ] 2.5 Export `CURRENT_SCHEMA_VERSION` constant from `packages/module-schema/src/index.ts`
-  - [ ] 2.6 Create barrel export in `packages/module-schema/src/index.ts`
+- [x] Task 2: Create Zod module definition schema (AC: #2, #3)
+  - [x] 2.1 Create `packages/module-schema/src/moduleSpec.ts` with Zod 4 source-of-truth schema
+  - [x] 2.2 Define all required fields: id, name, type, template, dataSources, refreshInterval, schemaVersion, accessibleLabel
+  - [x] 2.3 Define enum/union types for `type` field (metric, list, text, status, table — First Light primitives)
+  - [x] 2.4 Define template field with known template names (metric-dashboard, data-card, simple-list for First Light)
+  - [x] 2.5 Export `CURRENT_SCHEMA_VERSION` constant from `packages/module-schema/src/index.ts`
+  - [x] 2.6 Create barrel export in `packages/module-schema/src/index.ts`
 
-- [ ] Task 3: Schema generation pipeline (AC: #2)
-  - [ ] 3.1 Create `packages/module-schema/scripts/generate.ts` using Zod 4 native `z.toJSONSchema()`
-  - [ ] 3.2 Generate `packages/module-schema/generated/schema.json` (JSON Schema output)
-  - [ ] 3.3 Generate `packages/module-schema/generated/models.py` using `datamodel-code-generator` from JSON Schema
-  - [ ] 3.4 TypeScript types via Zod inference (zero codegen — `z.infer<typeof moduleSpecSchema>`)
-  - [ ] 3.5 Wire `pnpm schema:generate` root script to run the generation pipeline
-  - [ ] 3.6 Verify generated TypeScript types are importable as `@self-app/module-schema`
-  - [ ] 3.7 Verify generated Pydantic models are importable as `module_schema` in Python
+- [x] Task 3: Schema generation pipeline (AC: #2)
+  - [x] 3.1 Create `packages/module-schema/scripts/generate.ts` using Zod 4 native `z.toJSONSchema()`
+  - [x] 3.2 Generate `packages/module-schema/generated/schema.json` (JSON Schema output)
+  - [x] 3.3 Generate `packages/module-schema/generated/models.py` using `datamodel-code-generator` from JSON Schema
+  - [x] 3.4 TypeScript types via Zod inference (zero codegen — `z.infer<typeof moduleSpecSchema>`)
+  - [x] 3.5 Wire `pnpm schema:generate` root script to run the generation pipeline
+  - [x] 3.6 Verify generated TypeScript types are importable as `@self-app/module-schema`
+  - [x] 3.7 Verify generated Pydantic models are importable as `module_schema` in Python
 
-- [ ] Task 4: Schema validation tests (AC: #3)
-  - [ ] 4.1 Create `packages/module-schema/src/__tests__/moduleSpec.test.ts` with Jest
-  - [ ] 4.2 Test valid module spec passes validation
-  - [ ] 4.3 Test missing required fields produce descriptive errors
-  - [ ] 4.4 Test invalid enum values are rejected
-  - [ ] 4.5 Test schema_version field is present and numeric
-  - [ ] 4.6 Test accessibleLabel is required (NFR31)
-  - [ ] 4.7 Create test fixture factory: `createTestModuleSpec(overrides?)` in `__tests__/fixtures/moduleSpec.ts`
-  - [ ] 4.8 Create Python test `apps/backend/tests/test_module_schema.py` verifying Pydantic model validates same specs
+- [x] Task 4: Schema validation tests (AC: #3)
+  - [x] 4.1 Create `packages/module-schema/src/__tests__/moduleSpec.test.ts` with Jest
+  - [x] 4.2 Test valid module spec passes validation
+  - [x] 4.3 Test missing required fields produce descriptive errors
+  - [x] 4.4 Test invalid enum values are rejected
+  - [x] 4.5 Test schema_version field is present and numeric
+  - [x] 4.6 Test accessibleLabel is required (NFR31)
+  - [x] 4.7 Create test fixture factory: `createTestModuleSpec(overrides?)` in `__tests__/fixtures/moduleSpec.ts`
+  - [x] 4.8 Create Python test `apps/backend/tests/test_module_schema.py` verifying Pydantic model validates same specs
 
 ## Dev Notes
 
@@ -354,11 +354,78 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 ### Debug Log References
 
+- Pydantic 2.13.0 not yet released — used 2.12.5 (latest available Feb 2026)
+- Zod 4 `z.string().uuid()` generates both `format: uuid` AND `pattern` in JSON Schema, causing Pydantic UUID+pattern conflict — resolved by stripping pattern from uuid fields before Pydantic codegen
+- datamodel-code-generator execution now prefers `uv run --extra dev` and falls back to backend `.venv/bin/datamodel-codegen` when `uv` is unavailable or unstable in local sandbox environments
+- Generated Pydantic models use snake_case fields with camelCase aliases (via `--snake-case-field` flag); code review fixes add `alias_generator=to_camel` + `populate_by_name=True` post-generation
+
 ### Completion Notes List
 
 - Story context engine analysis completed — comprehensive developer guide created
 - Web research identified Zod 4 migration: `zod-to-json-schema` replaced by native `z.toJSONSchema()`
 - pnpm 10.x lifecycle script change documented
 - All technology versions pinned with February 2026 latest stable
+- **Task 1 complete**: Monorepo scaffolded with pnpm 10.30.1, Expo SDK 54 (RN 0.81.5, React 19.1), Python backend with FastAPI 0.131.0, Metro configured for pnpm symlinks
+- **Task 2 complete**: Zod 4 schema with all required + optional fields, enums for type/template/status, DataSource sub-schema
+- **Task 3 complete**: Generation pipeline (Zod → JSON Schema → Pydantic) working end-to-end via `pnpm run schema:generate`. Python package auto-generated as installable `module_schema` with uv path dependency
+- **Task 4 complete**: 25 Jest tests + 16 pytest tests — all passing. Covers valid specs, missing fields, invalid enums, field constraints, schema versioning, snake_case input compatibility
+- **AI code review fixes applied**: root `test/dev` scripts fixed, backend test execution made robust (`.venv` fallback + `uv` fallback), schema generation no longer depends only on a hardcoded venv path, generated Pydantic models patched with `alias_generator` + `populate_by_name`, legacy `generated/models.py` mirrored to avoid drift
+
+### Implementation Plan
+
+1. Scaffolded pnpm monorepo with 3 workspace projects (apps/mobile, apps/backend, packages/module-schema)
+2. Used create-expo-app for Expo SDK 54 with blank-typescript template, added Metro monorepo config
+3. Created Python backend with FastAPI placeholder, uv for dependency management
+4. Implemented Zod 4 source-of-truth schema with 8 required fields + 3 optional fields
+5. Built generation pipeline: Zod → JSON Schema (draft-2020-12) → Pydantic v2 models via datamodel-codegen
+6. Generated Python package (`module_schema`) auto-installed as uv path dependency in backend
+7. Created comprehensive test suites in both TypeScript (Jest) and Python (pytest)
 
 ### File List
+
+#### New Files
+- pnpm-workspace.yaml
+- package.json (root)
+- pnpm-lock.yaml
+- tsconfig.json (root)
+- scripts/dev.mjs
+- apps/mobile/App.tsx
+- apps/mobile/app.json
+- apps/mobile/index.ts
+- apps/mobile/package.json
+- apps/mobile/tsconfig.json
+- apps/mobile/metro.config.js
+- apps/mobile/.gitignore
+- apps/mobile/assets/ (icons and splash)
+- apps/backend/pyproject.toml
+- apps/backend/uv.lock
+- apps/backend/Dockerfile
+- apps/backend/app/__init__.py
+- apps/backend/app/main.py
+- apps/backend/tests/conftest.py
+- apps/backend/tests/test_module_schema.py
+- packages/module-schema/package.json
+- packages/module-schema/tsconfig.json
+- packages/module-schema/jest.config.js
+- packages/module-schema/src/moduleSpec.ts
+- packages/module-schema/src/index.ts
+- packages/module-schema/src/__tests__/moduleSpec.test.ts
+- packages/module-schema/src/__tests__/fixtures/moduleSpec.ts
+- packages/module-schema/scripts/generate.ts
+- packages/module-schema/generated/ (auto-generated, gitignored)
+
+#### Modified Files
+- .gitignore (added Python, generated files, data/ entries)
+
+#### Review Fixes (AI)
+- package.json (root) — fixed root `dev/test` scripts
+- packages/module-schema/package.json — generate script execution updated (`node --import tsx`)
+- packages/module-schema/scripts/generate.ts — robust codegen execution + post-generation Pydantic config patch + legacy mirror sync
+- apps/backend/tests/test_module_schema.py — added snake_case input compatibility test
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-02-23 | Story 1.1 implemented: monorepo scaffold, Zod 4 module schema, generation pipeline, 40 tests (25 Jest + 15 pytest) |
+| 2026-02-23 | AI code review fixes: root scripts hardened, codegen fallback added, Pydantic `populate_by_name`/`alias_generator` patch applied, legacy generated models synced, tests updated to 41 total (25 Jest + 16 pytest) |

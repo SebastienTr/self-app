@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@self/module-schema": ["../../packages/module-schema/src"],
+      "@/components/*": ["./components/*"],
+      "@/services/*": ["./services/*"],
+      "@/stores/*": ["./stores/*"]
+    }
+  }
+}

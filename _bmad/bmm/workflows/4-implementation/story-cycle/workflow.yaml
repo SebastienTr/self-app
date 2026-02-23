@@ -1,0 +1,34 @@
+name: story-cycle
+description: "Orchestrate complete story lifecycle: create > develop > test > review > finalize. Use when the user says 'run story cycle' or 'full story lifecycle'"
+
+# Critical variables from config
+config_source: "{project-root}/_bmad/bmm/config.yaml"
+user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
+user_skill_level: "{config_source}:user_skill_level"
+document_output_language: "{config_source}:document_output_language"
+date: system-generated
+planning_artifacts: "{config_source}:planning_artifacts"
+implementation_artifacts: "{config_source}:implementation_artifacts"
+
+# Workflow components (orchestrator — no instructions/template)
+installed_path: "{project-root}/_bmad/bmm/workflows/4-implementation/story-cycle"
+
+# Orchestration variables
+story_key: "" # Explicit story key; auto-discovered if empty
+execution_mode: "supervised" # supervised | gates-only | yolo
+max_retry_loops: 2
+
+# Sub-workflow references (Pattern A — processed by workflow.xml)
+workflow_engine: "{project-root}/_bmad/core/tasks/workflow.xml"
+create_story_workflow: "{project-root}/_bmad/bmm/workflows/4-implementation/create-story/workflow.yaml"
+dev_story_workflow: "{project-root}/_bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml"
+code_review_workflow: "{project-root}/_bmad/bmm/workflows/4-implementation/code-review/workflow.yaml"
+
+# Sub-workflow reference (Pattern B — workflow.md direct)
+testarch_automate_workflow: "{project-root}/_bmad/tea/workflows/testarch/automate/workflow.yaml"
+
+# Tracking files
+sprint_status: "{implementation_artifacts}/sprint-status.yaml"
+roadmap_file: "{implementation_artifacts}/roadmap.md"
+project_context: "**/project-context.md"

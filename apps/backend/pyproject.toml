@@ -1,0 +1,32 @@
+[project]
+name = "self-app-backend"
+version = "0.1.0"
+description = "Self-app backend - AI-driven autonomous mobile app"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.131.0",
+    "pydantic>=2.12.0",
+    "module-schema",
+]
+
+[tool.uv.sources]
+module-schema = { path = "../../packages/module-schema/generated", editable = true }
+
+[project.optional-dependencies]
+dev = [
+    "datamodel-code-generator",
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

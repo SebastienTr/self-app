@@ -45,8 +45,8 @@ development_status:
   # FRs: FR36, FR39, FR49, FR55, FR56, FR57, FR58
   # ═══════════════════════════════════════════════════════════════
   epic-1: in-progress
-  1-1-initialize-monorepo-and-module-definition-schema: ready-for-dev
-  1-1b-ci-pipeline: backlog
+  1-1-initialize-monorepo-and-module-definition-schema: done
+  1-1b-ci-pipeline: review
   1-2-backend-skeleton-and-single-command-deployment: backlog
   1-3-llm-provider-abstraction-and-byok-configuration: backlog
   1-4-mobile-app-shell-and-websocket-connection: backlog

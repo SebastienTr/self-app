@@ -6,7 +6,11 @@ node_modules/
 # Build outputs
 dist/
 build/
+.cache/
 *.tsbuildinfo
+
+# Generated files (recreated by schema:generate)
+packages/module-schema/generated/
 
 # Environment & secrets
 .env
@@ -24,6 +28,9 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+.agents/
+.gemini/
+.windsurf/
 
 # Claude Code
 .claude/
@@ -53,3 +60,17 @@ coverage/
 .expo/
 android/
 ios/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+.uv/
+
+# Data directory (user data, not tracked)
+data/

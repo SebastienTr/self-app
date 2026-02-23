@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    # Only main — this is the sole long-lived branch in a solo-developer project.
+    # All PRs target main; no other target branches exist or are planned.
+    branches: [main]
+
+# Cancel redundant CI runs on rapid pushes to the same branch
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Principle of least privilege — CI only needs to read source code
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Actions pinned to major version tags (v4/v6/v7), not full SHAs.
+      # Accepted trade-off for a solo-developer project: tag-based pinning
+      # provides automatic patch updates and readable diffs. Full SHA pinning
+      # adds maintenance burden without proportional security benefit here.
+      # Re-evaluate if the project becomes multi-contributor.
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        # Reads pnpm version from package.json#packageManager field
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: cd apps/backend && uv sync --frozen --extra dev
+
+      - name: Generate schema
+        run: pnpm run schema:generate
+
+      # CI uses `pnpm -r run` (recursive) instead of root scripts because:
+      # - Root `typecheck` only runs tsc in the root (no tsconfig.json there)
+      # - Root `test` chains test:mobile + test:backend with fallback logic for local dev
+      # - Recursive execution hits each workspace's own script directly, which is
+      #   the correct CI behavior: fail fast per-workspace, no shell fallbacks.
+      - name: TypeScript type check
+        run: pnpm -r run typecheck
+
+      - name: Run JS/TS tests
+        run: pnpm -r run test
+
+      - name: Run Python tests
+        run: cd apps/backend && uv run pytest
+
+      # NOTE: Branch protection rules must be configured in GitHub repo settings:
+      # Settings > Branches > Add rule for "main" >
+      #   - Require status checks to pass before merging
+      #   - Select "ci" job as required status check
+      #
+      # CLI equivalent (requires admin access):
+      #   gh api repos/{owner}/{repo}/branches/main/protection \
+      #     -X PUT -f "required_status_checks[strict]=true" \
+      #     -f "required_status_checks[contexts][]=ci"
