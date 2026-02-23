@@ -3,7 +3,15 @@
 > A mobile app that builds itself entirely through conversation. An AI agent discovers APIs, creates module definitions, fetches data, and sends rendering instructions to the client. One million users should have one million different apps.
 
 <p align="center">
-  <img src="docs/images/twilight-app-states-1.png" alt="Self-App — First Screen, First Conversation, Creation Moment" width="100%">
+  <img src="docs/images/01-empty-state.png" alt="Empty state — What's on your mind?" width="200">
+  &nbsp;&nbsp;
+  <img src="docs/images/02-first-conversation.png" alt="First conversation — module creation" width="200">
+  &nbsp;&nbsp;
+  <img src="docs/images/05-dashboard.png" alt="Dashboard — 18+ modules" width="200">
+</p>
+
+<p align="center">
+  <em>Empty state &rarr; First conversation &rarr; Dashboard with 18+ modules</em>
 </p>
 
 ## Project Status
@@ -133,10 +141,6 @@ These documents define the product vision, architecture, and implementation plan
 ## Design — Twilight Theme
 
 The app uses the **Twilight** theme: deep navy backgrounds with warm amber accents — like a lantern in the dark. See the full [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep-dive.html) for the interactive exploration.
-
-<p align="center">
-  <img src="docs/images/twilight-app-states-2.png" alt="Honest Failure, Dashboard, Equal-Weight Control" width="100%">
-</p>
 
 **Four theme variants** share the same token structure — only values change:
 
