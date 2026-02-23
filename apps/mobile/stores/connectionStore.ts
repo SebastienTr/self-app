@@ -13,6 +13,7 @@
 import { create } from 'zustand';
 
 import type { ConnectionStatus } from '@/types/ws';
+import { getBackendUrl } from '@/utils/getBackendUrl';
 
 interface ConnectionStore {
   // State (nouns)
@@ -38,7 +39,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   status: 'disconnected',
   reconnectAttempts: 0,
   lastSync: null,
-  backendUrl: 'ws://localhost:8000/ws',
+  backendUrl: getBackendUrl(),
 
   // Actions
   setStatus: (status) => set({ status }),

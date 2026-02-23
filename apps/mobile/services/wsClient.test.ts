@@ -786,4 +786,165 @@ describe('wsClient', () => {
       expect(wsClient.getPendingMessageCount()).toBe(0);
     });
   });
+
+  // --- Persistent queue tests (Story 1-5) ---
+
+  describe('persistent message queue', () => {
+    it('persists messages to localDb.enqueuePendingMessage when offline', () => {
+      const localDb = require('./localDb');
+      const spy = jest.spyOn(localDb, 'enqueuePendingMessage');
+
+      wsClient.send({ type: 'chat', payload: { message: 'offline msg' } });
+
+      expect(spy).toHaveBeenCalledWith({
+        type: 'chat',
+        payload: { message: 'offline msg' },
+      });
+      spy.mockRestore();
+    });
+
+    it('calls clearPendingMessages after flushing queue on connect', () => {
+      const localDb = require('./localDb');
+      const spy = jest.spyOn(localDb, 'clearPendingMessages');
+
+      wsClient.send({ type: 'chat', payload: { message: 'to flush' } });
+
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('does not call clearPendingMessages when no messages flushed', () => {
+      const localDb = require('./localDb');
+      const spy = jest.spyOn(localDb, 'clearPendingMessages');
+
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
+
+  describe('loadPersistedMessages', () => {
+    it('loads persisted messages from localDb and prepends to in-memory queue', async () => {
+      const localDb = require('./localDb');
+      const spy = jest.spyOn(localDb, 'dequeuePendingMessages').mockResolvedValueOnce([
+        { type: 'chat', payload: { message: 'persisted-1' } },
+        { type: 'chat', payload: { message: 'persisted-2' } },
+      ]);
+
+      // Add one in-memory message first
+      wsClient.send({ type: 'chat', payload: { message: 'in-memory' } });
+
+      await wsClient.loadPersistedMessages();
+
+      // Persisted messages should be prepended
+      expect(wsClient.getPendingMessageCount()).toBe(3);
+
+      // Verify order by connecting and flushing
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+
+      const sent = mockWsInstances[0].sentMessages.map((m: string) => JSON.parse(m));
+      expect(sent[0].payload.message).toBe('persisted-1');
+      expect(sent[1].payload.message).toBe('persisted-2');
+      expect(sent[2].payload.message).toBe('in-memory');
+      spy.mockRestore();
+    });
+
+    it('handles empty persisted messages gracefully', async () => {
+      const localDb = require('./localDb');
+      const spy = jest.spyOn(localDb, 'dequeuePendingMessages').mockResolvedValueOnce([]);
+
+      await wsClient.loadPersistedMessages();
+      expect(wsClient.getPendingMessageCount()).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('handles loadPersistedMessages error gracefully', async () => {
+      const localDb = require('./localDb');
+      const spy = jest.spyOn(localDb, 'dequeuePendingMessages').mockRejectedValueOnce(new Error('DB read fail'));
+
+      await expect(wsClient.loadPersistedMessages()).resolves.not.toThrow();
+      expect(wsClient.getPendingMessageCount()).toBe(0);
+      spy.mockRestore();
+    });
+  });
+
+  describe('queue overflow (MAX_PENDING_MESSAGES = 200)', () => {
+    it('drops oldest message when queue reaches 200', () => {
+      // Fill queue to capacity
+      for (let i = 0; i < 200; i++) {
+        wsClient.send({ type: 'chat', payload: { message: `msg-${i}` } });
+      }
+      expect(wsClient.getPendingMessageCount()).toBe(200);
+
+      // One more should drop the first
+      wsClient.send({ type: 'chat', payload: { message: 'overflow-msg' } });
+      expect(wsClient.getPendingMessageCount()).toBe(200);
+    });
+
+    it('preserves FIFO order after overflow with newest messages retained', () => {
+      for (let i = 0; i < 201; i++) {
+        wsClient.send({ type: 'chat', payload: { message: `msg-${i}` } });
+      }
+
+      // Connect and flush
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+
+      const sent = mockWsInstances[0].sentMessages.map((m: string) => JSON.parse(m));
+      // msg-0 was dropped, msg-1 should be first
+      expect(sent[0].payload.message).toBe('msg-1');
+      // msg-200 (overflow-msg) should be last
+      expect(sent[sent.length - 1].payload.message).toBe('msg-200');
+      expect(sent).toHaveLength(200);
+    });
+  });
+
+  describe('sync on reconnect edge cases', () => {
+    it('does not send sync on first connect', () => {
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+
+      const syncMsgs = mockWsInstances[0].sentMessages.filter((m: string) => {
+        return JSON.parse(m).type === 'sync';
+      });
+      expect(syncMsgs).toHaveLength(0);
+    });
+
+    it('sends sync on second connect (reconnection) after disconnect', () => {
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+      mockWsInstances[0].simulateClose(1006);
+
+      jest.advanceTimersByTime(1000);
+      mockWsInstances[1].simulateOpen();
+
+      const syncMsgs = mockWsInstances[1].sentMessages.filter((m: string) => {
+        return JSON.parse(m).type === 'sync';
+      });
+      expect(syncMsgs).toHaveLength(1);
+    });
+
+    it('flushes pending messages BEFORE sending sync on reconnect', () => {
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+      mockWsInstances[0].simulateClose(1006);
+
+      // Queue a message during disconnect
+      wsClient.send({ type: 'chat', payload: { message: 'queued' } });
+
+      jest.advanceTimersByTime(1000);
+      mockWsInstances[1].simulateOpen();
+
+      const sent = mockWsInstances[1].sentMessages.map((m: string) => JSON.parse(m));
+      // queued message comes first, sync comes after
+      expect(sent[0].type).toBe('chat');
+      expect(sent[1].type).toBe('sync');
+    });
+  });
 });

@@ -5,6 +5,7 @@
     "paths": {
       "@self/module-schema": ["../../packages/module-schema/src"],
       "@/components/*": ["./components/*"],
+      "@/constants/*": ["./constants/*"],
       "@/services/*": ["./services/*"],
       "@/stores/*": ["./stores/*"],
       "@/types/*": ["./types/*"],

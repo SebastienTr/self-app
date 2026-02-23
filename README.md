@@ -21,17 +21,17 @@ Most apps decide what you can do before you even open them. Self-App starts empt
 ## Project Status
 
 ```
-[▓▓░░░░░░░░░░░░░░░░░░] 5/56 stories done (9%)
+[▓▓░░░░░░░░░░░░░░░░░░] 6/56 stories done (11%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 18 | 5 | **In Progress** |
+| First Light | 18 | 6 | **In Progress** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
 **Current focus:** Epic 1 — Project Bootstrap & Developer Connection
-**Next up:** Story 1.5 — Offline Message Queue & Cached Data Rendering
+**Next up:** Story 1.6 — Session Authentication & Mobile-Backend Pairing
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
 
@@ -163,6 +163,7 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 | [Story 1.2 — Backend Skeleton](_bmad-output/implementation-artifacts/1-2-backend-skeleton-and-single-command-deployment.md) | Done |
 | [Story 1.3 — LLM Provider Abstraction](_bmad-output/implementation-artifacts/1-3-llm-provider-abstraction-and-byok-configuration.md) | Done |
 | [Story 1.4 — Mobile App Shell & WebSocket](_bmad-output/implementation-artifacts/1-4-mobile-app-shell-and-websocket-connection.md) | Done |
+| [Story 1.5 — Offline Message Queue & Cached Data](_bmad-output/implementation-artifacts/1-5-offline-message-queue-and-cached-data-rendering.md) | Done |
 
 </details>
 

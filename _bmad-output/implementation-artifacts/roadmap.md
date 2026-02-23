@@ -1,21 +1,21 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23T13:00 | **Updated by:** Bob (SM)
+> **Last updated:** 2026-02-23T14:30 | **Updated by:** Bob (SM)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 1 · Story 1.5 · BACKLOG                              ║
+║  WAVE 1 · Story 1.6 · BACKLOG                              ║
 ║  Next milestone: Wave 3 — First Module Test (3.4)           ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓░░░░░░░░░░░░░░░░░░]  5/56 done (9%)
+TOTAL   [▓▓░░░░░░░░░░░░░░░░░░]  6/56 done (11%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
-W1  Bootstrap      ▓▓▓▓▓··                    5/7   << ICI
+W1  Bootstrap      ▓▓▓▓▓▓·                    6/7   << ICI
 W2  Chat+Render    ····                        0/4
 W3  First Module   ·                           0/1   * VALIDATION
 W4  Backfill       ······                      0/6   * FIRST LIGHT
@@ -25,7 +25,7 @@ W7  Growth         ···················         0/19  * GROWTH
 
 ─── Epics (vue feature) ──────────────────────────────────────
 
-E1  Bootstrap      ▓▓▓▓▓··    5/7  <<
+E1  Bootstrap      ▓▓▓▓▓▓·    6/7  <<
 E2  Conversation   ····       0/4       ┐
 E3  Creation       ····       0/4       ├ First Light
 E4  Freshness      ···        0/3       ┘
@@ -85,15 +85,15 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 ## Wave 1 — Finish Bootstrap (Epic 1)
 
 > Goal: mobile app connected, authenticated, offline-capable
-> 2 stories remaining | 5/7 done
+> 1 story remaining | 6/7 done
 
 - `[x]` **1.1** — Initialize Monorepo & Module Definition Schema
 - `[x]` **1.1b** — CI Pipeline
 - `[x]` **1.2** — Backend Skeleton & Single-Command Deployment
 - `[x]` **1.3** — LLM Provider Abstraction & BYOK Configuration
 - `[x]` **1.4** — Mobile App Shell & WebSocket Connection
-- `[ ]` **1.5** — Offline Message Queue & Cached Data Rendering ← **next**
-- `[ ]` **1.6** — Session Authentication & Mobile-Backend Pairing
+- `[x]` **1.5** — Offline Message Queue & Cached Data Rendering
+- `[ ]` **1.6** — Session Authentication & Mobile-Backend Pairing ← **next**
 
 > **Shortcut option:** skip 1.5, do 1.4 → 1.6 directly to unblock Wave 2 faster. Come back to 1.5 in Wave 4.
 

@@ -50,7 +50,7 @@ development_status:
   1-2-backend-skeleton-and-single-command-deployment: done
   1-3-llm-provider-abstraction-and-byok-configuration: done
   1-4-mobile-app-shell-and-websocket-connection: done
-  1-5-offline-message-queue-and-cached-data-rendering: backlog
+  1-5-offline-message-queue-and-cached-data-rendering: done
   1-6-session-authentication-and-mobile-backend-pairing: backlog
   epic-1-retrospective: optional
 

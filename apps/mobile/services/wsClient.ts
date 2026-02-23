@@ -17,6 +17,11 @@ import type { WSMessage, WSMessageType } from '@/types/ws';
 import { toCamel } from '@/utils/toCamel';
 import { toSnake } from '@/utils/toSnake';
 import { logger } from './logger';
+import {
+  enqueuePendingMessage,
+  dequeuePendingMessages,
+  clearPendingMessages,
+} from './localDb';
 
 // --- Constants ---
 
@@ -54,6 +59,8 @@ function flushPendingMessages(): void {
   }
   if (messages.length > 0) {
     logger.info('ws', 'queue_flushed', { count: messages.length });
+    // Clear persisted queue after successful flush (fire-and-forget)
+    clearPendingMessages().catch(() => {});
   }
 }
 
@@ -235,6 +242,8 @@ export function send(msg: WSMessage): void {
       pendingMessages.shift();
     }
     pendingMessages.push(msg);
+    // Persist to SQLite for crash survival (fire-and-forget)
+    enqueuePendingMessage(msg).catch(() => {});
     logger.info('ws', 'message_queued', {
       type: msg.type,
       queue_length: pendingMessages.length,
@@ -264,6 +273,42 @@ export function onMessage(
       }
     }
   };
+}
+
+/**
+ * Load persisted messages from expo-sqlite on app startup.
+ * Prepends them to the in-memory queue (they were queued before current session).
+ * Enforces MAX_PENDING_MESSAGES limit after merging (drops oldest if over limit).
+ */
+export async function loadPersistedMessages(): Promise<void> {
+  try {
+    const persisted = await dequeuePendingMessages();
+    if (persisted.length > 0) {
+      // Prepend persisted messages (they came first)
+      pendingMessages = [...persisted, ...pendingMessages];
+
+      // Enforce MAX_PENDING_MESSAGES limit — drop oldest if over capacity
+      if (pendingMessages.length > MAX_PENDING_MESSAGES) {
+        const dropped = pendingMessages.length - MAX_PENDING_MESSAGES;
+        pendingMessages = pendingMessages.slice(dropped);
+        logger.warning('ws', 'persisted_queue_trimmed', {
+          dropped,
+          retained: pendingMessages.length,
+          agent_action: 'Persisted queue exceeded MAX_PENDING_MESSAGES on load; oldest messages dropped',
+        });
+      }
+
+      logger.info('ws', 'persisted_messages_loaded', {
+        count: persisted.length,
+        total_queue: pendingMessages.length,
+      });
+    }
+  } catch (err) {
+    logger.error('ws', 'load_persisted_failed', {
+      error: String(err),
+      agent_action: 'Check localDb initialization',
+    });
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -88,6 +89,90 @@ async def health():
     }
 
 
+def _parse_module_rows(rows: list) -> list[dict]:
+    """Parse module rows from the database into payload-ready dicts."""
+    modules = []
+    for row in rows:
+        try:
+            spec = json.loads(row[2]) if row[2] else {}
+        except json.JSONDecodeError:
+            spec = {}
+        spec["moduleId"] = row[0]
+        spec["name"] = row[1]
+        modules.append(spec)
+    return modules
+
+
+async def _handle_sync(ws: WebSocket, payload: dict, db) -> None:
+    """Handle sync message with delta sync support.
+
+    If last_sync is null/empty: respond with module_list (full sync).
+    If last_sync has a value: respond with module_sync (delta — only updated modules).
+
+    Uses a shared DB connection from the WS session to avoid per-call overhead.
+    """
+    last_sync = payload.get("last_sync")
+    server_now = datetime.now(UTC).isoformat()
+
+    try:
+        if not last_sync:
+            # Full sync — return all modules
+            cursor = await db.execute(
+                "SELECT id, name, spec, status, vitality_score, user_id, created_at, updated_at "
+                "FROM modules ORDER BY updated_at DESC"
+            )
+            rows = await cursor.fetchall()
+            modules = _parse_module_rows(rows)
+
+            await ws.send_json({
+                "type": "module_list",
+                "payload": {"modules": modules},
+            })
+            log.info(
+                "sync_full",
+                module_count=len(modules),
+            )
+        else:
+            # Delta sync — only modules updated since last_sync
+            cursor = await db.execute(
+                "SELECT id, name, spec, status, vitality_score, user_id, created_at, updated_at "
+                "FROM modules WHERE updated_at > ? ORDER BY updated_at DESC",
+                (last_sync,),
+            )
+            rows = await cursor.fetchall()
+            modules = _parse_module_rows(rows)
+
+            await ws.send_json({
+                "type": "module_sync",
+                "payload": {
+                    "modules": modules,
+                    "last_sync": server_now,
+                },
+            })
+            log.info(
+                "sync_delta",
+                module_count=len(modules),
+                last_sync=last_sync,
+            )
+    except Exception as e:
+        log.error(
+            "sync_failed",
+            error=str(e),
+            agent_action="Check database connection and modules table",
+        )
+        # Fallback to empty response
+        if not last_sync:
+            await ws.send_json({
+                "type": "module_list",
+                "payload": {"modules": []},
+            })
+        else:
+            await ws.send_json({
+                "type": "module_sync",
+                "payload": {"modules": [], "last_sync": server_now},
+            })
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     """WebSocket endpoint — the sole mobile-backend communication channel.
@@ -95,11 +180,16 @@ async def websocket_endpoint(ws: WebSocket):
     Message routing:
       - chat → echo stub via chat_stream (full agent integration in later story)
       - log  → forward to backend structured logging
-      - sync → respond with empty module_list (no modules exist yet)
+      - sync → delta sync (module_list for full, module_sync for delta)
       - *    → error with WS_UNKNOWN_TYPE
+
+    Opens a single DB connection per WS session for efficient sync queries.
     """
     await ws.accept()
     log.info("ws_connected")
+
+    # Open a session-scoped DB connection for sync queries
+    db = await get_connection(settings.db_path)
     try:
         while True:
             raw = await ws.receive_text()
@@ -143,10 +233,7 @@ async def websocket_endpoint(ws: WebSocket):
             elif msg_type == "log":
                 log.info("mobile_log", mobile_payload=payload)
             elif msg_type == "sync":
-                await ws.send_json({
-                    "type": "module_list",
-                    "payload": {"modules": []},
-                })
+                await _handle_sync(ws, payload, db)
             else:
                 await ws.send_json({
                     "type": "error",
@@ -158,3 +245,5 @@ async def websocket_endpoint(ws: WebSocket):
                 })
     except WebSocketDisconnect as e:
         log.info("ws_disconnected", close_code=e.code)
+    finally:
+        await db.close()

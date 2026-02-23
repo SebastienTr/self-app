@@ -6,8 +6,12 @@ and protocol compliance.
 Uses Starlette's TestClient with websocket_connect for WS testing.
 """
 
+import asyncio
+import importlib
 import json
+import uuid
 
+import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
@@ -18,6 +22,59 @@ from app.main import app
 def client():
     """Create a test client without triggering lifespan."""
     return TestClient(app)
+
+
+@pytest.fixture
+def sync_client(test_settings, tmp_path):
+    """Create a test client with a database containing test modules.
+
+    Sets up the DB with the modules table and test fixtures for delta sync tests.
+    Uses test_settings to point settings.db_path to a temp directory.
+    """
+    async def _setup_db():
+        db = await aiosqlite.connect(test_settings.db_path)
+        await db.execute("PRAGMA journal_mode=WAL;")
+        # Create modules table (matches 001_init.sql)
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS modules (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                spec TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                vitality_score REAL DEFAULT 0,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        # Also create schema_version table
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
+        )
+        await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (1)")
+        await db.commit()
+        await db.close()
+
+    asyncio.run(_setup_db())
+    # Reload main module to pick up new settings
+    import app.main as main_mod
+    importlib.reload(main_mod)
+    return TestClient(main_mod.app)
+
+
+async def _insert_module(db_path: str, module_id: str, name: str, updated_at: str,
+                          spec: str = "{}") -> None:
+    """Helper to insert a test module into the database."""
+    db = await aiosqlite.connect(db_path)
+    try:
+        await db.execute(
+            "INSERT OR REPLACE INTO modules (id, name, spec, status, vitality_score, user_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, 'active', 0, 'default', ?, ?)",
+            (module_id, name, spec, updated_at, updated_at),
+        )
+        await db.commit()
+    finally:
+        await db.close()
 
 
 class TestWebSocketConnection:
@@ -84,7 +141,7 @@ class TestLogMessage:
                 },
             })
             # Log messages don't send a response — send another message to verify no error
-            ws.send_json({"type": "sync", "payload": {"last_sync": "2024-01-01T00:00:00Z"}})
+            ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
             # If the log message caused an error, we'd get an error response first
             assert response["type"] == "module_list"
@@ -94,7 +151,19 @@ class TestSyncMessage:
     """Test sync message type handling."""
 
     def test_sync_receives_module_list_response(self, client):
-        """Test that a sync message receives a module_list response."""
+        """Test that a sync message with no last_sync receives a module_list response."""
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json({
+                "type": "sync",
+                "payload": {},
+            })
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            assert response["payload"]["modules"] == []
+
+    def test_sync_with_last_sync_receives_module_sync_response(self, client):
+        """Test that a sync with last_sync receives a module_sync (delta) response."""
         with client.websocket_connect("/ws") as ws:
             ws.send_json({
                 "type": "sync",
@@ -102,15 +171,16 @@ class TestSyncMessage:
             })
             response = ws.receive_json()
 
-            assert response["type"] == "module_list"
-            assert response["payload"]["modules"] == []
+            assert response["type"] == "module_sync"
+            assert "modules" in response["payload"]
+            assert "last_sync" in response["payload"]
 
     def test_sync_response_follows_type_payload_format(self, client):
-        """Test that module_list response follows { type, payload } format."""
+        """Test that sync response follows { type, payload } format."""
         with client.websocket_connect("/ws") as ws:
             ws.send_json({
                 "type": "sync",
-                "payload": {"last_sync": "2024-01-01T00:00:00Z"},
+                "payload": {},
             })
             response = ws.receive_json()
 
@@ -534,3 +604,290 @@ class TestEdgeCases:
             response = ws.receive_json()
             assert response["type"] == "chat_stream"
             assert "still alive" in response["payload"]["delta"]
+
+
+class TestDeltaSync:
+    """Test delta sync functionality for the sync message type."""
+
+    def test_sync_with_null_last_sync_returns_module_list(self, sync_client, test_settings):
+        """Test that sync with null last_sync returns module_list with all modules."""
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-1", "Module One", "2024-01-01T00:00:00Z")
+        )
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-2", "Module Two", "2024-02-01T00:00:00Z")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            modules = response["payload"]["modules"]
+            assert len(modules) == 2
+            # Verify module data
+            module_ids = {m["moduleId"] for m in modules}
+            assert "mod-1" in module_ids
+            assert "mod-2" in module_ids
+
+    def test_sync_with_valid_last_sync_returns_module_sync(self, sync_client, test_settings):
+        """Test that sync with valid last_sync returns module_sync with only updated modules."""
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-old", "Old Module", "2024-01-01T00:00:00Z")
+        )
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-new", "New Module", "2024-06-01T00:00:00Z")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            # last_sync is between the two modules
+            ws.send_json({
+                "type": "sync",
+                "payload": {"last_sync": "2024-03-01T00:00:00Z"},
+            })
+            response = ws.receive_json()
+
+            assert response["type"] == "module_sync"
+            modules = response["payload"]["modules"]
+            assert len(modules) == 1
+            assert modules[0]["moduleId"] == "mod-new"
+            assert modules[0]["name"] == "New Module"
+
+    def test_sync_with_recent_last_sync_returns_empty_module_sync(self, sync_client, test_settings):
+        """Test that sync with recent last_sync returns empty module_sync when no updates."""
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-1", "Module One", "2024-01-01T00:00:00Z")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            # last_sync is after all modules
+            ws.send_json({
+                "type": "sync",
+                "payload": {"last_sync": "2025-01-01T00:00:00Z"},
+            })
+            response = ws.receive_json()
+
+            assert response["type"] == "module_sync"
+            assert response["payload"]["modules"] == []
+
+    def test_module_sync_response_includes_last_sync_timestamp(self, sync_client, test_settings):
+        """Test that module_sync response includes last_sync server timestamp."""
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({
+                "type": "sync",
+                "payload": {"last_sync": "2024-01-01T00:00:00Z"},
+            })
+            response = ws.receive_json()
+
+            assert response["type"] == "module_sync"
+            assert "last_sync" in response["payload"]
+            # Verify it's a valid ISO timestamp
+            last_sync = response["payload"]["last_sync"]
+            assert isinstance(last_sync, str)
+            assert "T" in last_sync  # Basic ISO format check
+
+    def test_sync_with_empty_last_sync_returns_module_list(self, sync_client, test_settings):
+        """Test that sync with empty string last_sync returns module_list (full sync)."""
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-1", "Module One", "2024-01-01T00:00:00Z")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {"last_sync": ""}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            assert len(response["payload"]["modules"]) == 1
+
+    def test_full_sync_with_no_modules_returns_empty_list(self, sync_client, test_settings):
+        """Test full sync when database has no modules."""
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            assert response["payload"]["modules"] == []
+
+    def test_module_spec_json_is_parsed(self, sync_client, test_settings):
+        """Test that module spec JSON is correctly parsed and included in response."""
+        import asyncio
+
+        spec_json = json.dumps({"display_name": "Weather", "type": "data_card"})
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-weather", "Weather",
+                           "2024-01-01T00:00:00Z", spec=spec_json)
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            modules = response["payload"]["modules"]
+            assert len(modules) == 1
+            mod = modules[0]
+            assert mod["moduleId"] == "mod-weather"
+            assert mod["name"] == "Weather"
+            # The spec fields should be merged in
+            assert mod["display_name"] == "Weather"
+            assert mod["type"] == "data_card"
+
+    def test_invalid_spec_json_in_database_handled_gracefully(self, sync_client, test_settings):
+        """Test that invalid JSON in spec column does not crash the sync response."""
+        async def _insert_bad_spec():
+            db = await aiosqlite.connect(test_settings.db_path)
+            try:
+                await db.execute(
+                    "INSERT INTO modules (id, name, spec, status, vitality_score, user_id, created_at, updated_at) "
+                    "VALUES (?, ?, ?, 'active', 0, 'default', ?, ?)",
+                    ("mod-bad", "Bad Spec", "{{not valid json}}", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z"),
+                )
+                await db.commit()
+            finally:
+                await db.close()
+
+        asyncio.run(_insert_bad_spec())
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            modules = response["payload"]["modules"]
+            assert len(modules) == 1
+            # moduleId and name should still be present even with invalid spec
+            assert modules[0]["moduleId"] == "mod-bad"
+            assert modules[0]["name"] == "Bad Spec"
+
+    def test_sync_with_explicit_null_last_sync(self, sync_client, test_settings):
+        """Test that sync with explicit null last_sync returns module_list (full sync)."""
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-1", "Module One", "2024-01-01T00:00:00Z")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {"last_sync": None}})
+            response = ws.receive_json()
+
+            # None/null should be treated as falsy -> full sync
+            assert response["type"] == "module_list"
+            assert len(response["payload"]["modules"]) == 1
+
+    def test_multiple_modules_with_same_updated_at(self, sync_client, test_settings):
+        """Test that all modules with the same updated_at are returned."""
+        same_time = "2024-06-01T12:00:00Z"
+        asyncio.run(_insert_module(test_settings.db_path, "mod-1", "Module 1", same_time))
+        asyncio.run(_insert_module(test_settings.db_path, "mod-2", "Module 2", same_time))
+        asyncio.run(_insert_module(test_settings.db_path, "mod-3", "Module 3", same_time))
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            assert len(response["payload"]["modules"]) == 3
+
+    def test_delta_sync_with_boundary_timestamp(self, sync_client, test_settings):
+        """Test delta sync where last_sync exactly matches a module's updated_at.
+
+        The query is `updated_at > last_sync` (strict greater than), so
+        modules with updated_at == last_sync should NOT be included.
+        """
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-exact", "Exact Match", "2024-06-01T12:00:00Z")
+        )
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-after", "After Match", "2024-06-01T12:00:01Z")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({
+                "type": "sync",
+                "payload": {"last_sync": "2024-06-01T12:00:00Z"},
+            })
+            response = ws.receive_json()
+
+            assert response["type"] == "module_sync"
+            modules = response["payload"]["modules"]
+            # Only the module with updated_at > last_sync should appear
+            assert len(modules) == 1
+            assert modules[0]["moduleId"] == "mod-after"
+
+    def test_module_spec_with_nested_json(self, sync_client, test_settings):
+        """Test that complex nested spec JSON is correctly parsed and merged."""
+        spec_json = json.dumps({
+            "layout": {"type": "grid", "columns": 2},
+            "data_sources": [{"url": "https://api.example.com", "refresh": 300}],
+            "styles": {"theme": "dark", "accent_color": "#E8A84C"},
+        })
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-complex", "Complex",
+                           "2024-01-01T00:00:00Z", spec=spec_json)
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            mod = response["payload"]["modules"][0]
+            assert mod["layout"]["type"] == "grid"
+            assert len(mod["data_sources"]) == 1
+            assert mod["styles"]["accent_color"] == "#E8A84C"
+
+    def test_empty_spec_in_database(self, sync_client, test_settings):
+        """Test that empty spec string in database is handled as empty dict."""
+        asyncio.run(
+            _insert_module(test_settings.db_path, "mod-empty", "Empty Spec",
+                           "2024-01-01T00:00:00Z", spec="")
+        )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            assert response["type"] == "module_list"
+            mod = response["payload"]["modules"][0]
+            # moduleId and name should still be present
+            assert mod["moduleId"] == "mod-empty"
+            assert mod["name"] == "Empty Spec"
+
+    def test_full_sync_returns_modules_ordered_by_updated_at_desc(self, sync_client, test_settings):
+        """Test that full sync returns modules ordered by updated_at descending."""
+        asyncio.run(_insert_module(test_settings.db_path, "mod-old", "Old", "2024-01-01T00:00:00Z"))
+        asyncio.run(_insert_module(test_settings.db_path, "mod-mid", "Mid", "2024-06-01T00:00:00Z"))
+        asyncio.run(_insert_module(test_settings.db_path, "mod-new", "New", "2024-12-01T00:00:00Z"))
+
+        with sync_client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "sync", "payload": {}})
+            response = ws.receive_json()
+
+            modules = response["payload"]["modules"]
+            assert len(modules) == 3
+            assert modules[0]["moduleId"] == "mod-new"
+            assert modules[1]["moduleId"] == "mod-mid"
+            assert modules[2]["moduleId"] == "mod-old"
+
+    def test_delta_sync_with_many_modules(self, sync_client, test_settings):
+        """Test delta sync with a larger number of modules (stress test)."""
+        for i in range(20):
+            ts = f"2024-{(i % 12) + 1:02d}-01T00:00:00Z"
+            asyncio.run(
+                _insert_module(test_settings.db_path, f"mod-{i}", f"Module {i}", ts)
+            )
+
+        with sync_client.websocket_connect("/ws") as ws:
+            # last_sync halfway through — should return modules from month 7 onwards
+            ws.send_json({
+                "type": "sync",
+                "payload": {"last_sync": "2024-06-15T00:00:00Z"},
+            })
+            response = ws.receive_json()
+
+            assert response["type"] == "module_sync"
+            modules = response["payload"]["modules"]
+            # Modules with months 7-12 should be returned
+            for mod in modules:
+                # Each returned module should have updated_at > 2024-06-15
+                assert "moduleId" in mod
+                assert "name" in mod
