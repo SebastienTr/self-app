@@ -2,17 +2,24 @@
 
 > A mobile app that builds itself entirely through conversation. An AI agent discovers APIs, creates module definitions, fetches data, and sends rendering instructions to the client. One million users should have one million different apps.
 
+<p align="center">
+  <img src="docs/images/twilight-app-states-1.png" alt="Self-App — First Screen, First Conversation, Creation Moment" width="100%">
+</p>
+
 ## Project Status
 
 ```
-[▓░░░░░░░░░░░░░░░░░░░] 1/56 stories done (2%)
+[▓▓▓░░░░░░░░░░░░░░░░░] 4/56 stories done (7%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 18 | 1 | **In Progress** |
+| First Light | 18 | 4 | **In Progress** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
+
+**Current focus:** Epic 1 — Project Bootstrap & Developer Connection
+**Next up:** Story 1.4 — Mobile App Shell & WebSocket Connection
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) and [Sprint Status](_bmad-output/implementation-artifacts/sprint-status.yaml) for details.
 
@@ -106,8 +113,9 @@ These documents define the product vision, architecture, and implementation plan
 | [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) | Visual project roadmap with all phases |
 | [Sprint Status](_bmad-output/implementation-artifacts/sprint-status.yaml) | Current sprint tracking (machine-readable) |
 | [Story 1.1 — Monorepo & Schema](_bmad-output/implementation-artifacts/1-1-initialize-monorepo-and-module-definition-schema.md) | Done |
-| [Story 1.1b — CI Pipeline](_bmad-output/implementation-artifacts/1-1b-ci-pipeline.md) | In progress |
-| [Story 1.2 — Backend Skeleton](_bmad-output/implementation-artifacts/1-2-backend-skeleton-and-single-command-deployment.md) | Next up |
+| [Story 1.1b — CI Pipeline](_bmad-output/implementation-artifacts/1-1b-ci-pipeline.md) | Done |
+| [Story 1.2 — Backend Skeleton](_bmad-output/implementation-artifacts/1-2-backend-skeleton-and-single-command-deployment.md) | Done |
+| [Story 1.3 — LLM Provider Abstraction](_bmad-output/implementation-artifacts/1-3-llm-provider-abstraction-and-byok-configuration.md) | Done |
 
 ## Key Concepts
 
@@ -116,6 +124,27 @@ These documents define the product vision, architecture, and implementation plan
 - **Genome** — A portable, shareable configuration that captures a user's entire app setup (modules, preferences, persona).
 - **Orb** — The visual brand mark representing the AI agent's presence and state.
 - **Metamorphosis** — The interface pattern where the screen transitions from chat-dominant to dashboard-dominant as modules are created.
+
+## Design — Twilight Theme
+
+The app uses the **Twilight** theme: deep navy backgrounds with warm amber accents — like a lantern in the dark. See the full [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep-dive.html) for the interactive exploration.
+
+<p align="center">
+  <img src="docs/images/twilight-app-states-2.png" alt="Honest Failure, Dashboard, Equal-Weight Control" width="100%">
+</p>
+
+**Four theme variants** share the same token structure — only values change:
+
+<p align="center">
+  <img src="docs/images/twilight-themes.png" alt="Theme variants: Twilight, Ink, Moss, Dawn" width="100%">
+</p>
+
+| Theme | Description |
+|-------|------------|
+| **Twilight** (default) | Blue dusk, amber warmth. Magical, nocturnal, intimate. |
+| **Ink** | Monochrome, high-contrast, efficient. For the Flame persona. |
+| **Moss** | Soft greens, natural, calming. For the Tree persona. |
+| **Dawn** | Light mode, warm pastels. Same tokens, inverted luminance. |
 
 ## License
 
