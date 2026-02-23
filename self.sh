@@ -15,13 +15,13 @@ KILL_ONLY=false
 STATUS_ONLY=false
 
 # ── Colors ───────────────────────────────────────────────────────────
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-BOLD='\033[1m'
-NC='\033[0m'
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+BLUE=$'\033[0;34m'
+CYAN=$'\033[0;36m'
+YELLOW=$'\033[1;33m'
+BOLD=$'\033[1m'
+NC=$'\033[0m'
 
 log()     { echo -e "${CYAN}[self.sh]${NC} $*"; }
 log_ok()  { echo -e "${CYAN}[self.sh]${NC} ${GREEN}$*${NC}"; }
@@ -231,10 +231,10 @@ start_backend() {
   log "Starting backend on port $BACKEND_PORT..."
   cd "$ROOT_DIR/apps/backend"
   if [[ -x .venv/bin/uvicorn ]]; then
-    .venv/bin/uvicorn app.main:app --reload --port "$BACKEND_PORT" 2>&1 \
+    .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port "$BACKEND_PORT" 2>&1 \
       | sed -u "s/^/${GREEN}[backend]${NC} /" &
   else
-    UV_CACHE_DIR="$ROOT_DIR/.cache/uv" uv run uvicorn app.main:app --reload --port "$BACKEND_PORT" 2>&1 \
+    UV_CACHE_DIR="$ROOT_DIR/.cache/uv" uv run uvicorn app.main:app --reload --host 0.0.0.0 --port "$BACKEND_PORT" 2>&1 \
       | sed -u "s/^/${GREEN}[backend]${NC} /" &
   fi
   local pid=$!
@@ -271,7 +271,8 @@ start_mobile() {
   fi
 
   log "Starting mobile (Expo)..."
-  pnpm dev:mobile 2>&1 | sed -u "s/^/${BLUE}[mobile]${NC}  /" &
+  # No sed pipe — Expo needs a tty to render the QR code
+  pnpm dev:mobile &
   local pid=$!
   echo "$pid" > "$MOBILE_PID_FILE"
   CHILDREN+=("$pid")
