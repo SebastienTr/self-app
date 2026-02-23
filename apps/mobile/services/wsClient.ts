@@ -121,7 +121,7 @@ function sendAuthMessage(): void {
   }
 
   // Build auth payload — include pairing token if this is a new pairing
-  const payload: Record<string, string> = { token };
+  const payload: { token: string; pairing_token?: string } = { token };
 
   // If authStatus is 'pairing', we're in the initial pairing flow
   // The pairing token was entered by the user — it's different from the session token
