@@ -1,13 +1,13 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23T18:00 | **Updated by:** Bob (SM)
+> **Last updated:** 2026-02-23T18:10 | **Updated by:** Dev Agent (claude-sonnet-4-6)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 2 · Story 2.1 · BACKLOG                              ║
+║  WAVE 2 · Story 2.1 · REVIEW                               ║
 ║  Next milestone: Wave 3 — First Module Test (3.4)           ║
 ╚══════════════════════════════════════════════════════════════╝
 
@@ -16,7 +16,7 @@ TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  10/56 do
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
 W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE
-W2  Chat+Render    ▓▓·▓                        3/4   << ICI
+W2  Chat+Render    ▓▓~▓                        3/4   << ICI
 W3  First Module   ·                           0/1   * VALIDATION
 W4  Backfill       ······                      0/6   * FIRST LIGHT
 W5  MVP Core       ··············              0/14
@@ -26,9 +26,9 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
-E2  Conversation   ····       0/4        ┐
-E3  Creation       ▓▓▓·       3/4  <<    ├ First Light
-E4  Freshness      ···        0/3        ┘
+E2  Conversation   ~···       0/4   <<    ┐
+E3  Creation       ▓▓▓·       3/4         ├ First Light
+E4  Freshness      ···        0/3         ┘
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
 E7  Interaction    ····       0/4  ├ MVP

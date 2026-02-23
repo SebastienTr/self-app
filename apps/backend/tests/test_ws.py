@@ -5,18 +5,23 @@ and protocol compliance.
 
 Uses Starlette's TestClient with websocket_connect for WS testing.
 All tests authenticate before sending messages (auth gate added in story 1.6).
+
+Note: Chat tests use a mocked LLM provider (story 2.1 replaced echo stub with agent.handle_chat).
+The chat flow now sends: status:thinking → chat_stream(done=False) → chat_stream(done=True) → status:idle
 """
 
 import asyncio
 import importlib
 import json
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
+from app.llm.base import LLMResult
 from app.sessions import create_session
 
 
@@ -48,6 +53,17 @@ async def _setup_ws_db(db_path: str, session_token: str = "test-ws-token") -> No
             )"""
         )
         await db.execute(
+            """CREATE TABLE IF NOT EXISTS llm_usage (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                tokens_in INTEGER,
+                tokens_out INTEGER,
+                cost_estimate REAL,
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
         await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
@@ -56,6 +72,23 @@ async def _setup_ws_db(db_path: str, session_token: str = "test-ws-token") -> No
         await db.close()
     # Create a test session for authentication
     await create_session(db_path, session_token)
+
+
+def _make_mock_provider(response_text: str = "Mock response") -> MagicMock:
+    """Create a mock LLM provider that returns a fixed response."""
+    provider = MagicMock()
+    provider.name = "mock-provider"
+    result = LLMResult(
+        content=response_text,
+        provider="mock-provider",
+        model="mock-model",
+        tokens_in=5,
+        tokens_out=10,
+        latency_ms=50,
+        cost_estimate=0.0001,
+    )
+    provider.execute = AsyncMock(return_value=result)
+    return provider
 
 
 # Default test session token used by all WS tests
@@ -69,11 +102,19 @@ def _auth(ws, token: str = _TEST_TOKEN) -> None:
 
 @pytest.fixture
 def client(test_settings, tmp_path):
-    """Create a test client with auth-ready database."""
+    """Create a test client with auth-ready database and mocked LLM provider.
+
+    Patches app.main.get_provider so the WS endpoint uses a mock provider
+    instead of the real Claude CLI (which fails in nested sessions).
+    The patch must be on app.main because main.py does 'from app.llm import get_provider'.
+    """
     asyncio.run(_setup_ws_db(test_settings.db_path, _TEST_TOKEN))
     import app.main as main_mod
     importlib.reload(main_mod)
-    return TestClient(main_mod.app)
+    mock_provider = _make_mock_provider("Test response")
+    # Patch the local name in app.main (the already-imported reference)
+    with patch.object(main_mod, "get_provider", return_value=mock_provider):
+        yield TestClient(main_mod.app)
 
 
 @pytest.fixture
@@ -87,7 +128,9 @@ def sync_client(test_settings, tmp_path):
     # Reload main module to pick up new settings
     import app.main as main_mod
     importlib.reload(main_mod)
-    return TestClient(main_mod.app)
+    mock_provider = _make_mock_provider("Test response")
+    with patch.object(main_mod, "get_provider", return_value=mock_provider):
+        yield TestClient(main_mod.app)
 
 
 async def _insert_module(db_path: str, module_id: str, name: str, updated_at: str,
@@ -121,39 +164,90 @@ class TestWebSocketConnection:
 
 
 class TestChatMessage:
-    """Test chat message type handling."""
+    """Test chat message type handling.
 
-    def test_chat_message_receives_chat_stream_response(self, client):
-        """Test that a chat message receives a chat_stream echo response."""
+    Story 2.1: echo stub replaced by agent.handle_chat().
+    Message sequence: status:thinking → chat_stream(done=False) → chat_stream(done=True) → status:idle
+    """
+
+    def test_chat_message_receives_status_thinking_first(self, client):
+        """First response to chat must be status:thinking."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hello world"}})
             response = ws.receive_json()
 
-            assert response["type"] == "chat_stream"
-            assert response["payload"]["done"] is True
-            assert "Hello world" in response["payload"]["delta"]
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
+
+    def test_chat_message_receives_chat_stream_response(self, client):
+        """Chat must receive a chat_stream response with provider content."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Hello world"}})
+
+            # Consume status:thinking
+            r1 = ws.receive_json()
+            assert r1["type"] == "status"
+
+            # Second response: chat_stream with content
+            r2 = ws.receive_json()
+            assert r2["type"] == "chat_stream"
+            assert r2["payload"]["done"] is False
+            assert r2["payload"]["delta"] == "Test response"
+
+    def test_chat_message_receives_done_signal(self, client):
+        """Chat must receive chat_stream with done:True after content."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
+
+            # Consume status:thinking and chat_stream(done=False)
+            ws.receive_json()  # status:thinking
+            ws.receive_json()  # chat_stream(done=False)
+
+            # Third response: chat_stream with done=True
+            r3 = ws.receive_json()
+            assert r3["type"] == "chat_stream"
+            assert r3["payload"]["done"] is True
+
+    def test_chat_message_ends_with_status_idle(self, client):
+        """Last response to chat must be status:idle."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
+
+            # Consume all 4 messages
+            ws.receive_json()  # status:thinking
+            ws.receive_json()  # chat_stream(done=False)
+            ws.receive_json()  # chat_stream(done=True)
+            r4 = ws.receive_json()  # status:idle
+
+            assert r4["type"] == "status"
+            assert r4["payload"]["state"] == "idle"
 
     def test_chat_message_follows_type_payload_format(self, client):
-        """Test that chat_stream response follows { type, payload } format."""
+        """Test that all chat responses follow { type, payload } format."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Test"}})
-            response = ws.receive_json()
 
+            # Check first response (status:thinking)
+            response = ws.receive_json()
             assert "type" in response
             assert "payload" in response
             assert isinstance(response["payload"], dict)
 
     def test_chat_message_with_empty_message(self, client):
-        """Test chat with empty message field."""
+        """Test chat with empty message field — should still stream a response."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": ""}})
-            response = ws.receive_json()
 
-            assert response["type"] == "chat_stream"
-            assert response["payload"]["done"] is True
+            # Should get status:thinking first
+            r1 = ws.receive_json()
+            assert r1["type"] == "status"
+            assert r1["payload"]["state"] == "thinking"
 
 
 class TestLogMessage:
@@ -323,10 +417,14 @@ class TestMultipleMessages:
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
 
-            # Chat
+            # Chat — now sends status:thinking first, then 3 more messages
             ws.send_json({"type": "chat", "payload": {"message": "Hi"}})
             resp1 = ws.receive_json()
-            assert resp1["type"] == "chat_stream"
+            assert resp1["type"] == "status"  # status:thinking (story 2.1)
+            # Consume remaining chat messages
+            ws.receive_json()  # chat_stream(done=False)
+            ws.receive_json()  # chat_stream(done=True)
+            ws.receive_json()  # status:idle
 
             # Sync
             ws.send_json({"type": "sync", "payload": {"last_sync": ""}})
@@ -355,25 +453,25 @@ class TestEdgeCases:
     """Edge case tests for the WebSocket endpoint."""
 
     def test_empty_payload_in_chat(self, client):
-        """Test chat message with empty payload."""
+        """Test chat message with empty payload — should send status:thinking first."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
-            assert response["payload"]["done"] is True
-            # Empty message key should result in empty echo
-            assert "Echo: " in response["payload"]["delta"]
+            # First response is now status:thinking (story 2.1: echo stub replaced)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_missing_payload_key(self, client):
-        """Test message with no payload key at all."""
+        """Test message with no payload key — treated as empty chat."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat"})
             response = ws.receive_json()
             # payload defaults to {} via msg.get("payload", {})
-            assert response["type"] == "chat_stream"
-            assert response["payload"]["done"] is True
+            # First response is now status:thinking (story 2.1: echo stub replaced)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_auth_type_is_handled(self, client):
         """Test that auth message type is handled (not WS_UNKNOWN_TYPE)."""
@@ -382,7 +480,8 @@ class TestEdgeCases:
             # No error = success. Verify by sending chat.
             ws.send_json({"type": "chat", "payload": {"message": "test"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            # First response is status:thinking (story 2.1)
+            assert response["type"] in ("status", "chat_stream")
 
     def test_auth_reset_type_is_handled(self, client):
         """Test that auth_reset message type is handled (not WS_UNKNOWN_TYPE)."""
@@ -424,26 +523,28 @@ class TestEdgeCases:
             assert response["payload"]["code"] == "WS_UNKNOWN_TYPE"
 
     def test_chat_with_unicode_message(self, client):
-        """Test chat with unicode characters."""
+        """Test chat with unicode characters — first response is status:thinking."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({
                 "type": "chat",
                 "payload": {"message": "Hello! 你好 🌍 café"},
             })
+            # First response is status:thinking (story 2.1: echo stub replaced)
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
-            assert "Hello! 你好 🌍 café" in response["payload"]["delta"]
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_chat_with_very_long_message(self, client):
-        """Test chat with a very long message."""
+        """Test chat with a very long message — first response is status:thinking."""
         long_msg = "A" * 10000
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": long_msg}})
+            # First response is status:thinking (story 2.1: echo stub replaced)
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
-            assert long_msg in response["payload"]["delta"]
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_sync_with_empty_last_sync(self, client):
         """Test sync with empty string last_sync."""
@@ -502,7 +603,7 @@ class TestEdgeCases:
             assert response["type"] == "module_list"
 
     def test_payload_with_null_values(self, client):
-        """Test chat payload with null values in extra fields."""
+        """Test chat payload with null values in extra fields — first response is status:thinking."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({
@@ -510,7 +611,9 @@ class TestEdgeCases:
                 "payload": {"message": "test", "extra": None},
             })
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            # First response is status:thinking (story 2.1: echo stub replaced)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_extra_top_level_fields_ignored(self, client):
         """Test that extra top-level fields don't break message routing."""
@@ -523,7 +626,9 @@ class TestEdgeCases:
                 "version": 2,
             })
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            # First response is status:thinking (story 2.1: echo stub replaced)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_invalid_json_recovery(self, client):
         """Test that invalid JSON doesn't kill the connection — can send valid messages after."""
@@ -537,8 +642,9 @@ class TestEdgeCases:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "after error"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
-            assert "after error" in response["payload"]["delta"]
+            # First response is status:thinking (story 2.1: echo stub replaced)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_multiple_invalid_json_messages(self, client):
         """Test multiple invalid JSON messages in a row."""
@@ -570,27 +676,40 @@ class TestEdgeCases:
             assert "agent_action" in response["payload"]
 
     def test_rapid_messages_all_processed(self, client):
-        """Test that many messages sent rapidly are all processed."""
+        """Test that many messages sent rapidly are all processed.
+
+        Story 2.1: chat now sends 4 messages (thinking, stream, done, idle) per chat.
+        We send 3 chats and verify the first response for each is status:thinking.
+        """
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
-            count = 10
+            # Send 3 chat messages
+            count = 3
             for i in range(count):
                 ws.send_json({"type": "chat", "payload": {"message": f"msg_{i}"}})
 
+            # Verify first response per chat is status:thinking
+            # (4 messages per chat: thinking, stream, done, idle)
             for i in range(count):
-                response = ws.receive_json()
-                assert response["type"] == "chat_stream"
-                assert f"msg_{i}" in response["payload"]["delta"]
+                r = ws.receive_json()
+                assert r["type"] == "status"  # thinking
+                ws.receive_json()  # chat_stream(done=False)
+                ws.receive_json()  # chat_stream(done=True)
+                ws.receive_json()  # status:idle
 
     def test_interleaved_message_types(self, client):
         """Test interleaving different message types."""
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
 
-            # chat
+            # chat — now sends 4 messages
             ws.send_json({"type": "chat", "payload": {"message": "hello"}})
             r1 = ws.receive_json()
-            assert r1["type"] == "chat_stream"
+            # First response is status:thinking (story 2.1)
+            assert r1["type"] == "status"
+            ws.receive_json()  # chat_stream(done=False)
+            ws.receive_json()  # chat_stream(done=True)
+            ws.receive_json()  # status:idle
 
             # unknown
             ws.send_json({"type": "nonexistent", "payload": {}})
@@ -608,11 +727,11 @@ class TestEdgeCases:
             assert r4["type"] == "error"
             assert r4["payload"]["code"] == "WS_INVALID_JSON"
 
-            # chat again
+            # chat again — first response should be status:thinking
             ws.send_json({"type": "chat", "payload": {"message": "still works"}})
             r5 = ws.receive_json()
-            assert r5["type"] == "chat_stream"
-            assert "still works" in r5["payload"]["delta"]
+            assert r5["type"] == "status"
+            assert r5["payload"]["state"] == "thinking"
 
     def test_json_with_numeric_type(self, client):
         """Test message where type is a number instead of string."""
@@ -667,8 +786,9 @@ class TestEdgeCases:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "still alive"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
-            assert "still alive" in response["payload"]["delta"]
+            # First response is status:thinking (story 2.1: echo stub replaced)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
 
 class TestDeltaSync:

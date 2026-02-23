@@ -11,17 +11,23 @@ Covers security and error scenarios not in test_ws_auth.py:
   - Multiple auth attempts on the same connection
   - Auth with empty payload
   - Unknown message types when authenticated
+
+Note: Tests that verify auth success by sending a chat message now expect
+status:thinking as the first response (story 2.1 replaced the echo stub with
+agent.handle_chat). The auth_client fixture mocks the LLM provider.
 """
 
 import asyncio
 import importlib
 import json
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
+from app.llm.base import LLMResult
 from app.sessions import create_pairing_token, create_session, get_session_by_token
 
 
@@ -53,6 +59,17 @@ async def _setup_auth_db(db_path: str) -> None:
             )"""
         )
         await db.execute(
+            """CREATE TABLE IF NOT EXISTS llm_usage (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                tokens_in INTEGER,
+                tokens_out INTEGER,
+                cost_estimate REAL,
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
         await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
@@ -61,13 +78,35 @@ async def _setup_auth_db(db_path: str) -> None:
         await db.close()
 
 
+def _make_mock_provider() -> MagicMock:
+    """Create a mock LLM provider for auth edge tests."""
+    provider = MagicMock()
+    provider.name = "mock-provider"
+    result = LLMResult(
+        content="Auth edge test response",
+        provider="mock-provider",
+        model="mock-model",
+        tokens_in=3,
+        tokens_out=5,
+        latency_ms=10,
+        cost_estimate=0.0,
+    )
+    provider.execute = AsyncMock(return_value=result)
+    return provider
+
+
 @pytest.fixture
 def auth_client(test_settings, tmp_path):
-    """Create a test client with a database ready for auth tests."""
+    """Create a test client with a database ready for auth tests.
+
+    Mocks the LLM provider so chat tests don't call the real Claude CLI.
+    """
     asyncio.run(_setup_auth_db(test_settings.db_path))
     import app.main as main_mod
     importlib.reload(main_mod)
-    return TestClient(main_mod.app)
+    mock_provider = _make_mock_provider()
+    with patch.object(main_mod, "get_provider", return_value=mock_provider):
+        yield TestClient(main_mod.app)
 
 
 def _create_pairing_token(db_path: str) -> str:
@@ -131,9 +170,11 @@ class TestAuthMalformedPayloads:
                 },
             })
             # No error means success — verify by sending a real message
+            # Story 2.1: first response is status:thinking (agent.handle_chat)
             ws.send_json({"type": "chat", "payload": {"message": "hi"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
 
 class TestReAuth:
@@ -148,10 +189,11 @@ class TestReAuth:
             ws.send_json({"type": "auth", "payload": {"token": "same-token"}})
             # Second auth (same token)
             ws.send_json({"type": "auth", "payload": {"token": "same-token"}})
-            # Should still work
+            # Should still work — story 2.1: first response is status:thinking
             ws.send_json({"type": "chat", "payload": {"message": "still working"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_re_auth_with_different_valid_token(self, auth_client, test_settings):
         """Re-authenticating with a different valid token should switch session."""
@@ -163,10 +205,11 @@ class TestReAuth:
             ws.send_json({"type": "auth", "payload": {"token": "token-a"}})
             # Re-auth with token-b
             ws.send_json({"type": "auth", "payload": {"token": "token-b"}})
-            # Should work with new session
+            # Should work with new session — story 2.1: first response is status:thinking
             ws.send_json({"type": "chat", "payload": {"message": "switched"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_re_auth_with_invalid_token_does_not_break_session(self, auth_client, test_settings):
         """Re-authenticating with an invalid token after valid auth should return error
@@ -254,9 +297,11 @@ class TestAuthResetRoundTrip:
             assert response["payload"]["state"] == "idle"
 
             # Connection should still be usable (authenticated within this connection)
+            # Story 2.1: first response is status:thinking (agent.handle_chat)
             ws.send_json({"type": "chat", "payload": {"message": "after reset"}})
             chat_response = ws.receive_json()
-            assert chat_response["type"] == "chat_stream"
+            assert chat_response["type"] == "status"
+            assert chat_response["payload"]["state"] == "thinking"
 
     def test_auth_reset_old_token_no_longer_works_on_new_connection(self, auth_client, test_settings):
         """After auth_reset, the old token is invalidated and cannot be used
@@ -405,10 +450,11 @@ class TestMultipleAuthAttempts:
 
             # Second: valid
             ws.send_json({"type": "auth", "payload": {"token": "valid-retry-token"}})
-            # Should be authenticated now
+            # Should be authenticated now — story 2.1: first response is status:thinking
             ws.send_json({"type": "chat", "payload": {"message": "recovered"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_multiple_failed_auths_do_not_crash(self, auth_client):
         """Sending many failed auth messages should not crash the server."""

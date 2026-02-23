@@ -58,8 +58,8 @@ development_status:
   # Epic 2: Conversational Shell & Agent Identity (⚡ First Light)
   # FRs: FR1, FR2, FR5, FR8, FR29
   # ═══════════════════════════════════════════════════════════════
-  epic-2: backlog
-  2-1-real-time-chat-interface-with-streaming: backlog
+  epic-2: in-progress
+  2-1-real-time-chat-interface-with-streaming: review
   2-2-agent-identity-persistence: backlog
   2-3-persona-preset-selection: backlog
   2-4-contextual-empty-state: backlog

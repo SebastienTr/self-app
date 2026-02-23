@@ -5,13 +5,15 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useModuleStore } from '@/stores/moduleStore';
-import { connect, disconnect, loadPersistedMessages } from '@/services/wsClient';
+import { useChatStore } from '@/stores/chatStore';
+import { connect, disconnect, loadPersistedMessages, send } from '@/services/wsClient';
 import { initLocalDb, getCachedModules } from '@/services/localDb';
 import { getSessionToken, getStoredBackendUrl } from '@/services/auth';
 import { initModuleSync } from '@/services/moduleSync';
+import { initChatSync, cleanupChatSync } from '@/services/chatSync';
 import { logger } from '@/services/logger';
-import { ModuleList } from '@/components/bridge';
-import { PairingScreen } from '@/components/shell';
+import { ModuleList, ChatThread } from '@/components/bridge';
+import { PairingScreen, Orb, ChatInput } from '@/components/shell';
 import { tokens } from '@/constants/tokens';
 import type { ConnectionStatus } from '@/types/ws';
 
@@ -34,6 +36,7 @@ export default function App() {
   const status = useConnectionStore((s) => s.status);
   const moduleCount = useModuleStore((s) => s.modules.size);
   const authStatus = useAuthStore((s) => s.authStatus);
+  const agentStatus = useChatStore((s) => s.agentStatus);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -68,6 +71,9 @@ export default function App() {
       // 5. Register module sync handlers
       initModuleSync();
 
+      // 5b. Register chat sync handlers
+      initChatSync();
+
       setInitialized(true);
 
       const startupDuration = Date.now() - startTime;
@@ -90,14 +96,23 @@ export default function App() {
 
     return () => {
       disconnect();
+      cleanupChatSync();
     };
   }, []);
+
+  /** Handle sending a chat message: add to store + send to backend. */
+  function handleSend(message: string) {
+    useChatStore.getState().addUserMessage(message);
+    send({ type: 'chat', payload: { message } });
+  }
 
   // Show pairing screen if not configured or auth failed
   const showPairing =
     authStatus === 'unconfigured' ||
     authStatus === 'auth_failed' ||
     authStatus === 'pairing';
+
+  const isInputDisabled = agentStatus !== 'idle' || status !== 'connected';
 
   return (
     <View style={styles.container}>
@@ -119,7 +134,22 @@ export default function App() {
             </Text>
           </View>
 
+          {/* Orb: agent state indicator */}
+          <Orb />
+
+          {/* ChatThread: scrollable message list */}
+          {initialized && <ChatThread />}
+
+          {/* ModuleList: SDUI module rendering (Epic 3) */}
           {initialized && <ModuleList />}
+
+          {/* ChatInput: message input at bottom */}
+          {initialized && (
+            <ChatInput
+              onSend={handleSend}
+              disabled={isInputDisabled}
+            />
+          )}
         </>
       )}
 

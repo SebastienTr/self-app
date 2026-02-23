@@ -2,17 +2,23 @@
 
 Tests auth gate, pairing flow, session management, and error handling
 for the WS endpoint authentication layer.
+
+Note: Tests that verify auth success by sending a chat message now expect
+status:thinking as the first response (story 2.1 replaced the echo stub with
+agent.handle_chat). The auth_client fixture mocks the LLM provider.
 """
 
 import asyncio
 import importlib
 import json
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
+from app.llm.base import LLMResult
 from app.sessions import create_pairing_token, create_session, get_session_by_token
 
 
@@ -44,6 +50,17 @@ async def _setup_auth_db(db_path: str) -> None:
             )"""
         )
         await db.execute(
+            """CREATE TABLE IF NOT EXISTS llm_usage (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                tokens_in INTEGER,
+                tokens_out INTEGER,
+                cost_estimate REAL,
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
         await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
@@ -52,13 +69,35 @@ async def _setup_auth_db(db_path: str) -> None:
         await db.close()
 
 
+def _make_mock_provider() -> MagicMock:
+    """Create a mock LLM provider for auth tests."""
+    provider = MagicMock()
+    provider.name = "mock-provider"
+    result = LLMResult(
+        content="Auth test response",
+        provider="mock-provider",
+        model="mock-model",
+        tokens_in=3,
+        tokens_out=5,
+        latency_ms=10,
+        cost_estimate=0.0,
+    )
+    provider.execute = AsyncMock(return_value=result)
+    return provider
+
+
 @pytest.fixture
 def auth_client(test_settings, tmp_path):
-    """Create a test client with a database ready for auth tests."""
+    """Create a test client with a database ready for auth tests.
+
+    Mocks the LLM provider so chat tests don't call the real Claude CLI.
+    """
     asyncio.run(_setup_auth_db(test_settings.db_path))
     import app.main as main_mod
     importlib.reload(main_mod)
-    return TestClient(main_mod.app)
+    mock_provider = _make_mock_provider()
+    with patch.object(main_mod, "get_provider", return_value=mock_provider):
+        yield TestClient(main_mod.app)
 
 
 def _create_pairing_token(db_path: str) -> str:
@@ -130,8 +169,9 @@ class TestAuthWithValidToken:
             # No error response means success — send a real message
             ws.send_json({"type": "chat", "payload": {"message": "hello"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
-            assert "hello" in response["payload"]["delta"]
+            # Story 2.1: first response is now status:thinking (not chat_stream)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
     def test_auth_with_valid_token_updates_last_seen(self, auth_client, test_settings):
         """Test that successful auth updates the last_seen timestamp."""
@@ -186,7 +226,9 @@ class TestAuthWithPairingToken:
             # No error = success. Verify by sending a real message.
             ws.send_json({"type": "chat", "payload": {"message": "paired!"}})
             response = ws.receive_json()
-            assert response["type"] == "chat_stream"
+            # Story 2.1: first response is status:thinking (not chat_stream)
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "thinking"
 
         # Verify real session was created
         session = _get_session(test_settings.db_path, session_token)
@@ -270,16 +312,18 @@ class TestReconnection:
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "persist-token"}})
             ws.send_json({"type": "chat", "payload": {"message": "first"}})
+            # Story 2.1: first response is status:thinking (agent.handle_chat)
             r = ws.receive_json()
-            assert r["type"] == "chat_stream"
+            assert r["type"] == "status"
+            assert r["payload"]["state"] == "thinking"
 
         # Second connection (simulates reconnect)
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "persist-token"}})
             ws.send_json({"type": "chat", "payload": {"message": "second"}})
             r = ws.receive_json()
-            assert r["type"] == "chat_stream"
-            assert "second" in r["payload"]["delta"]
+            assert r["type"] == "status"
+            assert r["payload"]["state"] == "thinking"
 
     def test_reconnect_updates_last_seen(self, auth_client, test_settings):
         """Test that reconnection updates last_seen timestamp."""

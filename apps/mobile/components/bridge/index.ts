@@ -9,3 +9,4 @@ export { ErrorBoundary } from './ErrorBoundary';
 export { FreshnessIndicator } from './FreshnessIndicator';
 export { ModuleCard } from './ModuleCard';
 export { ModuleList } from './ModuleList';
+export { ChatThread } from './ChatThread';

@@ -18,8 +18,9 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from app.config import settings
+from app import agent
 from app.db import get_connection, get_schema_version, run_migrations
-from app.llm import get_available_providers
+from app.llm import get_available_providers, get_provider
 from app.logging import log, setup_logging
 from app.sessions import (
     consume_pairing_token,
@@ -338,6 +339,9 @@ async def websocket_endpoint(ws: WebSocket):
     authenticated = False
     session_id: str | None = None
 
+    # Obtain LLM provider once per WebSocket connection (not per message)
+    provider = get_provider()
+
     try:
         while True:
             raw = await ws.receive_text()
@@ -395,14 +399,9 @@ async def websocket_endpoint(ws: WebSocket):
                 if new_sid:
                     session_id = new_sid
             elif msg_type == "chat":
-                # Stub: echo back as chat_stream (full agent integration later)
-                await ws.send_json({
-                    "type": "chat_stream",
-                    "payload": {
-                        "delta": f"Echo: {payload.get('message', '')}",
-                        "done": True,
-                    },
-                })
+                await agent.handle_chat(
+                    ws, payload.get("message", ""), provider, settings.db_path
+                )
             elif msg_type == "log":
                 log.info("mobile_log", mobile_payload=payload)
             elif msg_type == "sync":
