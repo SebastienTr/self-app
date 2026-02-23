@@ -5,7 +5,7 @@
   "scripts": {
     "dev:mobile": "pnpm --filter mobile expo start",
     "dev:backend": "cd apps/backend && ( [ -x .venv/bin/uvicorn ] && .venv/bin/uvicorn app.main:app --reload || UV_CACHE_DIR=../../.cache/uv uv run uvicorn app.main:app --reload )",
-    "dev": "node scripts/dev.mjs",
+    "dev": "./self.sh",
     "schema:generate": "pnpm --filter @self-app/module-schema generate",
     "test:schema": "pnpm --filter @self-app/module-schema test --runInBand",
     "test:mobile": "pnpm test:schema",

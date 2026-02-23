@@ -40,6 +40,9 @@ CLAUDE.md
 # BMAD outputs (generated artifacts)
 #_bmad-output/
 
+# Dev runtime
+.run/
+
 # Logs
 *.log
 npm-debug.log*
@@ -74,3 +77,6 @@ venv/
 
 # Data directory (user data, not tracked)
 data/
+
+# BMAD TEA module (contains third-party references)
+_bmad/tea/

@@ -47,6 +47,7 @@ self-app/
 │   └── module-schema/      # Zod schema (shared contract)
 ├── scripts/                # Dev tooling
 ├── .github/workflows/      # CI pipeline
+├── self.sh                 # Dev service launcher (kill, start, health check)
 ├── pnpm-workspace.yaml
 └── tsconfig.json
 ```
@@ -69,19 +70,23 @@ pnpm install
 # Install Python dependencies
 cd apps/backend && uv sync && cd ../..
 
-# Generate shared schema (Zod → JSON Schema → Pydantic)
-pnpm schema:generate
-
-# Start both mobile and backend in parallel
-pnpm dev
+# Start all services (generates schema, kills zombies, launches backend + mobile)
+./self.sh
 ```
 
-### Individual Services
+### Dev Script (`self.sh`)
 
 ```bash
-pnpm dev:mobile       # Expo dev server
-pnpm dev:backend      # FastAPI with hot reload
+./self.sh              # Kill zombies + start all services
+./self.sh --backend    # Backend only
+./self.sh --mobile     # Mobile only
+./self.sh --kill       # Kill all services and exit
+./self.sh --status     # Show what's running
+./self.sh --no-schema  # Skip schema:generate
+./self.sh --port 3000  # Override backend port (default: 8000)
 ```
+
+The script handles zombie process cleanup (3-layer: PID files → port scan → pattern match), lock files to prevent double launches, health checks, and graceful shutdown on Ctrl+C.
 
 ### Tests
 
