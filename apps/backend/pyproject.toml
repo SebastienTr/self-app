@@ -6,6 +6,10 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.131.0",
     "pydantic>=2.12.0",
+    "pydantic-settings>=2.8.0",
+    "aiosqlite>=0.21.0",
+    "structlog>=25.1.0",
+    "httpx>=0.28.0",
     "module-schema",
 ]
 
@@ -25,8 +29,9 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
+select = ["E", "F", "I", "N", "W", "UP", "ASYNC"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]

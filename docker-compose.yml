@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: ./apps/backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SELF_LLM_PROVIDER=claude-cli
+      - SELF_LOG_LEVEL=info
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

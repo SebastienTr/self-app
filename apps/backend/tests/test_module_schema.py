@@ -1,7 +1,6 @@
 import pytest
+from module_schema.models import Model, Template, Type
 from pydantic import ValidationError
-
-from module_schema.models import DataSource, Model, Status, Template, Type
 
 
 def _valid_spec(**overrides):
