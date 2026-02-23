@@ -34,12 +34,51 @@ Parse `{sprint_status}` to find the epic containing `{story_key}`:
 
 ### 3. Update Roadmap
 
-Read and update `{roadmap_file}`:
+Read `{sprint_status}` to compute current counts, then read and update `{roadmap_file}`:
+
+**3a. Update Dashboard (top of file)**
+
+The dashboard is a fenced code block after `## Dashboard`. Update ALL of these:
+
+1. **Banner box** — update wave, story key, and status to reflect the NEXT story to work on:
+   ```
+   ║  WAVE {n} · Story {next_key} · {next_status}              ║
+   ║  Next milestone: ...                                       ║
+   ```
+
+2. **TOTAL progress bar** — recalculate `{done}/{total}` from sprint-status and regenerate:
+   ```
+   TOTAL   [▓▓▓░░░░░░░░░░░░░░░░░]  {done}/56 done ({pct}%)
+   ```
+   Use 20 chars: `▓` = round(done/56 * 20), rest `░`
+
+3. **Wave bars** — each char = 1 story. For each wave, rebuild the bar from sprint-status:
+   - `▓` = done, `~` = review or in-progress, `·` = backlog/ready-for-dev
+   - Update the count `{done}/{total}`
+   - Mark current wave with `<< ICI`
+
+4. **Epic heatmap** — same char logic as waves, rebuild each epic line:
+   - `▓` = done, `~` = review or in-progress, `·` = backlog/ready-for-dev
+   - Update counts, mark active epic with `<<`
+
+**3b. Update Story Detail Sections (below dashboard)**
+
 - Update the story line: change `[ ]` or `[>]` or `[~]` to `[x]`
-- Update the progress bar and stats (stories done count)
 - Update the "Current focus" line to the next in-progress or backlog story
 - Update the "Last updated" date
 - If epic completed, update epic status display
+
+**3c. Update README Project Status**
+
+Read `{project-root}/README.md` and update the `## Project Status` section:
+
+1. **Progress bar** — same formula as roadmap TOTAL bar (20 chars, `▓`/`░`)
+2. **Phase table** — update the "Done" column for each phase:
+   - First Light = epics 1–4
+   - MVP = epics 5–10
+   - Growth = epics 11–15
+   - Set Status to `**In Progress**` if any story is in-progress/review, `**Done**` if all done
+3. **Current focus / Next up** — match the roadmap's current wave and next story
 
 ### 4. Git Summary
 
