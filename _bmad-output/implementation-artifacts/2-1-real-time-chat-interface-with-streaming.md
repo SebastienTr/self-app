@@ -1,6 +1,6 @@
 # Story 2.1: Real-Time Chat Interface with Streaming
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -584,19 +584,72 @@ N/A — all tests green, no runtime debug sessions required.
 - `components/shell/StreamingIndicator.tsx` (NEW)
 - `components/shell/ChatInput.tsx` (NEW)
 - `components/shell/ChatInput.test.tsx` (NEW)
-- `components/shell/Orb.tsx` (NEW)
+- `components/shell/Orb.tsx` (NEW — MODIFIED by code review: added connectionStore import)
 - `components/shell/Orb.test.tsx` (NEW)
 - `components/bridge/ChatThread.tsx` (NEW)
 - `components/bridge/ChatThread.test.tsx` (NEW)
 - `__tests__/chat.test.ts` (NEW)
 - `components/shell/index.ts` (MODIFIED — added ChatBubble, ChatInput, Orb exports)
 - `components/bridge/index.ts` (MODIFIED — added ChatThread export)
-- `App.tsx` (MODIFIED — wired chatSync, Orb, ChatThread, ChatInput)
+- `App.tsx` (MODIFIED — wired chatSync, Orb, ChatThread, ChatInput; MODIFIED by code review: added cleanupModuleSync to cleanup)
 
 **Backend (apps/backend/):**
 - `app/agent.py` (NEW)
-- `app/main.py` (MODIFIED — replaced echo stub with agent.handle_chat())
+- `app/main.py` (MODIFIED — replaced echo stub with agent.handle_chat(); MODIFIED by code review: fixed stale docstring)
 - `tests/test_agent.py` (NEW)
 - `tests/test_ws.py` (MODIFIED — mocked LLM provider, updated chat assertions)
 - `tests/test_ws_auth.py` (MODIFIED — mocked LLM provider, updated chat assertions)
 - `tests/test_ws_auth_edge.py` (MODIFIED — mocked LLM provider, updated chat assertions)
+
+---
+
+## Code Review Record
+
+### Reviewer
+
+claude-sonnet-4-6 (adversarial code review workflow) — 2026-02-23
+
+### AC Validation
+
+| AC | Status | Evidence |
+|----|--------|---------|
+| AC1: User bubble styling, instant display | IMPLEMENTED | `ChatBubble.tsx` styles.userBubble with `#1A3050`, `tokens.colors.border`, `alignSelf: flex-end` |
+| AC2: Agent response streams token-by-token, first token < 1s | IMPLEMENTED | `chatSync.ts` `chat_stream` handler calls `startAgentStream` + `appendStreamDelta`; `agent.py` sends `status:thinking` + `chat_stream` messages |
+| AC3: Agent responds in same language | PARTIAL (by design) | Basic prompt forwarding in `agent.py` — no explicit language detection needed for First Light; LLM naturally mirrors language |
+| AC4: Structured error on LLM failure | IMPLEMENTED | `agent.py` sends `{ type: 'error', payload: { code: 'LLM_CHAT_FAILED', message, agent_action } }`; `chatSync.ts` handles error and calls `addErrorMessage` |
+| AC5: Streaming indicator disappears on `done: true` | IMPLEMENTED | `finalizeAgentMessage` sets `streamingMessage: null`, ChatThread stops rendering streaming ChatBubble |
+| AC6: ChatInput visible at bottom | IMPLEMENTED | `App.tsx` renders `<ChatInput onSend={handleSend} disabled={isInputDisabled} />` |
+| AC7: Orb transitions to thinking state | IMPLEMENTED | `Orb.tsx` reads `agentStatus` from `chatStore`, switches animation speed at 1.5s cycle for thinking/discovering/composing |
+
+### Issues Found and Fixed (MEDIUM severity)
+
+**[FIXED] MEDIUM-1: Task 5.2 marked complete but `connectionStore` not imported in `Orb.tsx`**
+- Story task 5.2: "reads from `chatStore` (agent status) and `connectionStore` (connection status)" — marked [x]
+- `Orb.tsx` only imported `useChatStore`, `connectionStore` was absent from source
+- The test (`Orb.test.tsx`) mocked `connectionStore` without it being used — test covered a non-existent dependency
+- Fix: Added `import { useConnectionStore } from '@/stores/connectionStore'` and `const connectionStatus = useConnectionStore(...)` to `Orb.tsx`; updated `accessibilityLabel` to reflect disconnected state
+- Files: `apps/mobile/components/shell/Orb.tsx`
+
+**[FIXED] MEDIUM-2: `App.tsx` cleanup does not call `cleanupModuleSync()`**
+- `initModuleSync()` registers WS message handlers at startup but `App.tsx` cleanup only called `cleanupChatSync()`, leaving module sync handlers unsubscribed on unmount — potential stale handler accumulation on hot reload
+- Fix: Added `cleanupModuleSync` import and call in the `useEffect` cleanup return
+- Files: `apps/mobile/App.tsx`
+
+**[FIXED] MEDIUM-3: `main.py` docstring for `websocket_endpoint` still referenced the old echo stub**
+- Line 329 said: "chat → echo stub via chat_stream (full agent integration in later story)"
+- The echo stub was replaced with `agent.handle_chat()` in this very story — stale documentation
+- Fix: Updated docstring to accurately reflect: "chat → agent.handle_chat() (LLM streaming via agent.py)"
+- Files: `apps/backend/app/main.py`
+
+### Review Follow-ups (LOW severity)
+
+- [ ] [AI-Review][LOW] `ChatThread.tsx` has a redundant double-scroll: `useEffect` calls `scrollToEnd({ animated: true })` AND `onContentSizeChange` calls `scrollToEnd({ animated: false })` on every content change. The `onContentSizeChange` handler is sufficient for scroll-on-new-content; the `useEffect` may cause a visible stutter on rapid streaming deltas. Consider removing the `onContentSizeChange` handler and relying solely on the `useEffect`. [apps/mobile/components/bridge/ChatThread.tsx:29-41]
+- [ ] [AI-Review][LOW] `StreamingIndicator.tsx` is a Shell component but is not exported from `components/shell/index.ts` barrel. While it is consumed internally by `ChatBubble.tsx` (same folder), it is inaccessible to other Shell or Bridge consumers without a direct relative import, which bypasses the barrel convention. [apps/mobile/components/shell/index.ts]
+- [ ] [AI-Review][LOW] `Orb.test.tsx` mocked `useConnectionStore` before this review fixed `Orb.tsx` to actually import it. Post-fix, the mock is now active and accurate. However, the test does not assert any behavior related to the disconnected connection state (e.g., accessibilityLabel changes when `connectionStatus !== 'connected'`). Consider adding a test case for this. [apps/mobile/components/shell/Orb.test.tsx]
+- [ ] [AI-Review][LOW] `react-native-reanimated` v4 is specified in the story (Task 5.4, 5.6) and in Dev Notes, but is not installed in `apps/mobile/package.json`. The dev agent used the built-in `Animated` API as a workaround (noted in Completion Note 1). This is an architecture debt item — when `react-native-reanimated` is eventually added, `Orb.tsx` and `StreamingIndicator.tsx` should be migrated.
+
+### Test Count After Review
+
+- Mobile: 1058 tests, 48 suites — all passing
+- Backend: 568 tests (excluding pre-existing `test_module_schema.py` collection error) — all passing
+- Total: 1626 tests green

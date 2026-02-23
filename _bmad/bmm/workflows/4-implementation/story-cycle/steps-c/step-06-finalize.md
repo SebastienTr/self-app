@@ -80,12 +80,84 @@ Read `{project-root}/README.md` and update the `## Project Status` section:
    - Set Status to `**In Progress**` if any story is in-progress/review, `**Done**` if all done
 3. **Current focus / Next up** — match the roadmap's current wave and next story
 
-### 4. Git Summary
+### 4. Commit and Push
+
+**4a. Stage all changes**
+
+Run `git add -A` to stage all modified, new, and deleted files.
+
+**4b. Create commit**
+
+Run `git commit` with a message following this format:
+```
+feat({story_key}): {one-line summary of what the story implemented}
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+```
+
+Use the story title and acceptance criteria to write a concise, meaningful commit message.
+
+**4c. Push to remote**
+
+Run `git push`. If the current branch has no upstream, use `git push -u origin HEAD`.
+
+**4d. If push fails:**
+- Display the error to the user
+- PAUSE and ask how to proceed (force push, pull --rebase first, or abort)
+
+### 5. Wait for GitHub Actions CI
+
+**5a. Get the CI run**
+
+After push, wait 10 seconds for GitHub Actions to pick up the commit, then run:
+```
+gh run list --branch $(git branch --show-current) --limit 1 --json databaseId,status,conclusion,name
+```
+
+If no run found, wait another 15 seconds and retry once.
+
+**5b. Monitor CI status**
+
+Poll the CI run until completion:
+```
+gh run watch {run_id} --exit-status
+```
+
+This blocks until the run completes and exits non-zero if the run fails.
+
+**5c. Handle CI result**
+
+**CI passes:**
+- Display: `✅ CI passed — all checks green`
+- Proceed to step 6
+
+**CI fails:**
+- Run `gh run view {run_id} --log-failed` to get failure details
+- Display the failure summary to the user
+
+```
+## ❌ CI Failed
+
+**Run:** {run_id}
+**Failed step:** {failed_step_name}
+
+{failure log excerpt}
+
+[F] Fix and re-push  [I] Ignore (proceed anyway)  [A] Abort
+```
+
+ALWAYS pause on CI failure regardless of execution mode.
+
+- **F:** Analyze the failure, fix the issue, then re-run from step 4 (commit + push + CI again)
+- **I:** Proceed to step 6 with a warning in the cycle summary
+- **A:** Exit workflow
+
+### 6. Git Summary
 
 Run `git diff --stat {baseline_commit}..HEAD` to get change stats.
 Run `git log --oneline {baseline_commit}..HEAD` to get commit list.
 
-### 5. Display Cycle Summary
+### 7. Display Cycle Summary
 
 ```
 ## Story Cycle Complete
@@ -94,6 +166,7 @@ Run `git log --oneline {baseline_commit}..HEAD` to get commit list.
 **Status:** Done
 **Mode:** {execution_mode}
 **Retry loops:** {retry_count}/{max_retry_loops}
+**CI:** {pass/fail/skipped}
 
 ### Phases Executed
 1. {Create Story — completed/skipped}
@@ -101,6 +174,7 @@ Run `git log --oneline {baseline_commit}..HEAD` to get commit list.
 3. Test — completed
 4. Code Review — completed {with N retries if retry_count > 0}
 5. Finalize — completed
+6. Commit + Push + CI — {passed/failed/skipped}
 
 ### Git Stats
 {git diff stat output}
@@ -112,13 +186,19 @@ Run `git log --oneline {baseline_commit}..HEAD` to get commit list.
 
 ---
 
+### How to Test
+
+{Write 2-5 lines explaining the simplest way for the user to manually verify the feature. Be concrete: which command to run, which URL to open, what to tap in the app, what result to expect. Base this on the story's acceptance criteria and the files that were changed. No fluff — just the fastest path to "it works".}
+
+---
+
 **Next Actions:**
 [N] Run next story cycle
 [S] Show sprint status
 [E] Exit
 ```
 
-### 6. Handle User Response
+### 8. Handle User Response
 
 - **N:** Determine next eligible story, then restart from step 1 with new `{story_key}`
   - **NEXT:** Read fully and follow: `{project-root}/_bmad/bmm/workflows/4-implementation/story-cycle/steps-c/step-01-init.md`

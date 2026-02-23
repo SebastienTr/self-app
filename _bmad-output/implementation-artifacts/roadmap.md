@@ -1,23 +1,23 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23T18:10 | **Updated by:** Dev Agent (claude-sonnet-4-6)
+> **Last updated:** 2026-02-23T18:45 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 2 · Story 2.1 · REVIEW                               ║
+║  WAVE 3 · Story 3.4 · BACKLOG                              ║
 ║  Next milestone: Wave 3 — First Module Test (3.4)           ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  10/56 done (18%)
+TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  11/56 done (20%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
 W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE
-W2  Chat+Render    ▓▓~▓                        3/4   << ICI
-W3  First Module   ·                           0/1   * VALIDATION
+W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
+W3  First Module   ·                           0/1   << ICI * VALIDATION
 W4  Backfill       ······                      0/6   * FIRST LIGHT
 W5  MVP Core       ··············              0/14
 W6  Security       ·····                       0/5   * MVP DONE
@@ -26,7 +26,7 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
-E2  Conversation   ~···       0/4   <<    ┐
+E2  Conversation   ▓···       1/4   <<    ┐
 E3  Creation       ▓▓▓·       3/4         ├ First Light
 E4  Freshness      ···        0/3         ┘
 E5  Memory         ···        0/3  ┐
@@ -110,7 +110,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 **Chain B — Conversation** (needs 1.4 + 1.6):
 
-- `[ ]` **2.1** — Real-Time Chat Interface with Streaming
+- `[x]` **2.1** — Real-Time Chat Interface with Streaming
 
 > Recommended order: `3.1 → 3.2 → 2.1 → 3.3` (start rendering while auth settles)
 

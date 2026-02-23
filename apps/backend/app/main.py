@@ -326,7 +326,7 @@ async def websocket_endpoint(ws: WebSocket):
       - auth_reset is only available when authenticated
 
     Message routing (after auth):
-      - chat → echo stub via chat_stream (full agent integration in later story)
+      - chat → agent.handle_chat() (LLM streaming via agent.py)
       - log  → forward to backend structured logging
       - sync → delta sync (module_list for full, module_sync for delta)
       - auth_reset → invalidate session, create new one

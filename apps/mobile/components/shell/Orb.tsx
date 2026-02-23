@@ -22,11 +22,13 @@ import { AccessibilityInfo, Animated, StyleSheet, View } from 'react-native';
 
 import { tokens } from '@/constants/tokens';
 import { useChatStore } from '@/stores/chatStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 
 const ORB_SIZE = 60;
 
 export function Orb() {
   const agentStatus = useChatStore((s) => s.agentStatus);
+  const connectionStatus = useConnectionStore((s) => s.status);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -92,7 +94,11 @@ export function Orb() {
   }, [agentStatus, reduceMotion, scaleAnim]);
 
   const accessibilityLabel =
-    agentStatus === 'idle' ? 'Agent status: idle' : `Agent status: ${agentStatus}`;
+    connectionStatus !== 'connected'
+      ? `Agent status: idle (${connectionStatus})`
+      : agentStatus === 'idle'
+        ? 'Agent status: idle'
+        : `Agent status: ${agentStatus}`;
 
   if (reduceMotion) {
     return (

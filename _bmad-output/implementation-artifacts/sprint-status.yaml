@@ -59,7 +59,7 @@ development_status:
   # FRs: FR1, FR2, FR5, FR8, FR29
   # ═══════════════════════════════════════════════════════════════
   epic-2: in-progress
-  2-1-real-time-chat-interface-with-streaming: review
+  2-1-real-time-chat-interface-with-streaming: done
   2-2-agent-identity-persistence: backlog
   2-3-persona-preset-selection: backlog
   2-4-contextual-empty-state: backlog

@@ -9,7 +9,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { connect, disconnect, loadPersistedMessages, send } from '@/services/wsClient';
 import { initLocalDb, getCachedModules } from '@/services/localDb';
 import { getSessionToken, getStoredBackendUrl } from '@/services/auth';
-import { initModuleSync } from '@/services/moduleSync';
+import { initModuleSync, cleanupModuleSync } from '@/services/moduleSync';
 import { initChatSync, cleanupChatSync } from '@/services/chatSync';
 import { logger } from '@/services/logger';
 import { ModuleList, ChatThread } from '@/components/bridge';
@@ -96,6 +96,7 @@ export default function App() {
 
     return () => {
       disconnect();
+      cleanupModuleSync();
       cleanupChatSync();
     };
   }, []);
