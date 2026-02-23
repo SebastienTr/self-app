@@ -1,10 +1,8 @@
-# Self-App
+# Self
 
 [![CI](https://github.com/SebastienTr/self-app/actions/workflows/ci.yml/badge.svg)](https://github.com/SebastienTr/self-app/actions/workflows/ci.yml)
 
-> A mobile app that builds itself entirely through conversation. One million users should have one million different apps.
-
-Most apps decide what you can do before you even open them. Self-App starts empty — a blank canvas with an AI agent. You describe what you need in plain language, and the agent discovers APIs, creates modules, fetches live data, and renders a native UI on the fly. Over time, the app learns your habits and evolves into something uniquely yours.
+**An AI-powered mobile app that starts empty and builds itself entirely through conversation.**
 
 <p align="center">
   <img src="docs/images/01-empty-state.png" alt="Empty state — What's on your mind?" width="200">
@@ -15,25 +13,19 @@ Most apps decide what you can do before you even open them. Self-App starts empt
 </p>
 
 <p align="center">
-  <em>Empty state &rarr; First conversation &rarr; Dashboard with 18+ modules</em>
+  <em>Empty state &rarr; First conversation &rarr; Your personal dashboard</em>
 </p>
 
-## Project Status
+## What Self Does
 
-```
-[▓▓▓▓░░░░░░░░░░░░░░░░] 10/56 stories done (18%)
-```
+Most apps decide what you can do before you open them. Self flips that:
 
-| Phase | Stories | Done | Status |
-|-------|---------|------|--------|
-| First Light | 18 | 10 | **In Progress** |
-| MVP | 19 | 0 | Backlog |
-| Growth | 19 | 0 | Backlog |
-
-**Current focus:** Wave 2 — Chat + Primitives (Epics 2 & 3)
-**Next up:** Story 2.1 — Real-Time Chat Interface with Streaming
-
-See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
+- **You talk, it builds.** Describe a need in plain language — the agent discovers APIs, creates a native UI module, and fetches live data. No templates, no app store.
+- **Server-Driven UI.** The backend sends structured rendering instructions; the mobile client renders real native components. No webviews.
+- **Morphing interface.** The screen transforms from full-chat (0 modules) to a module dashboard (9+) — one continuous experience, no navigation.
+- **4-layer memory.** Identity file (SOUL.md) + key-value store + vector episodes + semantic dedup. The agent remembers context without repeating itself.
+- **5 LLM providers, one abstraction.** Claude, DeepSeek, Codex — swap with a single config change. CLI mode uses Claude Max at $0.
+- **Self-hosted, BYOK, open source.** SQLite database + SOUL.md plain text file. Backup = copy a folder. Runs on a Raspberry Pi.
 
 ## Tech Stack
 
@@ -43,23 +35,40 @@ See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for det
 | Backend | Python 3.14 / FastAPI |
 | Database | SQLite (WAL) + sqlite-vec |
 | State | Zustand |
-| Schema | Zod (source of truth) → JSON Schema → Pydantic |
-| Protocol | WebSocket-only |
+| Schema | Zod → TypeScript types → Pydantic models |
+| Protocol | WebSocket-only (15 typed messages) |
 | Monorepo | pnpm workspaces |
 | CI | GitHub Actions |
+
+## Project Status
+
+```
+[▓▓▓▓░░░░░░░░░░░░░░░░] 10/56 stories (18%)
+```
+
+| Phase | Stories | Done | Status |
+|-------|---------|------|--------|
+| First Light | 18 | 10 | **In Progress** |
+| MVP | 19 | 0 | Backlog |
+| Growth | 19 | 0 | Backlog |
+
+**Current focus:** Story 2.1 — Real-Time Chat Interface with Streaming
+**Next milestone:** Story 3.4 — First Module Creation End-to-End
+
+See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
 
 ## Project Structure
 
 ```
 self-app/
 ├── apps/
-│   ├── mobile/             # Expo React Native app
-│   └── backend/            # Python FastAPI server
+│   ├── mobile/             # Expo React Native thin client
+│   └── backend/            # Python FastAPI + agent orchestration
 ├── packages/
-│   └── module-schema/      # Zod schema (shared contract)
+│   └── module-schema/      # Zod schema (single source of truth)
 ├── scripts/                # Dev tooling
 ├── .github/workflows/      # CI pipeline
-├── self.sh                 # Dev service launcher (kill, start, health check)
+├── self.sh                 # Dev service launcher
 ├── pnpm-workspace.yaml
 └── tsconfig.json
 ```
@@ -99,8 +108,6 @@ cd apps/backend && uv sync && cd ../..
 ./self.sh --port 3000  # Override backend port (default: 8000)
 ```
 
-The script handles zombie process cleanup (3-layer: PID files → port scan → pattern match), lock files to prevent double launches, health checks, and graceful shutdown on Ctrl+C.
-
 ### Tests
 
 ```bash
@@ -110,19 +117,28 @@ pnpm test:backend     # Python backend tests only
 pnpm typecheck        # TypeScript type checking
 ```
 
+## Architecture Highlights
+
+**3-layer component model** — Shell (static chrome: Orb, ChatInput) → Bridge (lifecycle wrappers: ErrorBoundary, CreationCeremony) → SDUI (pure stateless primitives: props in, JSX out).
+
+**Constrained composition** — The agent doesn't assemble UI freely. It picks from validated layout templates (`metric-dashboard`, `data-card`, `simple-list`…), preventing rendering chaos while preserving autonomy.
+
+**Schema contract** — Zod defines the module spec once. TypeScript types are inferred at compile time, Pydantic models are auto-generated. `snake_case` on the wire, `camelCase` in TS, converted at a single boundary.
+
+**Cost protection** — Rate limit (10 LLM calls/min), circuit breaker (3 failures → 60s cooldown), budget alerts ($5/day default). Every call logged in `llm_usage` table.
+
 ## Key Concepts
 
-- **Module** — A self-contained UI unit (weather widget, task list, etc.) created autonomously by the AI agent based on user conversation.
-- **SDUI** — Server-Driven UI. The backend sends rendering instructions; the mobile app renders them using a primitive registry.
-- **Genome** — A portable, shareable configuration that captures a user's entire app setup (modules, preferences, persona).
-- **Orb** — The visual brand mark representing the AI agent's presence and state.
-- **Metamorphosis** — The interface pattern where the screen transitions from chat-dominant to dashboard-dominant as modules are created.
+- **Module** — A self-contained UI unit (weather widget, task list, budget tracker…) created by the agent from conversation.
+- **SDUI** — Server-Driven UI. The backend sends rendering instructions; the mobile app maps them to native components via a primitive registry.
+- **Orb** — The amber pulsing circle that embodies the agent's presence and state.
+- **Metamorphosis** — The interface morph from chat-dominant (0 modules) to dashboard-dominant (9+ modules).
+- **Genome** — A portable config capturing an entire app setup — modules, preferences, persona — shareable between users.
+- **Persona** — Three agent archetypes (Flame / Tree / Star) that change behavior, autonomy level, and communication style — not just cosmetics.
 
 ## Design — Twilight Theme
 
-The app uses the **Twilight** theme: deep navy backgrounds with warm amber accents — like a lantern in the dark. See the full [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep-dive.html) for the interactive exploration.
-
-**Four theme variants** share the same token structure — only values change:
+Deep navy backgrounds with warm amber accents — like a lantern in the dark.
 
 <p align="center">
   <img src="docs/images/twilight-themes.png" alt="Theme variants: Twilight, Ink, Moss, Dawn" width="100%">
@@ -131,9 +147,11 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 | Theme | Description |
 |-------|------------|
 | **Twilight** (default) | Blue dusk, amber warmth. Magical, nocturnal, intimate. |
-| **Ink** | Monochrome, high-contrast, efficient. For the Flame persona. |
-| **Moss** | Soft greens, natural, calming. For the Tree persona. |
+| **Ink** | Monochrome, high-contrast, efficient. |
+| **Moss** | Soft greens, natural, calming. |
 | **Dawn** | Light mode, warm pastels. Same tokens, inverted luminance. |
+
+See the [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep-dive.html) for the interactive exploration.
 
 ## Documentation
 
@@ -172,7 +190,7 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 
 </details>
 
-This project uses the [BMAD](https://github.com/bmad-sim/bmad-ecosystem) framework for AI-driven product development — the `_bmad/` directory contains workflow definitions and agent configurations.
+Built with the [BMAD](https://github.com/bmad-sim/bmad-ecosystem) framework for AI-driven product development.
 
 ## License
 
