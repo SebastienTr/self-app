@@ -486,6 +486,74 @@ export const getPrimitive = (type: string) =>
 
 Adding a primitive = one new file + one registry entry. Nothing else changes.
 
+**Composition Template Registry:**
+
+The agent selects from pre-validated layout templates — not free-form primitive assembly. Each template is a JSON structure combining primitives with guaranteed visual quality (see UX Constrained Composition Principle).
+
+```typescript
+// components/sdui/templates.ts
+const templateRegistry: Record<string, TemplateDefinition> = {
+  'metric-dashboard': {
+    layout: { type: 'grid', columns: 2 },
+    slots: [
+      { role: 'metrics', primitive: 'metric', min: 2, max: 4 },
+      { role: 'chart', primitive: 'chart', optional: true },
+    ],
+  },
+  'data-card': {
+    layout: { type: 'stack', direction: 'vertical' },
+    slots: [
+      { role: 'header', primitive: 'text', variant: 'title' },
+      { role: 'content', primitive: ['list', 'table'], min: 1, max: 1 },
+    ],
+  },
+  'map-with-details': {
+    layout: { type: 'stack', direction: 'vertical' },
+    slots: [
+      { role: 'map', primitive: 'map', min: 1, max: 1 },
+      { role: 'details', primitive: 'card', min: 1, max: 4 },
+    ],
+  },
+  'timeline-view': {
+    layout: { type: 'stack', direction: 'vertical' },
+    slots: [
+      { role: 'timeline', primitive: 'timeline', min: 1, max: 1 },
+      { role: 'summary', primitive: 'metric', optional: true, max: 3 },
+    ],
+  },
+  'simple-list': {
+    layout: { type: 'stack', direction: 'vertical' },
+    slots: [
+      { role: 'list', primitive: 'list', min: 1, max: 1 },
+    ],
+  },
+  'chart-with-context': {
+    layout: { type: 'stack', direction: 'vertical' },
+    slots: [
+      { role: 'chart', primitive: 'chart', min: 1, max: 1 },
+      { role: 'explanation', primitive: 'text', optional: true },
+      { role: 'metrics', primitive: 'metric', optional: true, max: 3 },
+    ],
+  },
+};
+
+export const getTemplate = (name: string) =>
+  templateRegistry[name] ?? templateRegistry['data-card']; // fallback
+```
+
+**Template selection flow:**
+
+1. Agent creates module definition with `template: "metric-dashboard"` field
+2. Renderer looks up `templateRegistry["metric-dashboard"]`
+3. Template defines slot structure — renderer fills slots with primitive data from module spec
+4. Unknown template name → fallback to `data-card` (most generic)
+5. Adding a template = one registry entry. Renderer discovers templates dynamically.
+
+**First Light templates (3):** `metric-dashboard`, `data-card`, `simple-list`
+**MVP adds (3):** `map-with-details`, `timeline-view`, `chart-with-context`
+
+The module-schema Zod definition includes `template: z.string()` as a required field in the module spec. The agent outputs the template name; all layout, spacing, and responsive behavior is handled by the template definition.
+
 **Module lifecycle state machine:**
 
 ```
@@ -519,6 +587,113 @@ Normalise sur 0-100. Recalcul : cron backend quotidien a 03:00 UTC. Pas d'appel 
 - **Render errors:** `ErrorBoundary` React autour de chaque module → affiche une fallback card avec diagnostic info. L'erreur de rendu ne crash que le module concerne.
 - **Data errors:** `try/catch` dans `ModuleCard` autour du data fetching → etat "Donnees indisponibles" affiche dans la card sans crash du composant.
 - Le `moduleStore` distingue ces deux cas via `dataStatus: 'ok' | 'stale' | 'error'`, distinct du lifecycle `status`. Un module peut etre `status: 'active'` mais `dataStatus: 'error'` si son dernier refresh a echoue.
+
+### Phase Morphing Interface (Direction D)
+
+The app is a single screen (`index.tsx`) that transforms from pure chat to dashboard-dominant based on module count. No tabs, no navigation — the chat input is always at the bottom, the content above it evolves.
+
+**Phase thresholds and layout rules:**
+
+| Phase | Module Count | Layout | Chat Behavior |
+|-------|-------------|--------|---------------|
+| **Phase 0** | 0 | Full-screen: Orb + greeting + prompt chips + ChatInput | Primary interface — everything is conversation |
+| **Phase 1** | 1-3 | Conversation + inline module cards in chat flow | Modules appear within conversation, persist above |
+| **Phase 2** | 4-8 | ModuleZone (70%) + ChatZone (30%) + StatusLine | Conversation compresses — modules are the content |
+| **Phase 3** | 9+ | StatusLine + module grid (80%) + ChatInput as command bar (20%) | Chat is a command bar — quick refinements and requests |
+
+**Implementation pattern:**
+
+```typescript
+// layout/PhaseController.tsx
+type LayoutPhase = 0 | 1 | 2 | 3;
+
+const getPhase = (moduleCount: number): LayoutPhase => {
+  if (moduleCount === 0) return 0;
+  if (moduleCount <= 3) return 1;
+  if (moduleCount <= 8) return 2;
+  return 3;
+};
+```
+
+`PhaseController` is a pure function of `moduleStore.modules.length`. The `index.tsx` screen renders different layout compositions based on the current phase. Transitions are bidirectional — deleting modules can move from Phase 3 back to Phase 2.
+
+**Transition strategy:** Phase changes use `LayoutAnimation.configureNext()` (React Native built-in) for smooth, imperceptible resizing. No animated transitions between phases — the layout quietly reshapes. When `Reduce Motion` is enabled, layout changes are instant (no animation).
+
+**StatusLine component (Phase 2+):**
+
+Contextual greeting + system status bar appearing above the module zone. Content: time-aware greeting ("Good morning {user_name}"), connection status indicator, module count. Component: `layout/StatusLine.tsx`. Hidden in Phase 0-1, visible from Phase 2.
+
+**Data freshness indicators per module:**
+
+| Data Age | Visual Indicator |
+|----------|-----------------|
+| < 1 hour | None (implicitly fresh) |
+| 1h - 24h | Caption "Updated 3h ago" under module title |
+| > 24h | `warning` Badge "Stale", data slightly dimmed |
+| API unreachable | `textSecondary` Badge "Offline" + last known data |
+
+### V1 Design Tokens (Twilight Theme)
+
+V1 ships one theme (Twilight). Token swapping for additional themes (Ink, Moss, Dawn) is deferred to P1. All visual constants are defined in a single token file (`constants/tokens.ts`).
+
+```typescript
+// constants/tokens.ts
+export const tokens = {
+  colors: {
+    background: '#0C1420',      // Deep navy — night sky canvas
+    surface: '#101C2C',          // Cards, modules — subtle depth
+    surfaceElevated: '#162436',  // Input fields, active cards
+    border: '#1E2E44',           // Card borders, dividers
+    text: '#E4ECF4',             // Primary text — cool white
+    textSecondary: '#7899BB',    // Labels, captions — 4.8:1 contrast
+    accent: '#E8A84C',           // Amber — primary actions, agent presence
+    accentSubtle: '#12203A',     // Chip backgrounds, hover states
+    success: '#5CB8A0',          // Teal — positive states
+    warning: '#E8C84C',          // Lantern yellow — caution
+    error: '#CC5F5F',            // Ember red — errors
+    info: '#6B8ECC',             // Steel blue — informational
+    agentGlow: 'rgba(232, 168, 76, 0.15)', // Creation glow
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  typography: {
+    title: { fontSize: 22, fontWeight: '700' as const },
+    subtitle: { fontSize: 17, fontWeight: '600' as const },
+    body: { fontSize: 15, fontWeight: '400' as const },
+    caption: { fontSize: 13, fontWeight: '400' as const },
+    metric: { fontSize: 28, fontWeight: '700' as const },
+    metricUnit: { fontSize: 15, fontWeight: '400' as const },
+  },
+  radii: {
+    sm: 4,
+    md: 8,
+    lg: 16,
+  },
+  shadows: {
+    card: { shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+    elevated: { shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  },
+  animation: {
+    orbIdle: { duration: 4000 },      // 4s ease-in-out pulse
+    orbCreating: { duration: 1500 },   // 1.5s fast pulse
+    breathe: { duration: 6000 },       // 6s ambient breathing
+    fadeIn: { duration: 400 },         // Module/message appearance
+    shimmer: { duration: 2000 },       // Creation ceremony progress
+    chipDismiss: { duration: 300 },    // Prompt chips fade
+  },
+} as const;
+```
+
+Typography uses system fonts (SF Pro on iOS, Roboto on Android) via React Native defaults — no custom font loading. All text respects Dynamic Type / Android font scale (NFR30). All animation tokens resolve to `{ duration: 0 }` when `AccessibilityInfo.isReduceMotionEnabled` is true.
+
+### SDUI Accessibility Contract
+
+Every module spec MUST include an `accessibleLabel` field (string) for screen reader compatibility (NFR31). This field is required in the Zod schema (`packages/module-schema/src/moduleSpec.ts`). The agent generates this label describing the module's content and purpose (e.g., "Marine weather forecast showing wind and wave conditions for Audierne to Belle-Île"). Each SDUI primitive must also accept optional `accessibleLabel` and `accessibleRole` props for its interactive elements. Touch targets minimum: 44×44pt iOS / 48×48dp Android (NFR33).
 
 ### LLM Provider Architecture
 
@@ -998,7 +1173,14 @@ self-app/
 │   │   │       ├── TablePrimitive.tsx
 │   │   │       ├── TablePrimitive.test.tsx
 │   │   │       ├── UnknownPrimitive.tsx
+│   │   │       ├── templates.ts     # Composition template registry
 │   │   │       └── index.ts
+│   │   ├── layout/                  # Phase morphing system
+│   │   │   ├── PhaseController.tsx  # Phase threshold logic + transitions
+│   │   │   ├── StatusLine.tsx       # Contextual greeting + system status (Phase 2+)
+│   │   │   ├── ChatZone.tsx         # Chat area with phase-aware sizing
+│   │   │   ├── ModuleZone.tsx       # Module display area (inline → feed → grid)
+│   │   │   └── index.ts
 │   │   ├── services/                 # Singletons
 │   │   │   ├── logger.ts             # Structured JSON → WS to backend
 │   │   │   ├── wsClient.ts           # WebSocket + reconnection + message queue

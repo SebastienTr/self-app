@@ -28,6 +28,7 @@ Thumbs.db
 # Claude Code
 .claude/
 CLAUDE.md
+!/CLAUDE.md
 
 # BMAD outputs (generated artifacts)
 #_bmad-output/

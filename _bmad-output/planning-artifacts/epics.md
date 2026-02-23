@@ -208,8 +208,8 @@ This document provides the complete epic and story breakdown for self-app, decom
 
 - Direction D morphing interface: single screen that transforms from chat-dominant (0 modules) to dashboard-dominant (9+ modules) with imperceptible transitions
 - Metamorphosis thresholds: Phase 0 (0 modules), Phase 1 (1-3), Phase 2 (4-8), Phase 3 (9+) — bidirectional
-- Twilight theme as default (deep navy #0C1420 + amber #E8A84C) with 3 additional themes (Ink, Moss, Dawn) for V1
-- Theme selection during onboarding alongside persona selection
+- Twilight theme as default (deep navy #0C1420 + amber #E8A84C) — V1 ships Twilight only; additional themes (Ink, Moss, Dawn) deferred to P1 via token swapping
+- Theme selection deferred to P1 — V1 onboarding includes persona selection only
 - Orb as brand mark: amber pulsing circle communicating agent state (4s rest, 1.5s creating, static settled)
 - Creation Ceremony: multi-step animation (ambient shift → orb pulse → progress steps → module slide-in)
 - 3-layer component architecture: Shell (static) / Bridge (lifecycle-aware) / SDUI (pure primitives)
@@ -412,7 +412,27 @@ So that I have type-safe contracts between mobile and backend from day one.
 **Given** a module definition object
 **When** it is validated against the Zod schema
 **Then** it validates successfully for valid specs and rejects invalid specs with descriptive errors
-**And** the schema includes at minimum: module name, type, data sources (array), layout template, refresh interval, and schema_version (FR11)
+**And** the schema includes at minimum: module name, type, data sources (array), layout template, refresh interval, schema_version, and accessibleLabel (FR11, NFR31)
+
+### Story 1.1b: CI Pipeline *(Enabler)*
+
+As a developer,
+I want a CI pipeline that validates code quality on every push,
+So that regressions are caught before merging.
+
+**Acceptance Criteria:**
+
+**Given** a push to any branch
+**When** the CI pipeline runs
+**Then** it executes: TypeScript type checking (`tsc --noEmit`), Python tests (`pytest`), and JavaScript tests (`pnpm test`)
+
+**Given** any CI check fails
+**When** a PR is opened
+**Then** the PR is blocked from merging until all checks pass
+
+**Given** the CI configuration
+**When** inspected
+**Then** it uses the `.github/workflows/ci.yml` file defined in the architecture
 
 ### Story 1.2: Backend Skeleton & Single-Command Deployment
 
@@ -630,6 +650,10 @@ So that I know what to do on first use. (FR8)
 **When** the user sees prompt suggestion chips
 **Then** 3-4 contextual conversation starters are shown (chips: #12203A bg, amber border, 16px radius)
 **And** chips are personalized to the selected persona
+
+**Given** the user has "Reduce Motion" system setting enabled
+**When** the empty state is displayed
+**Then** the orb shows a static amber glow (no pulse animation) and ambient breathing resolves to a fixed opacity
 
 **Given** the user does nothing for 15 seconds on the first screen
 **When** the nudge timer triggers
@@ -960,13 +984,9 @@ So that the app feels personalized from the first moment. (FR6)
 **When** the user selects one
 **Then** the agent adapts its communication style and proactivity level immediately (FR6)
 
-**Given** theme selection
-**When** presented
-**Then** the user can choose between Twilight (default), Ink, Moss, and Dawn themes
-
-**Given** the selections
+**Given** the selection
 **When** confirmed
-**Then** the app applies the chosen persona and theme persistently
+**Then** the app applies the chosen persona persistently and uses the Twilight theme (V1 ships one theme; additional themes deferred to P1)
 
 ### Story 6.3: Creation Ceremony Animation *(UX Req: Creation Ceremony)*
 
@@ -1404,6 +1424,10 @@ So that my dashboard reflects my priorities and mental model. (FR20, FR22)
 **Given** the dashboard in different layout phases (Phase 1-3)
 **When** reorganized
 **Then** the layout adapts to the current morphing phase
+
+**Given** "Reduce Motion" system setting is enabled
+**When** modules are added, removed, or phases transition
+**Then** layout changes are instant (no animated transitions)
 
 ---
 
