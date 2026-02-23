@@ -60,10 +60,11 @@ describe('Chat Integration', () => {
       messages: [],
     };
 
-    mockGetState.mockReturnValue(mockStore as ReturnType<typeof useChatStore.getState>);
+    mockGetState.mockReturnValue(mockStore as unknown as ReturnType<typeof useChatStore.getState>);
 
     // Capture handlers registered by initChatSync
-    mockOnMessage.mockImplementation((type: string, handler: (msg: unknown) => void) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockOnMessage.mockImplementation((type: any, handler: any) => {
       if (type === 'chat_stream') chatStreamHandler = handler;
       if (type === 'status') statusHandler = handler;
       if (type === 'error') errorHandler = handler;

@@ -46,7 +46,8 @@ describe('chatSync', () => {
     unsubFns = [];
 
     // Mock onMessage to capture handlers and return unsubscribe functions
-    mockOnMessage.mockImplementation((type: string, handler: (msg: unknown) => void) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockOnMessage.mockImplementation((type: any, handler: any) => {
       handlers.set(type, handler);
       const unsub = jest.fn();
       unsubFns.push(unsub);
@@ -64,7 +65,7 @@ describe('chatSync', () => {
       agentStatus: 'idle',
     };
 
-    mockGetState.mockReturnValue(mockStore as ReturnType<typeof useChatStore.getState>);
+    mockGetState.mockReturnValue(mockStore as unknown as ReturnType<typeof useChatStore.getState>);
   });
 
   afterEach(() => {

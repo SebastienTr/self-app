@@ -25,7 +25,7 @@ export interface ChatMessage {
 // AgentStatus = AgentState (same type, reused from ws.ts)
 export type AgentStatus = AgentState;
 
-interface ChatStore {
+export interface ChatStore {
   // State (nouns)
   messages: ChatMessage[];
   streamingMessage: string | null;

@@ -15,10 +15,15 @@ jest.mock('@/stores/chatStore', () => ({
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { useChatStore } from '@/stores/chatStore';
+import { useChatStore, type ChatStore } from '@/stores/chatStore';
 import { ChatThread } from './ChatThread';
 
 const mockUseChatStore = useChatStore as jest.MockedFunction<typeof useChatStore>;
+
+/** Helper to build a partial store state for selector-based mocking */
+function makeState(partial: Partial<ChatStore>): ChatStore {
+  return partial as unknown as ChatStore;
+}
 
 describe('ChatThread', () => {
   afterEach(() => {
@@ -27,25 +32,17 @@ describe('ChatThread', () => {
 
   describe('empty state', () => {
     it('renders without crashing when no messages', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(makeState({ messages: [], streamingMessage: null }))
+      );
 
       expect(() => render(<ChatThread />)).not.toThrow();
     });
 
     it('has conversation thread accessibility label', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(makeState({ messages: [], streamingMessage: null }))
+      );
 
       const { getByLabelText } = render(<ChatThread />);
       expect(getByLabelText('Conversation thread')).toBeTruthy();
@@ -54,66 +51,69 @@ describe('ChatThread', () => {
 
   describe('with messages', () => {
     it('renders user messages', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [
-            {
-              id: '1',
-              role: 'user',
-              content: 'Hello agent',
-              timestamp: '2026-01-01T00:00:00.000Z',
-            },
-          ],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(
+          makeState({
+            messages: [
+              {
+                id: '1',
+                role: 'user',
+                content: 'Hello agent',
+                timestamp: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+            streamingMessage: null,
+          })
+        )
+      );
 
       const { getByText } = render(<ChatThread />);
       expect(getByText('Hello agent')).toBeTruthy();
     });
 
     it('renders agent messages', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [
-            {
-              id: '2',
-              role: 'agent',
-              content: 'I can help you',
-              timestamp: '2026-01-01T00:00:00.000Z',
-            },
-          ],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(
+          makeState({
+            messages: [
+              {
+                id: '2',
+                role: 'agent',
+                content: 'I can help you',
+                timestamp: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+            streamingMessage: null,
+          })
+        )
+      );
 
       const { getByText } = render(<ChatThread />);
       expect(getByText('I can help you')).toBeTruthy();
     });
 
     it('renders multiple messages in order', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [
-            {
-              id: '1',
-              role: 'user',
-              content: 'First message',
-              timestamp: '2026-01-01T00:00:00.000Z',
-            },
-            {
-              id: '2',
-              role: 'agent',
-              content: 'Second message',
-              timestamp: '2026-01-01T00:00:01.000Z',
-            },
-          ],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(
+          makeState({
+            messages: [
+              {
+                id: '1',
+                role: 'user',
+                content: 'First message',
+                timestamp: '2026-01-01T00:00:00.000Z',
+              },
+              {
+                id: '2',
+                role: 'agent',
+                content: 'Second message',
+                timestamp: '2026-01-01T00:00:01.000Z',
+              },
+            ],
+            streamingMessage: null,
+          })
+        )
+      );
 
       const { getByText } = render(<ChatThread />);
       expect(getByText('First message')).toBeTruthy();
@@ -121,21 +121,22 @@ describe('ChatThread', () => {
     });
 
     it('renders error messages', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [
-            {
-              id: '3',
-              role: 'agent',
-              content: 'Something went wrong',
-              timestamp: '2026-01-01T00:00:00.000Z',
-              isError: true,
-            },
-          ],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(
+          makeState({
+            messages: [
+              {
+                id: '3',
+                role: 'agent',
+                content: 'Something went wrong',
+                timestamp: '2026-01-01T00:00:00.000Z',
+                isError: true,
+              },
+            ],
+            streamingMessage: null,
+          })
+        )
+      );
 
       const { getByText } = render(<ChatThread />);
       expect(getByText('Something went wrong')).toBeTruthy();
@@ -144,39 +145,27 @@ describe('ChatThread', () => {
 
   describe('streaming state', () => {
     it('renders streaming bubble when streamingMessage is not null', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [],
-          streamingMessage: 'Partial response...',
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(makeState({ messages: [], streamingMessage: 'Partial response...' }))
+      );
 
       const { getByText } = render(<ChatThread />);
       expect(getByText('Partial response...')).toBeTruthy();
     });
 
     it('renders streaming indicator in streaming bubble', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [],
-          streamingMessage: 'Streaming...',
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(makeState({ messages: [], streamingMessage: 'Streaming...' }))
+      );
 
       const { getByTestId } = render(<ChatThread />);
       expect(getByTestId('streaming-indicator')).toBeTruthy();
     });
 
     it('does not render streaming bubble when streamingMessage is null', () => {
-      mockUseChatStore.mockImplementation((selector: (state: unknown) => unknown) => {
-        const state = {
-          messages: [],
-          streamingMessage: null,
-        };
-        return selector(state);
-      });
+      mockUseChatStore.mockImplementation((selector) =>
+        selector(makeState({ messages: [], streamingMessage: null }))
+      );
 
       const { queryByTestId } = render(<ChatThread />);
       expect(queryByTestId('streaming-indicator')).toBeNull();
