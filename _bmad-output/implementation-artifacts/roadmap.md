@@ -18,33 +18,33 @@
 ## Project Progress
 
 ```
-[▓▓░░░░░░░░░░░░░░░░░░] 3/56 stories done (5%)
+[▓▓▓░░░░░░░░░░░░░░░░░] 4/56 stories done (7%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| ⚡ First Light | 18 | 3 | **In Progress** |
+| ⚡ First Light | 18 | 4 | **In Progress** |
 | 🚀 MVP | 19 | 0 | Backlog |
 | 📈 Growth | 19 | 0 | Backlog |
 
 **Current focus:** Epic 1 — Project Bootstrap & Developer Connection
-**Next up:** Story 1.3 (LLM Provider Abstraction & BYOK Configuration)
+**Next up:** Story 1.4 (Mobile App Shell & WebSocket Connection)
 
 ---
 
 ## Phase 1 — First Light ⚡
 
 > Foundation: monorepo, backend, mobile shell, chat interface, SDUI primitives, data refresh
-> 18 stories | 3 done
+> 18 stories | 4 done
 
 ### Epic 1: Project Bootstrap & Developer Connection `in-progress`
 
-> 3/7 done | FRs: FR36, FR39, FR49, FR55–58
+> 4/7 done | FRs: FR36, FR39, FR49, FR55–58
 
 - `[x]` **1.1** — Initialize Monorepo & Module Definition Schema
 - `[x]` **1.1b** — CI Pipeline
 - `[x]` **1.2** — Backend Skeleton & Single-Command Deployment
-- `[ ]` **1.3** — LLM Provider Abstraction & BYOK Configuration
+- `[x]` **1.3** — LLM Provider Abstraction & BYOK Configuration
 - `[ ]` **1.4** — Mobile App Shell & WebSocket Connection
 - `[ ]` **1.5** — Offline Message Queue & Cached Data Rendering
 - `[ ]` **1.6** — Session Authentication & Mobile-Backend Pairing

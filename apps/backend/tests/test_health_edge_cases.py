@@ -59,10 +59,12 @@ class TestHealthHttpMethods:
 class TestHealthResponseStructure:
     """Test the exact structure and types of the /health response."""
 
-    async def test_response_has_exactly_four_keys(self, client):
+    async def test_response_has_expected_keys(self, client):
         response = await client.get("/health")
         data = response.json()
-        assert set(data.keys()) == {"status", "schema_version", "migrations_applied", "uptime"}
+        assert set(data.keys()) == {
+            "status", "schema_version", "migrations_applied", "uptime", "providers"
+        }
 
     async def test_response_content_type_is_json(self, client):
         response = await client.get("/health")

@@ -12,6 +12,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.db import get_connection, get_schema_version, run_migrations
+from app.llm import get_available_providers
 from app.logging import log, setup_logging
 
 # Module-level state populated during lifespan
@@ -72,11 +73,13 @@ app = FastAPI(title="self-app backend", version="0.1.0", lifespan=lifespan)
 
 @app.get("/health")
 async def health():
-    """Health check endpoint returning system status information."""
+    """Health check endpoint returning system status and provider information."""
     uptime = time.monotonic() - _state["start_time"]
+    providers = await get_available_providers()
     return {
         "status": "ok",
         "schema_version": _state["schema_version"],
         "migrations_applied": _state["migrations_applied"],
         "uptime": round(uptime, 1),
+        "providers": providers,
     }
