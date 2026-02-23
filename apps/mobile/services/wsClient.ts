@@ -12,6 +12,7 @@
  * Architecture boundary: wsClient is the ONLY module that touches WebSocket.
  */
 
+import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import type { WSMessage, WSMessageType } from '@/types/ws';
 import { toCamel } from '@/utils/toCamel';
@@ -37,6 +38,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let intentionalDisconnect = false;
 let currentUrl = '';
 let isReconnect = false;
+let pairingTokenForAuth: string | null = null;
 
 type MessageHandler = (msg: WSMessage) => void;
 const handlers = new Map<WSMessageType, Set<MessageHandler>>();
@@ -104,6 +106,39 @@ function scheduleReconnect(): void {
   }, delay);
 }
 
+// --- Send auth message ---
+
+function sendAuthMessage(): void {
+  const authStore = useAuthStore.getState();
+  const token = authStore.sessionToken;
+  const backendUrl = authStore.backendUrl;
+
+  if (!token) {
+    logger.warning('ws', 'auth_no_token', {
+      agent_action: 'No session token available. Cannot authenticate.',
+    });
+    return;
+  }
+
+  // Build auth payload — include pairing token if this is a new pairing
+  const payload: Record<string, string> = { token };
+
+  // If authStatus is 'pairing', we're in the initial pairing flow
+  // The pairing token was entered by the user — it's different from the session token
+  // We need to pass it as pairing_token in the auth message
+  // The pairing token is stored temporarily in a closure from the PairingScreen
+  // For pairing flow: session token + pairing token are sent together
+  // For reconnect: only session token is sent
+  if (pairingTokenForAuth) {
+    payload.pairing_token = pairingTokenForAuth;
+    pairingTokenForAuth = null; // Consume it after use
+  }
+
+  const authMsg: WSMessage = { type: 'auth', payload };
+  sendImmediate(authMsg);
+  logger.info('ws', 'auth_sent', { has_pairing_token: !!payload.pairing_token });
+}
+
 // --- Internal connect ---
 
 function doConnect(url: string): void {
@@ -116,10 +151,13 @@ function doConnect(url: string): void {
     store.resetReconnectAttempts();
     logger.info('ws', 'connect', { url, reconnect: isReconnect });
 
-    // Flush pending messages first (FIFO order)
+    // 1. Send auth message FIRST (before any other messages)
+    sendAuthMessage();
+
+    // 2. Flush pending messages (FIFO order)
     flushPendingMessages();
 
-    // Send sync message only on reconnect (not first connect)
+    // 3. Send sync message on reconnect (not first connect)
     if (isReconnect) {
       sendSyncOnReconnect();
     }
@@ -157,6 +195,39 @@ function doConnect(url: string): void {
 
       logger.debug('ws', 'message_received', { type: msgType });
 
+      // Check for auth errors and update auth state
+      if (msgType === 'error' && payload) {
+        const code = (payload as Record<string, unknown>).code as string;
+        if (code === 'AUTH_INVALID_TOKEN' || code === 'AUTH_REQUIRED') {
+          const authStore = useAuthStore.getState();
+          authStore.setAuthStatus('auth_failed');
+          authStore.setPairingError(
+            (payload as Record<string, unknown>).message as string ||
+            'Authentication failed'
+          );
+          logger.error('ws', 'auth_error', { code });
+        } else if (code === 'AUTH_PAIRING_FAILED') {
+          const authStore = useAuthStore.getState();
+          authStore.setAuthStatus('auth_failed');
+          authStore.setPairingError(
+            (payload as Record<string, unknown>).message as string ||
+            'Pairing failed'
+          );
+          logger.error('ws', 'pairing_failed', { code });
+        }
+      }
+
+      // Detect successful auth (no error after auth message = success)
+      // If we get a non-error message while in 'pairing' or 'authenticating', auth succeeded
+      if (
+        msgType !== 'error' &&
+        (useAuthStore.getState().authStatus === 'pairing' ||
+          useAuthStore.getState().authStatus === 'authenticating')
+      ) {
+        useAuthStore.getState().setAuthStatus('authenticated');
+        logger.info('ws', 'auth_success_inferred');
+      }
+
       // Route to registered handlers
       const typeHandlers = handlers.get(msgType);
       if (typeHandlers) {
@@ -177,8 +248,9 @@ function doConnect(url: string): void {
 
 /**
  * Open a WebSocket connection to the given URL.
+ * If pairingToken is provided, it will be included in the first auth message.
  */
-export function connect(url: string): void {
+export function connect(url: string, pairingToken?: string): void {
   // Clean up any existing connection before opening a new one
   if (ws) {
     ws.onclose = null;
@@ -196,6 +268,7 @@ export function connect(url: string): void {
   intentionalDisconnect = false;
   isReconnect = false;
   currentUrl = url;
+  pairingTokenForAuth = pairingToken ?? null;
   useConnectionStore.getState().setStatus('connecting');
   doConnect(url);
 }

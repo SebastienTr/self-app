@@ -21,17 +21,17 @@ Most apps decide what you can do before you even open them. Self-App starts empt
 ## Project Status
 
 ```
-[▓▓░░░░░░░░░░░░░░░░░░] 6/56 stories done (11%)
+[▓▓▓░░░░░░░░░░░░░░░░░] 9/56 stories done (16%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 18 | 6 | **In Progress** |
+| First Light | 18 | 9 | **In Progress** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
-**Current focus:** Epic 1 — Project Bootstrap & Developer Connection
-**Next up:** Story 1.6 — Session Authentication & Mobile-Backend Pairing
+**Current focus:** Wave 2 — Chat + Primitives (Epics 2 & 3)
+**Next up:** Story 2.1 — Real-Time Chat Interface with Streaming
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
 
@@ -95,6 +95,7 @@ cd apps/backend && uv sync && cd ../..
 ./self.sh --kill       # Kill all services and exit
 ./self.sh --status     # Show what's running
 ./self.sh --no-schema  # Skip schema:generate
+./self.sh --reset      # Purge backend DB (forces re-pairing on mobile)
 ./self.sh --port 3000  # Override backend port (default: 8000)
 ```
 
@@ -164,6 +165,9 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 | [Story 1.3 — LLM Provider Abstraction](_bmad-output/implementation-artifacts/1-3-llm-provider-abstraction-and-byok-configuration.md) | Done |
 | [Story 1.4 — Mobile App Shell & WebSocket](_bmad-output/implementation-artifacts/1-4-mobile-app-shell-and-websocket-connection.md) | Done |
 | [Story 1.5 — Offline Message Queue & Cached Data](_bmad-output/implementation-artifacts/1-5-offline-message-queue-and-cached-data-rendering.md) | Done |
+| [Story 1.6 — Session Auth & Pairing](_bmad-output/implementation-artifacts/1-6-session-authentication-and-mobile-backend-pairing.md) | Done |
+| [Story 3.1 — SDUI Primitive Registry](_bmad-output/implementation-artifacts/3-1-sdui-primitive-registry-and-simple-primitives.md) | Done |
+| [Story 3.2 — Composite Primitives](_bmad-output/implementation-artifacts/3-2-composite-primitives-card-list.md) | Done |
 
 </details>
 

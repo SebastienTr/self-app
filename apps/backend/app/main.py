@@ -3,11 +3,14 @@
 Handles startup (logging, migrations, DB health) and shutdown.
 The WebSocket endpoint (/ws) is the ONLY communication channel
 between mobile and backend (except /health for Docker healthcheck).
+
+Authentication: All WS messages require prior auth via { type: "auth" } message.
 """
 
 import json
 import os
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,6 +21,16 @@ from app.config import settings
 from app.db import get_connection, get_schema_version, run_migrations
 from app.llm import get_available_providers
 from app.logging import log, setup_logging
+from app.sessions import (
+    consume_pairing_token,
+    create_pairing_token,
+    create_session,
+    get_existing_pairing_token,
+    get_session_by_token,
+    has_active_client_session,
+    invalidate_session,
+    update_session_last_seen,
+)
 
 # Module-level state populated during lifespan
 _state: dict = {
@@ -33,6 +46,41 @@ _MIGRATIONS_DIR = str(Path(__file__).parent.parent / "migrations")
 def _ensure_data_dir() -> None:
     """Create the data directory if it does not exist."""
     os.makedirs(settings.self_data_dir, exist_ok=True)
+
+
+async def _ensure_pairing_token() -> None:
+    """Ensure a pairing token exists after startup.
+
+    If a pairing token already exists (from a previous startup), reuse it.
+    Otherwise generate a new one and log it clearly.
+    Also writes the token to .run/pairing-token for dev tooling (self.sh).
+    """
+    existing = await get_existing_pairing_token(settings.db_path)
+    if existing:
+        token = existing
+        log.info(
+            "pairing_token_available",
+            token=token,
+            agent_action="Copy this token to pair your mobile app",
+        )
+    else:
+        token = await create_pairing_token(settings.db_path)
+        log.info(
+            "pairing_token_generated",
+            token=token,
+            agent_action="Copy this token to pair your mobile app",
+        )
+
+    # Write token to .run/ for self.sh dev tooling (best-effort, non-critical)
+    try:
+        run_dir = Path(__file__).parent.parent.parent.parent / ".run"
+        run_dir.mkdir(exist_ok=True)
+        (run_dir / "pairing-token").write_text(token)
+    except OSError:
+        log.warning(
+            "pairing_token_file_write_failed",
+            agent_action="Could not write pairing token to .run/pairing-token. Manual copy from logs still works.",
+        )
 
 
 @asynccontextmanager
@@ -59,6 +107,9 @@ async def lifespan(app: FastAPI):
     finally:
         await db.close()
 
+    # Generate pairing token for mobile app connection
+    await _ensure_pairing_token()
+
     log.info(
         "backend_started",
         migrations_applied=migrations_applied,
@@ -80,12 +131,25 @@ async def health():
     """Health check endpoint returning system status and provider information."""
     uptime = time.monotonic() - _state["start_time"]
     providers = await get_available_providers()
+
+    # Check if pairing is available (pairing token exists and no recent active session)
+    pairing_available = False
+    try:
+        existing = await get_existing_pairing_token(settings.db_path)
+        if existing:
+            active = await has_active_client_session(settings.db_path)
+            pairing_available = not active
+    except Exception:
+        # If DB isn't set up yet (e.g., in tests without migrations), default to False
+        pass
+
     return {
         "status": "ok",
         "schema_version": _state["schema_version"],
         "migrations_applied": _state["migrations_applied"],
         "uptime": round(uptime, 1),
         "providers": providers,
+        "pairing_available": pairing_available,
     }
 
 
@@ -174,19 +238,105 @@ async def _handle_sync(ws: WebSocket, payload: dict) -> None:
         await db.close()
 
 
+async def _handle_auth(
+    ws: WebSocket, payload: dict
+) -> tuple[bool, str | None]:
+    """Handle auth message — verify token or consume pairing token.
+
+    Returns:
+        (authenticated: bool, session_id: str | None)
+    """
+    token = payload.get("token", "")
+    pairing_token = payload.get("pairing_token")
+
+    # Case 1: Pairing flow — mobile sends both a new session token and the pairing token
+    if pairing_token:
+        session = await consume_pairing_token(settings.db_path, pairing_token, token)
+        if session:
+            log.info("auth_pairing_success", session_id=session["id"])
+            return True, session["id"]
+        else:
+            await ws.send_json({
+                "type": "error",
+                "payload": {
+                    "code": "AUTH_PAIRING_FAILED",
+                    "message": "Pairing token is invalid or has already been used.",
+                    "agent_action": "Check pairing token from backend logs or /health endpoint",
+                },
+            })
+            return False, None
+
+    # Case 2: Existing session token
+    if token:
+        session = await get_session_by_token(settings.db_path, token)
+        if session and session["is_pairing"] == 0:
+            await update_session_last_seen(settings.db_path, session["id"])
+            log.info("auth_success", session_id=session["id"])
+            return True, session["id"]
+
+    # Case 3: Invalid or missing token
+    await ws.send_json({
+        "type": "error",
+        "payload": {
+            "code": "AUTH_INVALID_TOKEN",
+            "message": "Invalid session token. Re-pair with backend.",
+            "agent_action": "Clear stored token and show pairing screen",
+        },
+    })
+    return False, None
+
+
+async def _handle_auth_reset(
+    ws: WebSocket, session_id: str
+) -> str | None:
+    """Handle auth_reset — invalidate current session and create a new one.
+
+    Returns:
+        New session_id or None on failure.
+    """
+    # Invalidate old session
+    await invalidate_session(settings.db_path, session_id)
+
+    # Create new session with new token
+    new_token = str(uuid.uuid4())
+    new_session = await create_session(settings.db_path, new_token)
+
+    await ws.send_json({
+        "type": "status",
+        "payload": {"state": "idle"},
+    })
+
+    log.info(
+        "auth_reset_success",
+        old_session_id=session_id,
+        new_session_id=new_session["id"],
+    )
+
+    return new_session["id"]
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     """WebSocket endpoint — the sole mobile-backend communication channel.
 
-    Message routing:
+    Authentication gate:
+      - First message MUST be { type: "auth", payload: { token: "..." } }
+      - All subsequent messages are only processed if authenticated
+      - auth_reset is only available when authenticated
+
+    Message routing (after auth):
       - chat → echo stub via chat_stream (full agent integration in later story)
       - log  → forward to backend structured logging
       - sync → delta sync (module_list for full, module_sync for delta)
+      - auth_reset → invalidate session, create new one
       - *    → error with WS_UNKNOWN_TYPE
 
     """
     await ws.accept()
     log.info("ws_connected")
+
+    authenticated = False
+    session_id: str | None = None
 
     try:
         while True:
@@ -219,7 +369,32 @@ async def websocket_endpoint(ws: WebSocket):
             msg_type = msg.get("type")
             payload = msg.get("payload", {})
 
-            if msg_type == "chat":
+            # --- Auth message handling ---
+            if msg_type == "auth":
+                auth_result, sid = await _handle_auth(ws, payload)
+                if auth_result:
+                    authenticated = True
+                    session_id = sid
+                continue
+
+            # --- Auth gate: reject all non-auth messages if not authenticated ---
+            if not authenticated:
+                await ws.send_json({
+                    "type": "error",
+                    "payload": {
+                        "code": "AUTH_REQUIRED",
+                        "message": "Authentication required. Send auth message first.",
+                        "agent_action": "Send { type: 'auth', payload: { token: '...' } } before other messages",
+                    },
+                })
+                continue
+
+            # --- Authenticated message routing ---
+            if msg_type == "auth_reset":
+                new_sid = await _handle_auth_reset(ws, session_id)
+                if new_sid:
+                    session_id = new_sid
+            elif msg_type == "chat":
                 # Stub: echo back as chat_stream (full agent integration later)
                 await ws.send_json({
                     "type": "chat_stream",

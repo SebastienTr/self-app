@@ -4,6 +4,7 @@ Tests the /ws endpoint for message routing, error handling,
 and protocol compliance.
 
 Uses Starlette's TestClient with websocket_connect for WS testing.
+All tests authenticate before sending messages (auth gate added in story 1.6).
 """
 
 import asyncio
@@ -16,25 +17,14 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
+from app.sessions import create_session
 
 
-@pytest.fixture
-def client():
-    """Create a test client without triggering lifespan."""
-    return TestClient(app)
-
-
-@pytest.fixture
-def sync_client(test_settings, tmp_path):
-    """Create a test client with a database containing test modules.
-
-    Sets up the DB with the modules table and test fixtures for delta sync tests.
-    Uses test_settings to point settings.db_path to a temp directory.
-    """
-    async def _setup_db():
-        db = await aiosqlite.connect(test_settings.db_path)
+async def _setup_ws_db(db_path: str, session_token: str = "test-ws-token") -> None:
+    """Create tables and a test session for WS tests."""
+    db = await aiosqlite.connect(db_path)
+    try:
         await db.execute("PRAGMA journal_mode=WAL;")
-        # Create modules table (matches 001_init.sql)
         await db.execute(
             """CREATE TABLE IF NOT EXISTS modules (
                 id TEXT PRIMARY KEY,
@@ -47,15 +37,53 @@ def sync_client(test_settings, tmp_path):
                 updated_at TEXT NOT NULL
             )"""
         )
-        # Also create schema_version table
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                token TEXT UNIQUE NOT NULL,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                is_pairing INTEGER DEFAULT 0
+            )"""
+        )
         await db.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
-        await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (1)")
+        await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
         await db.commit()
+    finally:
         await db.close()
+    # Create a test session for authentication
+    await create_session(db_path, session_token)
 
-    asyncio.run(_setup_db())
+
+# Default test session token used by all WS tests
+_TEST_TOKEN = "test-ws-token"
+
+
+def _auth(ws, token: str = _TEST_TOKEN) -> None:
+    """Authenticate a WebSocket connection with the given token."""
+    ws.send_json({"type": "auth", "payload": {"token": token}})
+
+
+@pytest.fixture
+def client(test_settings, tmp_path):
+    """Create a test client with auth-ready database."""
+    asyncio.run(_setup_ws_db(test_settings.db_path, _TEST_TOKEN))
+    import app.main as main_mod
+    importlib.reload(main_mod)
+    return TestClient(main_mod.app)
+
+
+@pytest.fixture
+def sync_client(test_settings, tmp_path):
+    """Create a test client with a database containing test modules.
+
+    Sets up the DB with the modules table and test fixtures for delta sync tests.
+    Uses test_settings to point settings.db_path to a temp directory.
+    """
+    asyncio.run(_setup_ws_db(test_settings.db_path, _TEST_TOKEN))
     # Reload main module to pick up new settings
     import app.main as main_mod
     importlib.reload(main_mod)
@@ -98,6 +126,7 @@ class TestChatMessage:
     def test_chat_message_receives_chat_stream_response(self, client):
         """Test that a chat message receives a chat_stream echo response."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hello world"}})
             response = ws.receive_json()
 
@@ -108,6 +137,7 @@ class TestChatMessage:
     def test_chat_message_follows_type_payload_format(self, client):
         """Test that chat_stream response follows { type, payload } format."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Test"}})
             response = ws.receive_json()
 
@@ -118,6 +148,7 @@ class TestChatMessage:
     def test_chat_message_with_empty_message(self, client):
         """Test chat with empty message field."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": ""}})
             response = ws.receive_json()
 
@@ -131,6 +162,7 @@ class TestLogMessage:
     def test_log_message_is_processed(self, client):
         """Test that a log message is accepted without error response."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "log",
                 "payload": {
@@ -153,6 +185,7 @@ class TestSyncMessage:
     def test_sync_receives_module_list_response(self, client):
         """Test that a sync message with no last_sync receives a module_list response."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "sync",
                 "payload": {},
@@ -165,6 +198,7 @@ class TestSyncMessage:
     def test_sync_with_last_sync_receives_module_sync_response(self, client):
         """Test that a sync with last_sync receives a module_sync (delta) response."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "sync",
                 "payload": {"last_sync": "2024-01-01T00:00:00Z"},
@@ -178,6 +212,7 @@ class TestSyncMessage:
     def test_sync_response_follows_type_payload_format(self, client):
         """Test that sync response follows { type, payload } format."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "sync",
                 "payload": {},
@@ -195,6 +230,7 @@ class TestUnknownMessageType:
     def test_unknown_type_receives_error_response(self, client):
         """Test that unknown message type gets an error response."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "unknown_type", "payload": {}})
             response = ws.receive_json()
 
@@ -205,6 +241,7 @@ class TestUnknownMessageType:
     def test_unknown_type_error_has_agent_action(self, client):
         """Test that the error response includes agent_action field."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "bogus", "payload": {}})
             response = ws.receive_json()
 
@@ -214,6 +251,7 @@ class TestUnknownMessageType:
     def test_missing_type_field_receives_error(self, client):
         """Test that a message with no type field gets an error."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"payload": {"data": "no type"}})
             response = ws.receive_json()
 
@@ -251,18 +289,21 @@ class TestResponseFormat:
 
     def test_chat_stream_response_format(self, client):
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "test"}})
             response = ws.receive_json()
             assert set(response.keys()) == {"type", "payload"}
 
     def test_module_list_response_format(self, client):
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {"last_sync": ""}})
             response = ws.receive_json()
             assert set(response.keys()) == {"type", "payload"}
 
     def test_error_response_format(self, client):
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "bad_type", "payload": {}})
             response = ws.receive_json()
             assert set(response.keys()) == {"type", "payload"}
@@ -280,6 +321,8 @@ class TestMultipleMessages:
     def test_multiple_different_message_types(self, client):
         """Test that multiple message types can be handled in one session."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+
             # Chat
             ws.send_json({"type": "chat", "payload": {"message": "Hi"}})
             resp1 = ws.receive_json()
@@ -298,6 +341,7 @@ class TestMultipleMessages:
     def test_log_then_sync(self, client):
         """Test log (no response) followed by sync (has response)."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "log",
                 "payload": {"layer": "test", "event": "e", "severity": "info", "context": {}},
@@ -313,6 +357,7 @@ class TestEdgeCases:
     def test_empty_payload_in_chat(self, client):
         """Test chat message with empty payload."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "chat_stream"
@@ -323,32 +368,35 @@ class TestEdgeCases:
     def test_missing_payload_key(self, client):
         """Test message with no payload key at all."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat"})
             response = ws.receive_json()
             # payload defaults to {} via msg.get("payload", {})
             assert response["type"] == "chat_stream"
             assert response["payload"]["done"] is True
 
-    def test_auth_type_is_unknown(self, client):
-        """Test that auth message type is not handled (returns error)."""
+    def test_auth_type_is_handled(self, client):
+        """Test that auth message type is handled (not WS_UNKNOWN_TYPE)."""
         with client.websocket_connect("/ws") as ws:
-            ws.send_json({"type": "auth", "payload": {"token": "abc123"}})
+            ws.send_json({"type": "auth", "payload": {"token": _TEST_TOKEN}})
+            # No error = success. Verify by sending chat.
+            ws.send_json({"type": "chat", "payload": {"message": "test"}})
             response = ws.receive_json()
-            assert response["type"] == "error"
-            assert response["payload"]["code"] == "WS_UNKNOWN_TYPE"
-            assert "auth" in response["payload"]["message"]
+            assert response["type"] == "chat_stream"
 
-    def test_auth_reset_type_is_unknown(self, client):
-        """Test that auth_reset message type is not handled (returns error)."""
+    def test_auth_reset_type_is_handled(self, client):
+        """Test that auth_reset message type is handled (not WS_UNKNOWN_TYPE)."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "auth_reset", "payload": {}})
             response = ws.receive_json()
-            assert response["type"] == "error"
-            assert response["payload"]["code"] == "WS_UNKNOWN_TYPE"
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "idle"
 
     def test_module_action_type_is_unknown(self, client):
         """Test that module_action message type is not handled yet."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "module_action",
                 "payload": {"module_id": "123", "action": "refresh"},
@@ -360,6 +408,7 @@ class TestEdgeCases:
     def test_empty_string_type(self, client):
         """Test message with empty string as type."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "", "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "error"
@@ -368,6 +417,7 @@ class TestEdgeCases:
     def test_null_type(self, client):
         """Test message with null type."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": None, "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "error"
@@ -376,6 +426,7 @@ class TestEdgeCases:
     def test_chat_with_unicode_message(self, client):
         """Test chat with unicode characters."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "chat",
                 "payload": {"message": "Hello! 你好 🌍 café"},
@@ -388,6 +439,7 @@ class TestEdgeCases:
         """Test chat with a very long message."""
         long_msg = "A" * 10000
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": long_msg}})
             response = ws.receive_json()
             assert response["type"] == "chat_stream"
@@ -396,6 +448,7 @@ class TestEdgeCases:
     def test_sync_with_empty_last_sync(self, client):
         """Test sync with empty string last_sync."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {"last_sync": ""}})
             response = ws.receive_json()
             assert response["type"] == "module_list"
@@ -404,6 +457,7 @@ class TestEdgeCases:
     def test_sync_with_missing_last_sync(self, client):
         """Test sync with no last_sync field in payload."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "module_list"
@@ -412,6 +466,7 @@ class TestEdgeCases:
     def test_log_with_empty_context(self, client):
         """Test log with empty context object."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "log",
                 "payload": {
@@ -429,6 +484,7 @@ class TestEdgeCases:
     def test_log_with_nested_context(self, client):
         """Test log with deeply nested context payload."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "log",
                 "payload": {
@@ -448,6 +504,7 @@ class TestEdgeCases:
     def test_payload_with_null_values(self, client):
         """Test chat payload with null values in extra fields."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "chat",
                 "payload": {"message": "test", "extra": None},
@@ -458,6 +515,7 @@ class TestEdgeCases:
     def test_extra_top_level_fields_ignored(self, client):
         """Test that extra top-level fields don't break message routing."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "chat",
                 "payload": {"message": "test"},
@@ -475,7 +533,8 @@ class TestEdgeCases:
             assert error_response["type"] == "error"
             assert error_response["payload"]["code"] == "WS_INVALID_JSON"
 
-            # Should still be able to send valid messages
+            # Should still be able to auth and send valid messages
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "after error"}})
             response = ws.receive_json()
             assert response["type"] == "chat_stream"
@@ -493,6 +552,7 @@ class TestEdgeCases:
     def test_error_response_contains_all_required_fields(self, client):
         """Test that error responses always contain code, message, and agent_action."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             # Test WS_UNKNOWN_TYPE error
             ws.send_json({"type": "unknown", "payload": {}})
             response = ws.receive_json()
@@ -512,6 +572,7 @@ class TestEdgeCases:
     def test_rapid_messages_all_processed(self, client):
         """Test that many messages sent rapidly are all processed."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             count = 10
             for i in range(count):
                 ws.send_json({"type": "chat", "payload": {"message": f"msg_{i}"}})
@@ -524,6 +585,8 @@ class TestEdgeCases:
     def test_interleaved_message_types(self, client):
         """Test interleaving different message types."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+
             # chat
             ws.send_json({"type": "chat", "payload": {"message": "hello"}})
             r1 = ws.receive_json()
@@ -554,6 +617,7 @@ class TestEdgeCases:
     def test_json_with_numeric_type(self, client):
         """Test message where type is a number instead of string."""
         with client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": 123, "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "error"
@@ -600,6 +664,7 @@ class TestEdgeCases:
             assert error_response["type"] == "error"
 
             # Connection should still be alive
+            _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "still alive"}})
             response = ws.receive_json()
             assert response["type"] == "chat_stream"
@@ -619,6 +684,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -640,6 +706,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             # last_sync is between the two modules
             ws.send_json({
                 "type": "sync",
@@ -660,6 +727,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             # last_sync is after all modules
             ws.send_json({
                 "type": "sync",
@@ -673,6 +741,7 @@ class TestDeltaSync:
     def test_module_sync_response_includes_last_sync_timestamp(self, sync_client, test_settings):
         """Test that module_sync response includes last_sync server timestamp."""
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "sync",
                 "payload": {"last_sync": "2024-01-01T00:00:00Z"},
@@ -693,6 +762,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {"last_sync": ""}})
             response = ws.receive_json()
 
@@ -702,6 +772,7 @@ class TestDeltaSync:
     def test_full_sync_with_no_modules_returns_empty_list(self, sync_client, test_settings):
         """Test full sync when database has no modules."""
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -719,6 +790,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -749,6 +821,7 @@ class TestDeltaSync:
         asyncio.run(_insert_bad_spec())
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -766,6 +839,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {"last_sync": None}})
             response = ws.receive_json()
 
@@ -781,6 +855,7 @@ class TestDeltaSync:
         asyncio.run(_insert_module(test_settings.db_path, "mod-3", "Module 3", same_time))
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -801,6 +876,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({
                 "type": "sync",
                 "payload": {"last_sync": "2024-06-01T12:00:00Z"},
@@ -826,6 +902,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -843,6 +920,7 @@ class TestDeltaSync:
         )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -859,6 +937,7 @@ class TestDeltaSync:
         asyncio.run(_insert_module(test_settings.db_path, "mod-new", "New", "2024-12-01T00:00:00Z"))
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             ws.send_json({"type": "sync", "payload": {}})
             response = ws.receive_json()
 
@@ -877,6 +956,7 @@ class TestDeltaSync:
             )
 
         with sync_client.websocket_connect("/ws") as ws:
+            _auth(ws)
             # last_sync halfway through — should return modules from month 7 onwards
             ws.send_json({
                 "type": "sync",

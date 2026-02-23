@@ -1,22 +1,22 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23T14:30 | **Updated by:** Bob (SM)
+> **Last updated:** 2026-02-23T17:30 | **Updated by:** Bob (SM)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 1 · Story 1.6 · BACKLOG                              ║
+║  WAVE 2 · Story 2.1 · BACKLOG                              ║
 ║  Next milestone: Wave 3 — First Module Test (3.4)           ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓░░░░░░░░░░░░░░░░░░]  6/56 done (11%)
+TOTAL   [▓▓▓░░░░░░░░░░░░░░░░░]  9/56 done (16%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
-W1  Bootstrap      ▓▓▓▓▓▓·                    6/7   << ICI
-W2  Chat+Render    ····                        0/4
+W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE
+W2  Chat+Render    ▓▓··                        2/4   << ICI
 W3  First Module   ·                           0/1   * VALIDATION
 W4  Backfill       ······                      0/6   * FIRST LIGHT
 W5  MVP Core       ··············              0/14
@@ -25,10 +25,10 @@ W7  Growth         ···················         0/19  * GROWTH
 
 ─── Epics (vue feature) ──────────────────────────────────────
 
-E1  Bootstrap      ▓▓▓▓▓▓·    6/7  <<
-E2  Conversation   ····       0/4       ┐
-E3  Creation       ····       0/4       ├ First Light
-E4  Freshness      ···        0/3       ┘
+E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
+E2  Conversation   ····       0/4        ┐
+E3  Creation       ▓▓··       2/4  <<    ├ First Light
+E4  Freshness      ···        0/3        ┘
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
 E7  Interaction    ····       0/4  ├ MVP
@@ -85,7 +85,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 ## Wave 1 — Finish Bootstrap (Epic 1)
 
 > Goal: mobile app connected, authenticated, offline-capable
-> 1 story remaining | 6/7 done
+> **Complete** | 7/7 done ✓
 
 - `[x]` **1.1** — Initialize Monorepo & Module Definition Schema
 - `[x]` **1.1b** — CI Pipeline
@@ -93,9 +93,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 - `[x]` **1.3** — LLM Provider Abstraction & BYOK Configuration
 - `[x]` **1.4** — Mobile App Shell & WebSocket Connection
 - `[x]` **1.5** — Offline Message Queue & Cached Data Rendering
-- `[ ]` **1.6** — Session Authentication & Mobile-Backend Pairing ← **next**
-
-> **Shortcut option:** skip 1.5, do 1.4 → 1.6 directly to unblock Wave 2 faster. Come back to 1.5 in Wave 4.
+- `[x]` **1.6** — Session Authentication & Mobile-Backend Pairing
 
 ---
 
@@ -106,8 +104,8 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 **Chain A — Rendering** (needs 1.4):
 
-- `[ ]` **3.1** — SDUI Primitive Registry & Simple Primitives
-- `[ ]` **3.2** — Composite Primitives (Card, List)
+- `[x]` **3.1** — SDUI Primitive Registry & Simple Primitives
+- `[x]` **3.2** — Composite Primitives (Card, List)
 - `[ ]` **3.3** — Module Rendering Pipeline
 
 **Chain B — Conversation** (needs 1.4 + 1.6):

@@ -63,7 +63,7 @@ class TestHealthResponseStructure:
         response = await client.get("/health")
         data = response.json()
         assert set(data.keys()) == {
-            "status", "schema_version", "migrations_applied", "uptime", "providers"
+            "status", "schema_version", "migrations_applied", "uptime", "providers", "pairing_available"
         }
 
     async def test_response_content_type_is_json(self, client):
@@ -169,7 +169,7 @@ class TestLifespanInitializesState:
 
         the_app = app.main.app
         async with the_app.router.lifespan_context(the_app):
-            assert app.main._state["schema_version"] == 1
+            assert app.main._state["schema_version"] == 2
 
     async def test_state_has_migrations_applied_after_lifespan(self, tmp_path, monkeypatch):
         monkeypatch.setenv("SELF_DATA_DIR", str(tmp_path))
@@ -187,4 +187,4 @@ class TestLifespanInitializesState:
 
         the_app = app.main.app
         async with the_app.router.lifespan_context(the_app):
-            assert app.main._state["migrations_applied"] == 1
+            assert app.main._state["migrations_applied"] == 2

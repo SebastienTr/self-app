@@ -44,15 +44,15 @@ development_status:
   # Epic 1: Project Bootstrap & Developer Connection (⚡ First Light + 🚀 MVP)
   # FRs: FR36, FR39, FR49, FR55, FR56, FR57, FR58
   # ═══════════════════════════════════════════════════════════════
-  epic-1: in-progress
+  epic-1: done
   1-1-initialize-monorepo-and-module-definition-schema: done
   1-1b-ci-pipeline: done
   1-2-backend-skeleton-and-single-command-deployment: done
   1-3-llm-provider-abstraction-and-byok-configuration: done
   1-4-mobile-app-shell-and-websocket-connection: done
   1-5-offline-message-queue-and-cached-data-rendering: done
-  1-6-session-authentication-and-mobile-backend-pairing: ready-for-dev
-  epic-1-retrospective: optional
+  1-6-session-authentication-and-mobile-backend-pairing: done
+  epic-1-retrospective: done
 
   # ═══════════════════════════════════════════════════════════════
   # Epic 2: Conversational Shell & Agent Identity (⚡ First Light)
@@ -69,10 +69,10 @@ development_status:
   # Epic 3: Autonomous Module Creation & Native Rendering (⚡ First Light)
   # FRs: FR9, FR10, FR11, FR17, FR18, FR28
   # ═══════════════════════════════════════════════════════════════
-  epic-3: backlog
-  3-1-sdui-primitive-registry-and-simple-primitives: backlog
-  3-2-composite-primitives-card-list: backlog
-  3-3-module-rendering-pipeline: backlog
+  epic-3: in-progress
+  3-1-sdui-primitive-registry-and-simple-primitives: done
+  3-2-composite-primitives-card-list: done
+  3-3-module-rendering-pipeline: review
   3-4-module-creation-end-to-end: backlog
   epic-3-retrospective: optional
 

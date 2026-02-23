@@ -1183,7 +1183,7 @@ class TestHealthEndpointEdgeCases:
         data = resp.json()
         expected_keys = {
             "status", "schema_version", "migrations_applied",
-            "uptime", "providers",
+            "uptime", "providers", "pairing_available",
         }
         assert set(data.keys()) == expected_keys
 

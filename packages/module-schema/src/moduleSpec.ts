@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** First Light SDUI primitive types */
-export const moduleTypeEnum = z.enum(['metric', 'list', 'text', 'status', 'table']);
+export const moduleTypeEnum = z.enum(['metric', 'list', 'text', 'status', 'table', 'card', 'layout']);
 
 /** Known composition templates for First Light */
 export const templateEnum = z.enum(['metric-dashboard', 'data-card', 'simple-list']);

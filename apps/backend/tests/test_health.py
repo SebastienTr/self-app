@@ -67,12 +67,18 @@ class TestHealthEndpoint:
         assert isinstance(data["uptime"], (int, float))
         assert data["uptime"] >= 0
 
-    async def test_health_schema_version_is_1_after_init(self, client):
+    async def test_health_schema_version_after_init(self, client):
         response = await client.get("/health")
         data = response.json()
-        assert data["schema_version"] == 1
+        assert data["schema_version"] == 2
 
-    async def test_health_migrations_applied_is_1(self, client):
+    async def test_health_migrations_applied_after_init(self, client):
         response = await client.get("/health")
         data = response.json()
-        assert data["migrations_applied"] == 1
+        assert data["migrations_applied"] == 2
+
+    async def test_health_includes_pairing_available(self, client):
+        response = await client.get("/health")
+        data = response.json()
+        assert "pairing_available" in data
+        assert isinstance(data["pairing_available"], bool)

@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useModuleStore } from '@/stores/moduleStore';
 import { connect, disconnect, loadPersistedMessages } from '@/services/wsClient';
 import { initLocalDb, getCachedModules } from '@/services/localDb';
+import { getSessionToken, getStoredBackendUrl } from '@/services/auth';
 import { initModuleSync } from '@/services/moduleSync';
 import { logger } from '@/services/logger';
 import { ModuleList } from '@/components/bridge';
+import { PairingScreen } from '@/components/shell';
 import { tokens } from '@/constants/tokens';
-import { getBackendUrl } from '@/utils/getBackendUrl';
 import type { ConnectionStatus } from '@/types/ws';
 
 /** Map connection status to a colored indicator. */
@@ -30,8 +32,8 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
 
 export default function App() {
   const status = useConnectionStore((s) => s.status);
-  const backendUrl = useConnectionStore((s) => s.backendUrl);
   const moduleCount = useModuleStore((s) => s.modules.size);
+  const authStatus = useAuthStore((s) => s.authStatus);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -50,7 +52,20 @@ export default function App() {
       // 3. Load persisted pending messages
       await loadPersistedMessages();
 
-      // 4. Register module sync handlers
+      // 4. Load auth state from SecureStore
+      const [token, backendUrl] = await Promise.all([
+        getSessionToken(),
+        getStoredBackendUrl(),
+      ]);
+
+      const authStore = useAuthStore.getState();
+      if (token && backendUrl) {
+        authStore.setSessionToken(token);
+        authStore.setBackendUrl(backendUrl);
+        authStore.setAuthStatus('authenticating');
+      }
+
+      // 5. Register module sync handlers
       initModuleSync();
 
       setInitialized(true);
@@ -59,14 +74,16 @@ export default function App() {
       logger.info('app', 'startup_complete', {
         cached_modules: cached.length,
         startup_ms: startupDuration,
+        has_session: !!token,
         agent_action: startupDuration > 2000
           ? 'Startup exceeded 2s target (NFR1). Investigate slow operations.'
           : null,
       });
 
-      // 5. Connect to WebSocket (async, non-blocking)
-      const url = backendUrl || getBackendUrl();
-      connect(url);
+      // 6. Connect to WebSocket if session is configured
+      if (token && backendUrl) {
+        connect(backendUrl);
+      }
     }
 
     startup();
@@ -74,25 +91,37 @@ export default function App() {
     return () => {
       disconnect();
     };
-  }, [backendUrl]);
+  }, []);
+
+  // Show pairing screen if not configured or auth failed
+  const showPairing =
+    authStatus === 'unconfigured' ||
+    authStatus === 'auth_failed' ||
+    authStatus === 'pairing';
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>self</Text>
-      <View style={styles.statusRow}>
-        <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: STATUS_COLORS[status] },
-          ]}
-        />
-        <Text style={styles.statusText}>
-          {STATUS_LABELS[status]}
-          {moduleCount > 0 ? ` \u00B7 ${moduleCount} module${moduleCount !== 1 ? 's' : ''}` : ''}
-        </Text>
-      </View>
+      {initialized && showPairing ? (
+        <PairingScreen />
+      ) : (
+        <>
+          <Text style={styles.title}>self</Text>
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: STATUS_COLORS[status] },
+              ]}
+            />
+            <Text style={styles.statusText}>
+              {STATUS_LABELS[status]}
+              {moduleCount > 0 ? ` \u00B7 ${moduleCount} module${moduleCount !== 1 ? 's' : ''}` : ''}
+            </Text>
+          </View>
 
-      {initialized && <ModuleList />}
+          {initialized && <ModuleList />}
+        </>
+      )}
 
       <StatusBar style="light" />
     </View>

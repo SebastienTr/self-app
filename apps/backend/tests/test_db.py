@@ -66,18 +66,18 @@ class TestGetConnection:
 class TestRunMigrations:
     """Test the migration runner."""
 
-    async def test_applies_initial_migration(self, tmp_path):
+    async def test_applies_all_migrations(self, tmp_path):
         db_path = str(tmp_path / "test.db")
         count = await run_migrations(db_path, MIGRATIONS_DIR)
-        assert count == 1
+        assert count == 2
 
     async def test_creates_schema_version_table(self, tmp_path):
         db_path = str(tmp_path / "test.db")
         await run_migrations(db_path, MIGRATIONS_DIR)
         async with aiosqlite.connect(db_path) as db:
-            cursor = await db.execute("SELECT version FROM schema_version;")
+            cursor = await db.execute("SELECT MAX(version) FROM schema_version;")
             row = await cursor.fetchone()
-            assert row[0] == 1
+            assert row[0] == 2
 
     async def test_creates_all_tables(self, tmp_path):
         db_path = str(tmp_path / "test.db")
@@ -104,7 +104,7 @@ class TestRunMigrations:
         db_path = str(tmp_path / "test.db")
         count1 = await run_migrations(db_path, MIGRATIONS_DIR)
         count2 = await run_migrations(db_path, MIGRATIONS_DIR)
-        assert count1 == 1
+        assert count1 == 2
         assert count2 == 0
 
     async def test_creates_backup_before_migration(self, tmp_path):
@@ -176,7 +176,7 @@ class TestGetSchemaVersion:
         await run_migrations(db_path, MIGRATIONS_DIR)
         async with aiosqlite.connect(db_path) as db:
             version = await get_schema_version(db)
-            assert version == 1
+            assert version == 2
 
 
 class TestDryRun:
@@ -185,7 +185,7 @@ class TestDryRun:
     async def test_dry_run_does_not_apply_migrations(self, tmp_path):
         db_path = str(tmp_path / "test.db")
         pending = await run_migrations(db_path, MIGRATIONS_DIR, dry_run=True)
-        assert pending == 1
+        assert pending == 2
         # DB should not have the tables
         async with aiosqlite.connect(db_path) as db:
             cursor = await db.execute(

@@ -218,7 +218,7 @@ class TestSessionsTableSchema:
     async def test_has_all_expected_columns(self, migrated_db):
         info = await _get_table_info(migrated_db, "sessions")
         columns = {r["name"] for r in info}
-        expected = {"id", "token", "user_id", "created_at", "last_seen"}
+        expected = {"id", "token", "user_id", "created_at", "last_seen", "is_pairing"}
         assert expected == columns
 
     async def test_id_is_primary_key(self, migrated_db):
@@ -284,12 +284,12 @@ class TestSchemaVersionTableSchema:
         col = next(r for r in info if r["name"] == "version")
         assert col["type"] == "INTEGER"
 
-    async def test_initial_version_is_1(self, migrated_db):
+    async def test_schema_versions_present(self, migrated_db):
         async with aiosqlite.connect(migrated_db) as db:
-            cursor = await db.execute("SELECT version FROM schema_version;")
+            cursor = await db.execute("SELECT version FROM schema_version ORDER BY version;")
             rows = await cursor.fetchall()
             versions = [r[0] for r in rows]
-            assert versions == [1]
+            assert versions == [1, 2]
 
 
 # ---------------------------------------------------------------------------
