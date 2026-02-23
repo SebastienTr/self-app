@@ -3,6 +3,7 @@ stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 's
 lastStep: 'step-04-validate'
 lastSaved: '2026-02-23'
 inputDocuments:
+  - _bmad-output/implementation-artifacts/3-3-module-rendering-pipeline.md
   - _bmad-output/implementation-artifacts/1-5-offline-message-queue-and-cached-data-rendering.md
   - _bmad-output/implementation-artifacts/1-6-session-authentication-and-mobile-backend-pairing.md
   - apps/mobile/services/localDb.ts
@@ -444,3 +445,108 @@ Identified the following coverage gaps not addressed by the original 90 Story 3.
 - P0 (Critical paths): 15 tests -- prototype pollution safety, card/list rendering through registry, realistic spec rendering
 - P1 (Important features): 35 tests -- accessibility edge cases, Dynamic Type/RTL, styling validation, composition
 - P2 (Edge cases): 33 tests -- boundary conditions, large data sets, malformed inputs, schema type validation
+
+---
+
+# Test Automation Expansion — Story 3-3
+
+## Summary
+
+Expanded test coverage for Story 3-3 (Module Rendering Pipeline with Composition Templates) by adding 61 new tests across 3 new test files, bringing the mobile test total from 779 to 840 tests (34 suites). All tests pass with zero regressions.
+
+## Coverage Targets
+
+Mode: BMad-Integrated (using story 3-3 artifact for context)
+Coverage target: critical-paths + edge cases (not covered by original 35 story tests)
+Detected stack: mobile frontend
+
+## Gap Analysis
+
+Identified the following coverage gaps not addressed by the original 35 Story 3.3 tests (templates.test.ts + ModuleCard.test.tsx + pipeline.test.tsx):
+
+1. **templates.ts edge cases** — null/undefined input to getTemplate, prototype-pollution names (__proto__, constructor, toString, hasOwnProperty), reference identity on repeated calls, data-card header slot variant field, metric-dashboard layout has no direction property, simple-list slot min/max cardinality, future MVP template names fall back to data-card
+2. **ModuleCard extractPrimitiveProps** — 'card' type (title + children forwarded), 'layout' type (direction + columns forwarded), unknown type returns only { type } (no extra fields leak), card with schemaVersion/dataSources not forwarded to CardPrimitive
+3. **ModuleCard accessibleLabel** — absent accessibleLabel → no accessibilityLabel on root View, empty-string accessibleLabel passed through without crash
+4. **ModuleCard template defaults** — spec.template absent → data-card, spec.template null → data-card, spec.template empty string → data-card fallback
+5. **ModuleCard spec.type edge cases** — null type → UnknownPrimitive, spec with only moduleId/name (no type) → no crash
+6. **Render timing slow path** — logger.warning called with agent_action when mocked render_ms > 100 (NFR3 warning path)
+7. **ErrorBoundary logging** — logger.error called with module_id and agent_action when child throws, fallback shows error message
+8. **Pipeline: card type module** — CardPrimitive with title+children rendered via full ModuleCard pipeline (not tested in original pipeline.test.tsx)
+9. **Pipeline: layout type module** — LayoutPrimitive rendered via ModuleCard pipeline
+10. **Pipeline: prototype-pollution type/template names** — '__proto__', 'constructor' as spec.type; '__proto__' as spec.template
+11. **Pipeline: dataStatus 'stale'** — not 'error', shows time-based caption via FreshnessIndicator (not Offline badge)
+12. **Pipeline: mixed dataStatus** — ok + stale (time-based) + error (Offline) modules simultaneously via ModuleList
+13. **Pipeline: 3+ modules with unknown type** — mixed known and unknown types via ModuleList
+14. **Pipeline: minimal spec robustness** — only moduleId (no name/type/template), bare-bones spec
+15. **Pipeline: accessibleLabel propagation** — all 3 First Light templates propagate accessibleLabel to root View
+16. **UnknownPrimitive error logging** — logger.error called exactly once (useRef guard), with correct type and agent_action
+
+## Tests Added
+
+### Mobile — components/sdui/templates.edge.test.ts (22 new tests, NEW FILE)
+
+- Falls back to data-card when called with null, undefined, or a number
+- Prototype-pollution safety: __proto__, constructor, toString, hasOwnProperty all return data-card
+- Reference identity: same call returns same object; two unknown names return same data-card reference
+- metric-dashboard: layout has no direction, columns is exactly 2
+- data-card: no columns (stack), header slot has variant='title', content slot min=1 max=1, exactly 2 slots
+- simple-list: list slot min=1 max=1, no columns
+- All templates have layout.type of stack or grid
+- Stack templates have layout.direction vertical or horizontal
+- getTemplate always returns non-empty slots
+- Falls back for future MVP templates (timeline-view, chart-with-context)
+
+### Mobile — components/bridge/ModuleCard.edge.test.tsx (23 new tests, NEW FILE)
+
+- extractPrimitiveProps for 'card' type: renders CardPrimitive title, children, does not forward schemaVersion
+- extractPrimitiveProps for 'layout' type: renders LayoutPrimitive, no crash without direction/columns
+- extractPrimitiveProps for unknown type: shows UnknownPrimitive for stub (table) and fully unknown (heatmap) types
+- accessibleLabel absent → no accessibilityLabel on root View
+- accessibleLabel empty string → renders without crash
+- spec.template absent → defaults to data-card
+- spec.template null → data-card fallback
+- spec.template empty string → data-card fallback
+- spec.type null → UnknownPrimitive shown
+- spec with only moduleId and name → no crash
+- Render timing: logs module_id, template, type with render_ms >= 0
+- Render timing slow path (mocked 200ms): logger.warning with agent_action containing 'NFR3'
+- ErrorBoundary: logs error via logger.error with module_id and agent_action on crash
+- ErrorBoundary: fallback shows the thrown error message
+- list type with accessibleLabel from spec applied to root View
+- metric with value, label, unit, trend=up via ModuleCard pipeline
+- metric without trend: no trend indicator shown
+- FreshnessIndicator: 3h old data shows "Updated Xh ago" caption
+- FreshnessIndicator: < 1h data shows no indicator
+
+### Mobile — components/bridge/pipeline.edge.test.tsx (16 new tests, NEW FILE)
+
+- card type renders CardPrimitive title via ModuleCard pipeline
+- card type with text + metric children renders all content
+- card with unknown child type shows UnknownPrimitive without crashing pipeline
+- layout type renders via pipeline without crash
+- type "__proto__" shows UnknownPrimitive without crashing
+- type "constructor" shows UnknownPrimitive without crashing
+- template "__proto__" falls back to data-card layout without crash
+- dataStatus "stale" (not error) shows time-based FreshnessIndicator caption, not Offline
+- dataStatus "ok" shows no freshness indicator when data is fresh
+- Mixed ok+stale+error modules render simultaneously via ModuleList
+- 3+ modules with one unknown type via ModuleList
+- Minimal spec (only moduleId) renders without crash
+- Bare-bones spec (no template/accessibleLabel) renders without crash
+- accessibleLabel on spec applied to ModuleCard root View
+- All 3 First Light templates propagate accessibleLabel to root View
+- UnknownPrimitive logs error exactly once with correct type and agent_action
+
+## Test Results (Story 3-3 expansion run)
+
+- Mobile: 840 tests, 34 suites, all passing (up from 779)
+- Schema: 152 tests (unchanged)
+- Total: 992 tests (up from 931)
+- Zero regressions from previous stories
+- New tests added: 61 mobile
+
+## Priority Breakdown
+
+- P0 (Critical paths): 18 tests — card/layout type via pipeline, prototype-pollution safety in pipeline and templates, ErrorBoundary logging, UnknownPrimitive once-only logging
+- P1 (Important features): 28 tests — render timing warning path (NFR3), accessibleLabel propagation for all templates, mixed dataStatus rendering, template default handling
+- P2 (Edge cases): 15 tests — null/undefined inputs, minimal specs, empty string fields, reference identity, future MVP template names

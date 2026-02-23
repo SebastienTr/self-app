@@ -1,6 +1,6 @@
 # Story 3.3: Module Rendering Pipeline
 
-Status: review
+Status: done
 
 ## Story
 
@@ -332,11 +332,25 @@ No debug issues encountered. All implementations followed red-green-refactor TDD
 
 - `apps/mobile/components/sdui/templates.ts` (CREATED)
 - `apps/mobile/components/sdui/templates.test.ts` (CREATED)
+- `apps/mobile/components/sdui/templates.edge.test.ts` (CREATED — edge/robustness tests: null/undefined input, prototype-pollution safety, reference identity, slot cardinality)
 - `apps/mobile/components/bridge/pipeline.test.tsx` (CREATED)
-- `apps/mobile/components/bridge/ModuleCard.tsx` (MODIFIED — template-aware rendering, scoped extractPrimitiveProps, accessibilityLabel, render timing)
+- `apps/mobile/components/bridge/pipeline.edge.test.tsx` (CREATED — edge/robustness tests: card/layout types, prototype-pollution type names, dataStatus states, mixed modules, empty state)
+- `apps/mobile/components/bridge/ModuleCard.tsx` (MODIFIED — template-aware rendering, scoped extractPrimitiveProps, accessibilityLabel, render timing; FIXED in review: getTemplate now imported via barrel @/components/sdui)
 - `apps/mobile/components/bridge/ModuleCard.test.tsx` (MODIFIED — 9 new tests for template resolution, accessibleLabel, render timing logging)
+- `apps/mobile/components/bridge/ModuleCard.edge.test.tsx` (CREATED — edge/robustness tests: card/layout/unknown extractPrimitiveProps, accessibleLabel edge cases, template defaults, slow render warning path, ErrorBoundary logging)
 - `apps/mobile/components/sdui/index.ts` (MODIFIED — export getTemplate, TemplateDefinition, TemplateSlot, TemplateLayout)
+
+### Review Follow-ups
+
+- [ ] [AI-Review][LOW] `ModuleCard.tsx` line 129: `direction={layoutColumns != null ? 'horizontal' : layoutDirection}` is redundant for grid templates — `LayoutPrimitive` already ignores `direction` when `isGrid=true` (columns provided). Simplify to `direction={layoutDirection}` since `LayoutPrimitive` derives `flexDirection` from `isGrid` check first. No behavioral impact today, but could mislead future readers and will silently break if `LayoutPrimitive` ever adds direction support for grid wrap-direction. [`apps/mobile/components/bridge/ModuleCard.tsx:129`]
+
+- [ ] [AI-Review][LOW] `ModuleCard.tsx` line 92: `layoutDirection = templateDef.layout.direction ?? 'vertical'` duplicates `LayoutPrimitive`'s own default (`direction = 'vertical'`). The fallback is redundant. Consider removing the `?? 'vertical'` guard here and relying on `LayoutPrimitive`'s own default. Minor code smell only. [`apps/mobile/components/bridge/ModuleCard.tsx:92`]
+
+- [ ] [AI-Review][LOW] Story completion notes claim "779 mobile tests (35 new)" but actual test count is 840 (96 new from 744 baseline). The 3 edge test files (`templates.edge.test.ts`, `ModuleCard.edge.test.tsx`, `pipeline.edge.test.tsx`) added 61 additional tests that were not accounted for in the original count. The File List has been updated to document these files. No action required beyond awareness.
+
+- [ ] [AI-Review][LOW] In React Strict Mode (Expo dev), `React.useRef<number>(Date.now())` in `ModuleCardContent` may report inflated `render_ms` values (approx 2x) because Strict Mode renders components twice in development. The `useRef` initial value is set on the first render, but the `useEffect` fires after the second render commit. This means development-mode render timing warnings may appear at ~2x actual duration. This is a dev-only experience issue (Strict Mode is not used in production). No fix needed but worth documenting. [`apps/mobile/components/bridge/ModuleCard.tsx:81,100`]
 
 ### Change Log
 
+- 2026-02-23: Code review completed. MEDIUM fix applied: consolidated `getTemplate` import to barrel (`@/components/sdui`) from direct path (`@/components/sdui/templates`), consistent with barrel pattern and architecture rule. File List updated to include 3 previously undocumented edge test files (`templates.edge.test.ts`, `ModuleCard.edge.test.tsx`, `pipeline.edge.test.tsx`). Status set to done. All 840 mobile tests + 152 schema tests pass. 4 LOW issues documented in Review Follow-ups.
 - 2026-02-23: Implemented Story 3.3 — module rendering pipeline with composition templates. Created template registry (`templates.ts`) with 3 First Light templates. Updated `ModuleCard` with template-aware rendering via `getTemplate()` + `LayoutPrimitive`, fixed scoped `extractPrimitiveProps` (LOW review item from 3.1), applied `accessibilityLabel` (NFR31), added render timing logging (NFR3). Created `pipeline.test.tsx` for end-to-end pipeline integration tests. All 779 mobile tests + 152 schema tests pass.

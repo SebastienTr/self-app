@@ -21,12 +21,12 @@ Most apps decide what you can do before you even open them. Self-App starts empt
 ## Project Status
 
 ```
-[▓▓▓░░░░░░░░░░░░░░░░░] 9/56 stories done (16%)
+[▓▓▓▓░░░░░░░░░░░░░░░░] 10/56 stories done (18%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 18 | 9 | **In Progress** |
+| First Light | 18 | 10 | **In Progress** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
@@ -168,6 +168,7 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 | [Story 1.6 — Session Auth & Pairing](_bmad-output/implementation-artifacts/1-6-session-authentication-and-mobile-backend-pairing.md) | Done |
 | [Story 3.1 — SDUI Primitive Registry](_bmad-output/implementation-artifacts/3-1-sdui-primitive-registry-and-simple-primitives.md) | Done |
 | [Story 3.2 — Composite Primitives](_bmad-output/implementation-artifacts/3-2-composite-primitives-card-list.md) | Done |
+| [Story 3.3 — Module Rendering Pipeline](_bmad-output/implementation-artifacts/3-3-module-rendering-pipeline.md) | Done |
 
 </details>
 

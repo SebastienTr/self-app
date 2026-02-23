@@ -18,8 +18,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { ModuleState } from '@/types/module';
 import { tokens } from '@/constants/tokens';
-import { getPrimitive, LayoutPrimitive } from '@/components/sdui';
-import { getTemplate } from '@/components/sdui/templates';
+import { getPrimitive, LayoutPrimitive, getTemplate } from '@/components/sdui';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { ErrorBoundary } from './ErrorBoundary';
 import { logger } from '@/services/logger';

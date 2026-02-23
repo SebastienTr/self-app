@@ -1,6 +1,6 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23T17:30 | **Updated by:** Bob (SM)
+> **Last updated:** 2026-02-23T18:00 | **Updated by:** Bob (SM)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
@@ -11,12 +11,12 @@
 ║  Next milestone: Wave 3 — First Module Test (3.4)           ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓░░░░░░░░░░░░░░░░░]  9/56 done (16%)
+TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  10/56 done (18%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
 W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE
-W2  Chat+Render    ▓▓··                        2/4   << ICI
+W2  Chat+Render    ▓▓·▓                        3/4   << ICI
 W3  First Module   ·                           0/1   * VALIDATION
 W4  Backfill       ······                      0/6   * FIRST LIGHT
 W5  MVP Core       ··············              0/14
@@ -27,7 +27,7 @@ W7  Growth         ···················         0/19  * GROWTH
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
 E2  Conversation   ····       0/4        ┐
-E3  Creation       ▓▓··       2/4  <<    ├ First Light
+E3  Creation       ▓▓▓·       3/4  <<    ├ First Light
 E4  Freshness      ···        0/3        ┘
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
@@ -106,7 +106,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 - `[x]` **3.1** — SDUI Primitive Registry & Simple Primitives
 - `[x]` **3.2** — Composite Primitives (Card, List)
-- `[ ]` **3.3** — Module Rendering Pipeline
+- `[x]` **3.3** — Module Rendering Pipeline
 
 **Chain B — Conversation** (needs 1.4 + 1.6):
 
