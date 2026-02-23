@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self — Color Theme Comparison</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0A0A0C;
+    color: #E8E4F0;
+    line-height: 1.4;
+  }
+
+  .page-header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 1px solid #222;
+  }
+  .page-header h1 { font-size: 28px; font-weight: 300; margin-bottom: 8px; }
+  .page-header p { color: #888; font-size: 14px; max-width: 500px; margin: 0 auto; }
+
+  .themes-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+  @media (max-width: 1200px) { .themes-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .themes-grid { grid-template-columns: 1fr; } }
+
+  .theme-col { text-align: center; }
+  .theme-title {
+    font-size: 16px; font-weight: 600; margin-bottom: 4px;
+  }
+  .theme-subtitle {
+    font-size: 12px; margin-bottom: 16px;
+  }
+
+  /* Phone */
+  .phone {
+    width: 280px; height: 580px;
+    border-radius: 28px; border: 3px solid #333;
+    overflow: hidden; position: relative;
+    margin: 0 auto 16px;
+  }
+  .phone-notch {
+    width: 100px; height: 24px;
+    border-radius: 0 0 14px 14px; margin: 0 auto;
+    position: relative; z-index: 10;
+  }
+  .phone-content {
+    height: calc(100% - 24px); overflow-y: auto; position: relative;
+  }
+  .phone-content::-webkit-scrollbar { display: none; }
+
+  /* Ambient glow */
+  .ambient {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; opacity: 0.35;
+  }
+
+  /* Chat input */
+  .chat-input {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chat-field {
+    flex: 1; border: none; border-radius: 18px;
+    padding: 9px 14px; font-size: 13px;
+  }
+  .send-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: none; color: white; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Chips */
+  .chips { display: flex; gap: 5px; flex-wrap: wrap; padding: 6px 14px; }
+  .chip {
+    padding: 5px 12px; border-radius: 14px;
+    font-size: 11px; white-space: nowrap;
+  }
+
+  /* Agent/user msg */
+  .agent-msg {
+    margin: 6px 14px; padding: 10px 14px;
+    border-radius: 14px 14px 14px 4px;
+    font-size: 13px; max-width: 82%; text-align: left;
+  }
+  .user-msg {
+    margin: 6px 14px 6px auto; padding: 10px 14px;
+    border-radius: 14px 14px 4px 14px;
+    font-size: 13px; max-width: 82%; text-align: right;
+  }
+
+  /* Module card */
+  .mod-card {
+    margin: 10px 14px; border-radius: 10px;
+    overflow: hidden;
+  }
+  .mod-header {
+    padding: 10px 14px 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .mod-title { font-size: 13px; font-weight: 600; }
+  .mod-badge { font-size: 9px; padding: 2px 7px; border-radius: 6px; }
+  .mod-body { padding: 0 14px 12px; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .metric-item {
+    padding: 10px; border-radius: 6px; text-align: center;
+  }
+  .metric-val { font-size: 20px; font-weight: 700; }
+  .metric-lbl { font-size: 10px; margin-top: 2px; }
+  .metric-trend { font-size: 10px; }
+
+  .chart-area {
+    height: 60px; border-radius: 6px;
+    position: relative; overflow: hidden; margin-top: 6px;
+  }
+  .chart-fill {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 100%;
+    clip-path: polygon(0% 80%, 15% 60%, 30% 65%, 45% 40%, 55% 35%, 65% 25%, 75% 30%, 85% 15%, 100% 10%, 100% 100%, 0% 100%);
+  }
+
+  /* Creation anim */
+  .creation {
+    margin: 10px 14px; padding: 14px;
+    border-radius: 10px; text-align: center;
+    font-size: 12px;
+  }
+
+  /* Undo toast */
+  .undo-toast {
+    position: absolute; bottom: 52px; left: 14px; right: 14px;
+    border-radius: 10px; padding: 10px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+  }
+  .undo-btn { font-weight: 600; font-size: 12px; background: none; border: none; cursor: pointer; }
+
+  /* Status line */
+  .status-line {
+    font-size: 10px; padding: 4px 14px;
+    display: flex; justify-content: space-between;
+  }
+
+  /* Swatch row */
+  .swatches {
+    display: flex; gap: 4px; justify-content: center;
+    margin-top: 8px; flex-wrap: wrap;
+  }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .swatch-label {
+    font-size: 9px; margin-top: 4px; text-align: center;
+  }
+
+  /* Section dividers */
+  .section-divider {
+    text-align: center; padding: 40px 24px 16px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  .section-divider h2 { font-size: 20px; font-weight: 400; margin-bottom: 4px; }
+  .section-divider p { font-size: 13px; color: #888; }
+
+  /* Comparison bar */
+  .vote-section {
+    max-width: 1400px; margin: 0 auto;
+    padding: 40px 24px 60px;
+    text-align: center;
+  }
+  .vote-section h2 { font-size: 20px; margin-bottom: 24px; }
+  .vote-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; max-width: 900px; margin: 0 auto;
+  }
+  @media (max-width: 700px) { .vote-grid { grid-template-columns: repeat(2, 1fr); } }
+  .vote-card {
+    padding: 20px 16px; border-radius: 12px;
+    border: 2px solid #333; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .vote-card:hover { transform: translateY(-2px); }
+  .vote-card h3 { font-size: 15px; margin-bottom: 4px; }
+  .vote-card p { font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Self — Theme Comparison</h1>
+  <p>Four color palettes applied to the Direction D (Contextual Shift) layout. Same UX, different emotional registers.</p>
+</div>
+
+<!-- ==================== FIRST SCREEN STATE ==================== -->
+<div class="section-divider">
+  <h2>The Magical First Screen</h2>
+  <p>Empty state with prompt suggestions — the first emotional impression</p>
+</div>
+
+<div class="themes-grid">
+
+  <!-- TERRA -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#CC7A5A;">Terra</div>
+    <div class="theme-subtitle" style="color:#A89888;">Warm craft, ember glow</div>
+    <div class="phone" style="border-color:#3A3430;">
+      <div class="phone-notch" style="background:#0D0B0A;"></div>
+      <div class="phone-content" style="background:#1A1614;">
+        <div class="ambient" style="background:radial-gradient(ellipse at 50% 30%, #4A3028 0%, transparent 70%);"></div>
+        <div style="padding-top: 100px; text-align: center;">
+          <div style="width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 40%, rgba(255,255,255,0.3), currentColor);margin:0 auto 12px;box-shadow:0 0 20px currentColor;opacity:0.9;"></div>
+          <div style="font-size: 17px; font-weight: 300; padding: 0 28px; color:#F5EDE6;">What's on your mind?</div>
+          <div style="font-size: 12px; color: #A89888; padding: 8px 28px 0;">I'm here to build whatever you need.</div>
+        </div>
+        <div style="position: absolute; bottom: 95px; left: 0; right: 0;">
+          <div class="chips">
+            <span class="chip" style="background:#4A3028; color:#CC7A5A; border:1px solid #CC7A5A;">☀️ Weather</span>
+            <span class="chip" style="background:#4A3028; color:#CC7A5A; border:1px solid #CC7A5A;">📋 Track</span>
+          </div>
+          <div class="chips" style="padding-top:0;">
+            <span class="chip" style="background:#4A3028; color:#CC7A5A; border:1px solid #CC7A5A;">📅 Organize</span>
+            <span class="chip" style="background:#4A3028; color:#CC7A5A; border:1px dashed #CC7A5A;">🔥 Automate</span>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#2A2320; border-top:1px solid #352E28;">
+          <input class="chat-field" style="background:#352E28; color:#F5EDE6;" placeholder="Type anything..." disabled>
+          <button class="send-btn" style="background:#CC7A5A;">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="swatch" style="background:#1A1614;"></div>
+      <div class="swatch" style="background:#2A2320;"></div>
+      <div class="swatch" style="background:#CC7A5A;"></div>
+      <div class="swatch" style="background:#7A9E7E;"></div>
+      <div class="swatch" style="background:#D4A055;"></div>
+      <div class="swatch" style="background:#C45C4A;"></div>
+    </div>
+  </div>
+
+  <!-- STARLIGHT (Indigo + Gold) -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#D4A862;">Starlight</div>
+    <div class="theme-subtitle" style="color:#8888AA;">Deep indigo, golden glow</div>
+    <div class="phone" style="border-color:#2A2A44;">
+      <div class="phone-notch" style="background:#08081A;"></div>
+      <div class="phone-content" style="background:#0E0E22;">
+        <div class="ambient" style="background:radial-gradient(ellipse at 50% 25%, #2A2050 0%, transparent 60%), radial-gradient(ellipse at 70% 60%, #3A2810 0%, transparent 50%);"></div>
+        <div style="padding-top: 100px; text-align: center;">
+          <div style="width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 40%, rgba(255,255,255,0.3), currentColor);margin:0 auto 12px;box-shadow:0 0 20px currentColor;opacity:0.9;"></div>
+          <div style="font-size: 17px; font-weight: 300; padding: 0 28px; color:#E8E4F0;">What's on your mind?</div>
+          <div style="font-size: 12px; color: #8888AA; padding: 8px 28px 0;">I'm here to build whatever you need.</div>
+        </div>
+        <div style="position: absolute; bottom: 95px; left: 0; right: 0;">
+          <div class="chips">
+            <span class="chip" style="background:#1A1838; color:#D4A862; border:1px solid #D4A862;">☀️ Weather</span>
+            <span class="chip" style="background:#1A1838; color:#D4A862; border:1px solid #D4A862;">📋 Track</span>
+          </div>
+          <div class="chips" style="padding-top:0;">
+            <span class="chip" style="background:#1A1838; color:#D4A862; border:1px solid #D4A862;">📅 Organize</span>
+            <span class="chip" style="background:#1A1838; color:#D4A862; border:1px dashed #D4A862;">✨ Surprise me</span>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#161630; border-top:1px solid #2A2A44;">
+          <input class="chat-field" style="background:#1E1E3A; color:#E8E4F0;" placeholder="Type anything..." disabled>
+          <button class="send-btn" style="background:#D4A862;">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="swatch" style="background:#0E0E22;"></div>
+      <div class="swatch" style="background:#161630;"></div>
+      <div class="swatch" style="background:#D4A862;"></div>
+      <div class="swatch" style="background:#6EAA8D;"></div>
+      <div class="swatch" style="background:#7B6BCC;"></div>
+      <div class="swatch" style="background:#CC6B6B;"></div>
+    </div>
+  </div>
+
+  <!-- AURORA (Violet + Cyan) -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#66D9CC;">Aurora</div>
+    <div class="theme-subtitle" style="color:#9988BB;">Violet depths, cyan light</div>
+    <div class="phone" style="border-color:#2D2244;">
+      <div class="phone-notch" style="background:#0A0818;"></div>
+      <div class="phone-content" style="background:#100E20;">
+        <div class="ambient" style="background:radial-gradient(ellipse at 30% 20%, #2A1848 0%, transparent 55%), radial-gradient(ellipse at 70% 40%, #0A3038 0%, transparent 50%);"></div>
+        <div style="padding-top: 100px; text-align: center;">
+          <div style="width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 40%, rgba(255,255,255,0.3), currentColor);margin:0 auto 12px;box-shadow:0 0 20px currentColor;opacity:0.9;"></div>
+          <div style="font-size: 17px; font-weight: 300; padding: 0 28px; color:#E4E0F4;">What's on your mind?</div>
+          <div style="font-size: 12px; color: #9988BB; padding: 8px 28px 0;">I'm here to build whatever you need.</div>
+        </div>
+        <div style="position: absolute; bottom: 95px; left: 0; right: 0;">
+          <div class="chips">
+            <span class="chip" style="background:#1A1530; color:#66D9CC; border:1px solid #66D9CC;">☀️ Weather</span>
+            <span class="chip" style="background:#1A1530; color:#66D9CC; border:1px solid #66D9CC;">📋 Track</span>
+          </div>
+          <div class="chips" style="padding-top:0;">
+            <span class="chip" style="background:#1A1530; color:#66D9CC; border:1px solid #66D9CC;">📅 Organize</span>
+            <span class="chip" style="background:#1A1530; color:#66D9CC; border:1px dashed #66D9CC;">🌌 Explore</span>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#161228; border-top:1px solid #2D2244;">
+          <input class="chat-field" style="background:#1C1834; color:#E4E0F4;" placeholder="Type anything..." disabled>
+          <button class="send-btn" style="background:#66D9CC; color:#100E20;">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="swatch" style="background:#100E20;"></div>
+      <div class="swatch" style="background:#1C1834;"></div>
+      <div class="swatch" style="background:#66D9CC;"></div>
+      <div class="swatch" style="background:#A477E0;"></div>
+      <div class="swatch" style="background:#E0C850;"></div>
+      <div class="swatch" style="background:#E06888;"></div>
+    </div>
+  </div>
+
+  <!-- TWILIGHT (Blue night + Amber) -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#E8A84C;">Twilight</div>
+    <div class="theme-subtitle" style="color:#7899BB;">Blue dusk, amber warmth</div>
+    <div class="phone" style="border-color:#1E2E44;">
+      <div class="phone-notch" style="background:#060E18;"></div>
+      <div class="phone-content" style="background:#0C1420;">
+        <div class="ambient" style="background:radial-gradient(ellipse at 50% 25%, #1A2844 0%, transparent 60%), radial-gradient(ellipse at 60% 70%, #2E1E10 0%, transparent 45%);"></div>
+        <div style="padding-top: 100px; text-align: center;">
+          <div style="width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 40%, rgba(255,255,255,0.3), currentColor);margin:0 auto 12px;box-shadow:0 0 20px currentColor;opacity:0.9;"></div>
+          <div style="font-size: 17px; font-weight: 300; padding: 0 28px; color:#E4ECF4;">What's on your mind?</div>
+          <div style="font-size: 12px; color: #7899BB; padding: 8px 28px 0;">I'm here to build whatever you need.</div>
+        </div>
+        <div style="position: absolute; bottom: 95px; left: 0; right: 0;">
+          <div class="chips">
+            <span class="chip" style="background:#12203A; color:#E8A84C; border:1px solid #E8A84C;">☀️ Weather</span>
+            <span class="chip" style="background:#12203A; color:#E8A84C; border:1px solid #E8A84C;">📋 Track</span>
+          </div>
+          <div class="chips" style="padding-top:0;">
+            <span class="chip" style="background:#12203A; color:#E8A84C; border:1px solid #E8A84C;">📅 Organize</span>
+            <span class="chip" style="background:#12203A; color:#E8A84C; border:1px dashed #E8A84C;">🌅 Discover</span>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#101C2C; border-top:1px solid #1E2E44;">
+          <input class="chat-field" style="background:#162436; color:#E4ECF4;" placeholder="Type anything..." disabled>
+          <button class="send-btn" style="background:#E8A84C; color:#0C1420;">↑</button>
+        </div>
+      </div>
+    </div>
+    <div class="swatches">
+      <div class="swatch" style="background:#0C1420;"></div>
+      <div class="swatch" style="background:#162436;"></div>
+      <div class="swatch" style="background:#E8A84C;"></div>
+      <div class="swatch" style="background:#5CB8A0;"></div>
+      <div class="swatch" style="background:#6B8ECC;"></div>
+      <div class="swatch" style="background:#CC5F5F;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD STATE ==================== -->
+<div class="section-divider">
+  <h2>Dashboard State (Month 3)</h2>
+  <p>Multiple modules, agent status line, chat input at bottom — the mature experience</p>
+</div>
+
+<div class="themes-grid">
+
+  <!-- TERRA DASHBOARD -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#CC7A5A;">Terra</div>
+    <div class="phone" style="border-color:#3A3430;">
+      <div class="phone-notch" style="background:#0D0B0A;"></div>
+      <div class="phone-content" style="background:#1A1614;">
+        <div style="padding: 6px 0 55px;">
+          <div class="status-line" style="color:#A89888;">
+            <span>Good morning Seb <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor;vertical-align:middle;"></span></span><span>All fresh</span>
+          </div>
+          <div class="mod-card" style="background:#2A2320; border:1px solid #352E28;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#F5EDE6;">🌊 Marine</span>
+              <span style="font-size:9px;color:#7A9E7E;">✓ Calm</span>
+            </div>
+            <div class="mod-body">
+              <div class="metric-grid">
+                <div class="metric-item" style="background:#352E28;">
+                  <div class="metric-val" style="font-size:17px;color:#F5EDE6;">12 kn</div>
+                  <div class="metric-lbl" style="color:#A89888;">Wind</div>
+                </div>
+                <div class="metric-item" style="background:#352E28;">
+                  <div class="metric-val" style="font-size:17px;color:#F5EDE6;">0.8 m</div>
+                  <div class="metric-lbl" style="color:#A89888;">Waves</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 14px;">
+            <div style="background:#2A2320;border-radius:10px;padding:10px;text-align:center;border:1px solid #352E28;">
+              <div style="font-size:17px;font-weight:700;color:#F5EDE6;">€9.1k</div>
+              <div style="font-size:9px;color:#A89888;">MRR</div>
+              <div style="font-size:9px;color:#7A9E7E;">↑ 3%</div>
+            </div>
+            <div style="background:#2A2320;border-radius:10px;padding:10px;text-align:center;border:1px solid #352E28;">
+              <div style="font-size:17px;font-weight:700;color:#F5EDE6;">23 km</div>
+              <div style="font-size:9px;color:#A89888;">Running</div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#2A2320; border:1px solid #352E28; margin-top:6px;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#F5EDE6;">📅 Today</span>
+            </div>
+            <div class="mod-body">
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #352E28;font-size:11px;color:#F5EDE6;">
+                <span>Deploy v2.3</span><span style="color:#A89888;">10:00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px;color:#F5EDE6;">
+                <span>Client call</span><span style="color:#A89888;">14:00</span>
+              </div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#2A2320; border:1px solid #352E28;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#D4A055;">⚠️ Alert</span>
+            </div>
+            <div class="mod-body" style="font-size:11px;color:#D4A055;">
+              Force 7 on Saturday route.
+            </div>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#2A2320; border-top:1px solid #352E28;">
+          <input class="chat-field" style="background:#352E28; color:#F5EDE6;" placeholder="Ask anything..." disabled>
+          <button class="send-btn" style="background:#CC7A5A;">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STARLIGHT DASHBOARD -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#D4A862;">Starlight</div>
+    <div class="phone" style="border-color:#2A2A44;">
+      <div class="phone-notch" style="background:#08081A;"></div>
+      <div class="phone-content" style="background:#0E0E22;">
+        <div style="padding: 6px 0 55px;">
+          <div class="status-line" style="color:#8888AA;">
+            <span>Good morning Seb <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor;vertical-align:middle;"></span></span><span>All fresh</span>
+          </div>
+          <div class="mod-card" style="background:#161630; border:1px solid #2A2A44;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E8E4F0;">🌊 Marine</span>
+              <span style="font-size:9px;color:#6EAA8D;">✓ Calm</span>
+            </div>
+            <div class="mod-body">
+              <div class="metric-grid">
+                <div class="metric-item" style="background:#1E1E3A;">
+                  <div class="metric-val" style="font-size:17px;color:#E8E4F0;">12 kn</div>
+                  <div class="metric-lbl" style="color:#8888AA;">Wind</div>
+                </div>
+                <div class="metric-item" style="background:#1E1E3A;">
+                  <div class="metric-val" style="font-size:17px;color:#E8E4F0;">0.8 m</div>
+                  <div class="metric-lbl" style="color:#8888AA;">Waves</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 14px;">
+            <div style="background:#161630;border-radius:10px;padding:10px;text-align:center;border:1px solid #2A2A44;">
+              <div style="font-size:17px;font-weight:700;color:#E8E4F0;">€9.1k</div>
+              <div style="font-size:9px;color:#8888AA;">MRR</div>
+              <div style="font-size:9px;color:#6EAA8D;">↑ 3%</div>
+            </div>
+            <div style="background:#161630;border-radius:10px;padding:10px;text-align:center;border:1px solid #2A2A44;">
+              <div style="font-size:17px;font-weight:700;color:#E8E4F0;">23 km</div>
+              <div style="font-size:9px;color:#8888AA;">Running</div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#161630; border:1px solid #2A2A44; margin-top:6px;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E8E4F0;">📅 Today</span>
+            </div>
+            <div class="mod-body">
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #2A2A44;font-size:11px;color:#E8E4F0;">
+                <span>Deploy v2.3</span><span style="color:#8888AA;">10:00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px;color:#E8E4F0;">
+                <span>Client call</span><span style="color:#8888AA;">14:00</span>
+              </div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#161630; border:1px solid #2A2A44;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#D4A862;">⚠️ Alert</span>
+            </div>
+            <div class="mod-body" style="font-size:11px;color:#D4A862;">
+              Force 7 on Saturday route.
+            </div>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#161630; border-top:1px solid #2A2A44;">
+          <input class="chat-field" style="background:#1E1E3A; color:#E8E4F0;" placeholder="Ask anything..." disabled>
+          <button class="send-btn" style="background:#D4A862; color:#0E0E22;">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AURORA DASHBOARD -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#66D9CC;">Aurora</div>
+    <div class="phone" style="border-color:#2D2244;">
+      <div class="phone-notch" style="background:#0A0818;"></div>
+      <div class="phone-content" style="background:#100E20;">
+        <div style="padding: 6px 0 55px;">
+          <div class="status-line" style="color:#9988BB;">
+            <span>Good morning Seb <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor;vertical-align:middle;"></span></span><span>All fresh</span>
+          </div>
+          <div class="mod-card" style="background:#1C1834; border:1px solid #2D2244;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E4E0F4;">🌊 Marine</span>
+              <span style="font-size:9px;color:#66D9CC;">✓ Calm</span>
+            </div>
+            <div class="mod-body">
+              <div class="metric-grid">
+                <div class="metric-item" style="background:#221E38;">
+                  <div class="metric-val" style="font-size:17px;color:#E4E0F4;">12 kn</div>
+                  <div class="metric-lbl" style="color:#9988BB;">Wind</div>
+                </div>
+                <div class="metric-item" style="background:#221E38;">
+                  <div class="metric-val" style="font-size:17px;color:#E4E0F4;">0.8 m</div>
+                  <div class="metric-lbl" style="color:#9988BB;">Waves</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 14px;">
+            <div style="background:#1C1834;border-radius:10px;padding:10px;text-align:center;border:1px solid #2D2244;">
+              <div style="font-size:17px;font-weight:700;color:#E4E0F4;">€9.1k</div>
+              <div style="font-size:9px;color:#9988BB;">MRR</div>
+              <div style="font-size:9px;color:#66D9CC;">↑ 3%</div>
+            </div>
+            <div style="background:#1C1834;border-radius:10px;padding:10px;text-align:center;border:1px solid #2D2244;">
+              <div style="font-size:17px;font-weight:700;color:#E4E0F4;">23 km</div>
+              <div style="font-size:9px;color:#9988BB;">Running</div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#1C1834; border:1px solid #2D2244; margin-top:6px;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E4E0F4;">📅 Today</span>
+            </div>
+            <div class="mod-body">
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #2D2244;font-size:11px;color:#E4E0F4;">
+                <span>Deploy v2.3</span><span style="color:#9988BB;">10:00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px;color:#E4E0F4;">
+                <span>Client call</span><span style="color:#9988BB;">14:00</span>
+              </div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#1C1834; border:1px solid #2D2244;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E0C850;">⚠️ Alert</span>
+            </div>
+            <div class="mod-body" style="font-size:11px;color:#E0C850;">
+              Force 7 on Saturday route.
+            </div>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#161228; border-top:1px solid #2D2244;">
+          <input class="chat-field" style="background:#1C1834; color:#E4E0F4;" placeholder="Ask anything..." disabled>
+          <button class="send-btn" style="background:#66D9CC; color:#100E20;">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TWILIGHT DASHBOARD -->
+  <div class="theme-col">
+    <div class="theme-title" style="color:#E8A84C;">Twilight</div>
+    <div class="phone" style="border-color:#1E2E44;">
+      <div class="phone-notch" style="background:#060E18;"></div>
+      <div class="phone-content" style="background:#0C1420;">
+        <div style="padding: 6px 0 55px;">
+          <div class="status-line" style="color:#7899BB;">
+            <span>Good morning Seb <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor;vertical-align:middle;"></span></span><span>All fresh</span>
+          </div>
+          <div class="mod-card" style="background:#101C2C; border:1px solid #1E2E44;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E4ECF4;">🌊 Marine</span>
+              <span style="font-size:9px;color:#5CB8A0;">✓ Calm</span>
+            </div>
+            <div class="mod-body">
+              <div class="metric-grid">
+                <div class="metric-item" style="background:#162436;">
+                  <div class="metric-val" style="font-size:17px;color:#E4ECF4;">12 kn</div>
+                  <div class="metric-lbl" style="color:#7899BB;">Wind</div>
+                </div>
+                <div class="metric-item" style="background:#162436;">
+                  <div class="metric-val" style="font-size:17px;color:#E4ECF4;">0.8 m</div>
+                  <div class="metric-lbl" style="color:#7899BB;">Waves</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 14px;">
+            <div style="background:#101C2C;border-radius:10px;padding:10px;text-align:center;border:1px solid #1E2E44;">
+              <div style="font-size:17px;font-weight:700;color:#E4ECF4;">€9.1k</div>
+              <div style="font-size:9px;color:#7899BB;">MRR</div>
+              <div style="font-size:9px;color:#5CB8A0;">↑ 3%</div>
+            </div>
+            <div style="background:#101C2C;border-radius:10px;padding:10px;text-align:center;border:1px solid #1E2E44;">
+              <div style="font-size:17px;font-weight:700;color:#E4ECF4;">23 km</div>
+              <div style="font-size:9px;color:#7899BB;">Running</div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#101C2C; border:1px solid #1E2E44; margin-top:6px;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E4ECF4;">📅 Today</span>
+            </div>
+            <div class="mod-body">
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1E2E44;font-size:11px;color:#E4ECF4;">
+                <span>Deploy v2.3</span><span style="color:#7899BB;">10:00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px;color:#E4ECF4;">
+                <span>Client call</span><span style="color:#7899BB;">14:00</span>
+              </div>
+            </div>
+          </div>
+          <div class="mod-card" style="background:#101C2C; border:1px solid #1E2E44;">
+            <div class="mod-header">
+              <span class="mod-title" style="color:#E8A84C;">⚠️ Alert</span>
+            </div>
+            <div class="mod-body" style="font-size:11px;color:#E8A84C;">
+              Force 7 on Saturday route.
+            </div>
+          </div>
+        </div>
+        <div class="chat-input" style="background:#101C2C; border-top:1px solid #1E2E44;">
+          <input class="chat-field" style="background:#162436; color:#E4ECF4;" placeholder="Ask anything..." disabled>
+          <button class="send-btn" style="background:#E8A84C; color:#0C1420;">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SUMMARY ==================== -->
+<div class="vote-section">
+  <h2>Which feels the most magical?</h2>
+  <div class="vote-grid">
+    <div class="vote-card" style="border-color:#CC7A5A;" onmouseover="this.style.borderColor='#CC7A5A';this.style.background='#2A2320'" onmouseout="this.style.background='transparent'">
+      <h3 style="color:#CC7A5A;">Terra</h3>
+      <p>Warm craft, ember forge. Earthy and handmade.</p>
+    </div>
+    <div class="vote-card" style="border-color:#D4A862;" onmouseover="this.style.borderColor='#D4A862';this.style.background='#161630'" onmouseout="this.style.background='transparent'">
+      <h3 style="color:#D4A862;">Starlight</h3>
+      <p>Night sky, golden constellations. Mystical and deep.</p>
+    </div>
+    <div class="vote-card" style="border-color:#66D9CC;" onmouseover="this.style.borderColor='#66D9CC';this.style.background='#1C1834'" onmouseout="this.style.background='transparent'">
+      <h3 style="color:#66D9CC;">Aurora</h3>
+      <p>Northern lights, electric glow. Vivid and otherworldly.</p>
+    </div>
+    <div class="vote-card" style="border-color:#E8A84C;" onmouseover="this.style.borderColor='#E8A84C';this.style.background='#101C2C'" onmouseout="this.style.background='transparent'">
+      <h3 style="color:#E8A84C;">Twilight</h3>
+      <p>Dusk ocean, amber horizon. Calm and transitional.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

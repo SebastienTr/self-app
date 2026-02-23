@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self — Design Direction Exploration</title>
+<style>
+  :root {
+    --bg: #1A1614;
+    --surface: #2A2320;
+    --surfaceElevated: #352E28;
+    --text: #F5EDE6;
+    --textSecondary: #A89888;
+    --accent: #CC7A5A;
+    --accentSubtle: #4A3028;
+    --success: #7A9E7E;
+    --warning: #D4A055;
+    --error: #C45C4A;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0D0B0A;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  /* Header */
+  .page-header {
+    text-align: center;
+    padding: 60px 24px 40px;
+    border-bottom: 1px solid var(--surfaceElevated);
+  }
+  .page-header h1 { font-size: 32px; font-weight: 300; margin-bottom: 8px; }
+  .page-header h1 span { color: var(--accent); font-weight: 600; }
+  .page-header p { color: var(--textSecondary); font-size: 15px; max-width: 600px; margin: 0 auto; }
+
+  /* Navigation */
+  .direction-nav {
+    display: flex; gap: 8px; justify-content: center; padding: 24px;
+    position: sticky; top: 0; background: #0D0B0A; z-index: 100;
+    border-bottom: 1px solid var(--surfaceElevated);
+    flex-wrap: wrap;
+  }
+  .nav-btn {
+    padding: 10px 20px; border-radius: 8px; border: 1px solid var(--surfaceElevated);
+    background: transparent; color: var(--textSecondary); cursor: pointer;
+    font-size: 14px; transition: all 0.2s;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--text); }
+  .nav-btn.active { background: var(--accentSubtle); border-color: var(--accent); color: var(--accent); }
+
+  /* Direction Section */
+  .direction {
+    max-width: 1200px; margin: 0 auto; padding: 60px 24px;
+    border-bottom: 1px solid var(--surfaceElevated);
+  }
+  .direction-header {
+    display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px;
+  }
+  .direction-label {
+    font-size: 13px; font-weight: 600; color: var(--accent);
+    background: var(--accentSubtle); padding: 4px 12px; border-radius: 4px;
+  }
+  .direction h2 { font-size: 24px; font-weight: 600; }
+  .direction > p { color: var(--textSecondary); font-size: 15px; margin-bottom: 32px; max-width: 700px; }
+
+  /* Phone Mockup */
+  .mockup-row {
+    display: flex; gap: 32px; justify-content: center; flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .mockup-container { text-align: center; }
+  .mockup-label { font-size: 13px; color: var(--textSecondary); margin-bottom: 12px; }
+  .phone {
+    width: 320px; height: 640px; background: var(--bg);
+    border-radius: 32px; border: 3px solid #3A3430;
+    overflow: hidden; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .phone-notch {
+    width: 120px; height: 28px; background: #0D0B0A;
+    border-radius: 0 0 16px 16px; margin: 0 auto;
+    position: relative; z-index: 10;
+  }
+  .phone-content {
+    height: calc(100% - 28px); overflow-y: auto; position: relative;
+  }
+  .phone-content::-webkit-scrollbar { display: none; }
+
+  /* Status bar */
+  .status-bar {
+    display: flex; justify-content: space-between; padding: 4px 20px;
+    font-size: 11px; color: var(--textSecondary);
+  }
+
+  /* Common UI elements */
+  .chat-input {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 12px 16px; background: var(--surface);
+    border-top: 1px solid var(--surfaceElevated);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chat-input-field {
+    flex: 1; background: var(--surfaceElevated); border: none;
+    border-radius: 20px; padding: 10px 16px; color: var(--text);
+    font-size: 14px;
+  }
+  .chat-input-field::placeholder { color: var(--textSecondary); }
+  .send-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent); border: none; color: white;
+    font-size: 16px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+  }
+
+  .suggestion-chips {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 16px;
+  }
+  .chip {
+    padding: 6px 14px; border-radius: 16px;
+    background: var(--accentSubtle); color: var(--accent);
+    font-size: 12px; border: 1px solid var(--accent);
+    white-space: nowrap;
+  }
+
+  .agent-msg {
+    background: var(--surface); margin: 8px 16px 8px 16px;
+    padding: 12px 16px; border-radius: 16px 16px 16px 4px;
+    font-size: 14px; max-width: 85%;
+  }
+  .user-msg {
+    background: var(--accentSubtle); margin: 8px 16px 8px auto;
+    padding: 12px 16px; border-radius: 16px 16px 4px 16px;
+    font-size: 14px; max-width: 85%; text-align: right;
+    border: 1px solid var(--accent);
+  }
+
+  .module-card {
+    background: var(--surface); margin: 12px 16px;
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--surfaceElevated);
+  }
+  .module-card-header {
+    padding: 12px 16px 8px; display: flex;
+    justify-content: space-between; align-items: center;
+  }
+  .module-card-title { font-size: 15px; font-weight: 600; }
+  .module-card-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 8px;
+    background: var(--accentSubtle); color: var(--accent);
+  }
+  .module-card-body { padding: 0 16px 16px; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-item {
+    background: var(--surfaceElevated); padding: 12px;
+    border-radius: 8px; text-align: center;
+  }
+  .metric-value { font-size: 24px; font-weight: 700; color: var(--text); }
+  .metric-label { font-size: 11px; color: var(--textSecondary); margin-top: 2px; }
+  .metric-trend { font-size: 11px; color: var(--success); }
+  .metric-trend.down { color: var(--error); }
+
+  .chart-placeholder {
+    height: 80px; background: var(--surfaceElevated);
+    border-radius: 8px; position: relative; overflow: hidden;
+    margin-top: 8px;
+  }
+  .chart-line {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 100%;
+    background: linear-gradient(180deg, transparent 0%, var(--accentSubtle) 100%);
+    clip-path: polygon(0% 80%, 10% 65%, 20% 70%, 30% 45%, 40% 50%, 50% 30%, 60% 35%, 70% 20%, 80% 25%, 90% 15%, 100% 10%, 100% 100%, 0% 100%);
+  }
+  .chart-line-stroke {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 100%;
+    border-top: 2px solid var(--accent);
+    clip-path: polygon(0% 80%, 10% 65%, 20% 70%, 30% 45%, 40% 50%, 50% 30%, 60% 35%, 70% 20%, 80% 25%, 90% 15%, 100% 10%, 100% 10%, 90% 15%, 80% 25%, 70% 20%, 60% 35%, 50% 30%, 40% 50%, 30% 45%, 20% 70%, 10% 65%, 0% 80%);
+  }
+
+  .map-placeholder {
+    height: 120px; background: var(--surfaceElevated);
+    border-radius: 8px; position: relative; overflow: hidden;
+  }
+  .map-grid {
+    position: absolute; inset: 0; opacity: 0.15;
+    background-image: repeating-linear-gradient(var(--textSecondary) 0 1px, transparent 1px 30px),
+                        repeating-linear-gradient(90deg, var(--textSecondary) 0 1px, transparent 1px 30px);
+  }
+  .map-dot {
+    position: absolute; width: 8px; height: 8px;
+    background: var(--accent); border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .map-route {
+    position: absolute; height: 2px; background: var(--accent);
+    opacity: 0.6; transform-origin: left center;
+  }
+
+  .list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--surfaceElevated);
+    font-size: 13px;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 10px; flex-shrink: 0;
+  }
+  .list-item-left { display: flex; align-items: center; }
+
+  /* Tabs / Navigation */
+  .bottom-tabs {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-around;
+    padding: 8px 0 20px; background: var(--surface);
+    border-top: 1px solid var(--surfaceElevated);
+  }
+  .tab-item {
+    text-align: center; font-size: 10px; color: var(--textSecondary);
+  }
+  .tab-item.active { color: var(--accent); }
+  .tab-icon { font-size: 20px; margin-bottom: 2px; }
+
+  /* Bottom sheet */
+  .bottom-sheet {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--surfaceElevated);
+  }
+  .sheet-handle {
+    width: 36px; height: 4px; background: var(--surfaceElevated);
+    border-radius: 2px; margin: 8px auto 12px;
+  }
+
+  /* FAB */
+  .fab {
+    position: absolute; right: 16px;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--accent); display: flex;
+    align-items: center; justify-content: center;
+    font-size: 24px; color: white;
+    box-shadow: 0 4px 16px rgba(204,122,90,0.4);
+  }
+
+  /* Undo toast */
+  .undo-toast {
+    position: absolute; bottom: 70px; left: 16px; right: 16px;
+    background: var(--surfaceElevated); border-radius: 12px;
+    padding: 12px 16px; display: flex;
+    justify-content: space-between; align-items: center;
+    border: 1px solid var(--accent);
+    font-size: 13px;
+  }
+  .undo-btn {
+    color: var(--accent); font-weight: 600; font-size: 13px;
+    background: none; border: none; cursor: pointer;
+  }
+
+  /* Ambient glow */
+  .ambient-glow {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 50% 30%, var(--accentSubtle) 0%, transparent 70%);
+    opacity: 0.3; pointer-events: none;
+  }
+
+  /* Pros/Cons */
+  .analysis {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-top: 24px; max-width: 700px;
+  }
+  .analysis-col h4 {
+    font-size: 13px; font-weight: 600; margin-bottom: 8px;
+    color: var(--success);
+  }
+  .analysis-col h4.cons { color: var(--warning); }
+  .analysis-col li {
+    font-size: 13px; color: var(--textSecondary);
+    margin-bottom: 4px; list-style: none;
+    padding-left: 16px; position: relative;
+  }
+  .analysis-col li::before {
+    content: '→'; position: absolute; left: 0; color: var(--accent);
+  }
+
+  /* Agent thinking */
+  .agent-thinking {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 16px; margin: 8px 16px;
+    font-size: 13px; color: var(--accent);
+  }
+  .thinking-dots span {
+    display: inline-block; width: 6px; height: 6px;
+    background: var(--accent); border-radius: 50%;
+    margin: 0 2px; opacity: 0.4;
+  }
+  .thinking-dots span:nth-child(1) { opacity: 1; }
+  .thinking-dots span:nth-child(2) { opacity: 0.7; }
+
+  /* Creation animation placeholder */
+  .creation-anim {
+    margin: 12px 16px; padding: 16px;
+    border: 1px dashed var(--accent); border-radius: 12px;
+    text-align: center; color: var(--accent); font-size: 13px;
+    background: linear-gradient(180deg, var(--accentSubtle) 0%, transparent 100%);
+  }
+
+  /* Comparison table */
+  .comparison { margin-top: 48px; overflow-x: auto; }
+  .comparison table {
+    width: 100%; border-collapse: collapse; font-size: 14px;
+  }
+  .comparison th {
+    text-align: left; padding: 12px 16px; border-bottom: 2px solid var(--accent);
+    color: var(--accent); font-weight: 600;
+  }
+  .comparison td {
+    padding: 10px 16px; border-bottom: 1px solid var(--surfaceElevated);
+    color: var(--textSecondary);
+  }
+  .comparison tr:hover td { background: var(--surface); }
+  .check { color: var(--success); }
+  .warn { color: var(--warning); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1><span>Self</span> — Design Directions</h1>
+  <p>Four approaches to the Chat ↔ Dashboard metamorphosis. Each direction solves the core UX challenge differently: how does an app that starts as a conversation become a dashboard?</p>
+</div>
+
+<nav class="direction-nav">
+  <button class="nav-btn active" onclick="scrollTo('first-screen')">First Screen</button>
+  <button class="nav-btn" onclick="scrollTo('dir-a')">A: Unified Stream</button>
+  <button class="nav-btn" onclick="scrollTo('dir-b')">B: Sheet + Canvas</button>
+  <button class="nav-btn" onclick="scrollTo('dir-c')">C: Tab Split</button>
+  <button class="nav-btn" onclick="scrollTo('dir-d')">D: Contextual Shift</button>
+  <button class="nav-btn" onclick="scrollTo('comparison')">Compare</button>
+</nav>
+
+<!-- ==================== FIRST SCREEN ==================== -->
+<section class="direction" id="first-screen">
+  <div class="direction-header">
+    <span class="direction-label">SHARED</span>
+    <h2>The Magical First Screen</h2>
+  </div>
+  <p>This screen is universal across all directions — the empty state before any module exists. Terra theme, prompt suggestions, and a free input field. The app is alive and waiting.</p>
+
+  <div class="mockup-row">
+    <div class="mockup-container">
+      <div class="mockup-label">Empty State — First Open</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient-glow"></div>
+          <div style="padding-top: 120px; text-align: center;">
+            <div style="width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 40% 40%, rgba(255,255,255,0.3), var(--accent));margin:0 auto 16px;box-shadow:0 0 24px var(--accent);opacity:0.9;"></div>
+            <div style="font-size: 20px; font-weight: 300; padding: 0 32px; margin-bottom: 8px;">What's on your mind?</div>
+            <div style="font-size: 13px; color: var(--textSecondary); padding: 0 32px;">I'm here to build whatever you need. Just tell me.</div>
+          </div>
+          <div style="position: absolute; bottom: 110px; left: 0; right: 0;">
+            <div class="suggestion-chips">
+              <span class="chip">☀️ What's the weather?</span>
+              <span class="chip">📋 Track something</span>
+            </div>
+            <div class="suggestion-chips" style="padding-top: 0;">
+              <span class="chip">📅 Organize my week</span>
+              <span class="chip" style="border-style: dashed;">🔥 Automate something</span>
+            </div>
+          </div>
+          <div class="chat-input" style="bottom: 0;">
+            <input class="chat-input-field" placeholder="Type anything..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">First Module Being Created</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div style="padding-top: 16px;">
+            <div class="user-msg">Météo marine entre Audierne et Belle-Île</div>
+            <div class="agent-msg">I'm looking for marine weather data for your area...</div>
+            <div class="agent-thinking">
+              <div class="thinking-dots"><span></span><span></span><span></span></div>
+              Found Open-Meteo Marine API
+            </div>
+            <div class="creation-anim">
+              ● Creating your module...<br>
+              <span style="font-size: 11px; color: var(--textSecondary);">Map + Conditions + Timeline</span>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input class="chat-input-field" placeholder="Type anything..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION A ==================== -->
+<section class="direction" id="dir-a">
+  <div class="direction-header">
+    <span class="direction-label">DIRECTION A</span>
+    <h2>Unified Stream</h2>
+  </div>
+  <p>Everything lives in one scrollable stream. Modules appear inline between messages, like rich media in a messaging app. The conversation and the dashboard are the same thing. No navigation, no tabs — just scroll.</p>
+
+  <div class="mockup-row">
+    <div class="mockup-container">
+      <div class="mockup-label">Day 1 — 2 modules in stream</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content" style="padding-bottom: 60px;">
+          <div style="padding-top: 8px;">
+            <div class="agent-msg">Your marine weather module is ready ●</div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine Weather</span>
+                <span class="module-card-badge">Live</span>
+              </div>
+              <div class="module-card-body">
+                <div class="map-placeholder">
+                  <div class="map-grid"></div>
+                  <div class="map-dot" style="top: 40%; left: 25%;"></div>
+                  <div class="map-dot" style="top: 35%; left: 70%;"></div>
+                  <div class="map-route" style="top: 39%; left: 29%; width: 130px; transform: rotate(-3deg);"></div>
+                </div>
+                <div class="metric-grid" style="margin-top: 8px;">
+                  <div class="metric-item">
+                    <div class="metric-value">15<span style="font-size:14px;color:var(--textSecondary)"> kn</span></div>
+                    <div class="metric-label">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">1.2<span style="font-size:14px;color:var(--textSecondary)"> m</span></div>
+                    <div class="metric-label">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="user-msg">Ajoute mes revenus Stripe</div>
+            <div class="agent-msg">I've connected to your Stripe account ●</div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">💰 Stripe Revenue</span>
+                <span class="module-card-badge">Live</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">€2.4k</div>
+                    <div class="metric-label">This week</div>
+                    <div class="metric-trend">↑ 12%</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">€9.1k</div>
+                    <div class="metric-label">MRR</div>
+                    <div class="metric-trend">↑ 3%</div>
+                  </div>
+                </div>
+                <div class="chart-placeholder">
+                  <div class="chart-line"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input class="chat-input-field" placeholder="Type anything..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">Month 1 — scrolling through modules</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content" style="padding-bottom: 60px;">
+          <div style="padding-top: 8px;">
+            <div class="agent-msg" style="font-size: 12px; color: var(--textSecondary); background: transparent; padding: 4px 16px;">
+              Good morning Seb — everything is fresh ●
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine Weather</span>
+                <span style="font-size:10px; color:var(--textSecondary)">6:50</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">12<span style="font-size:14px;color:var(--textSecondary)"> kn</span></div>
+                    <div class="metric-label">Wind</div>
+                    <div class="metric-trend down">↓</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">0.8<span style="font-size:14px;color:var(--textSecondary)"> m</span></div>
+                    <div class="metric-label">Waves</div>
+                    <div class="metric-trend">Good ✓</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">💰 Stripe</span>
+                <span style="font-size:10px; color:var(--textSecondary)">7:00</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">€2.8k</div>
+                    <div class="metric-label">Week</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">3</div>
+                    <div class="metric-label">New subs</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">📅 Today</span>
+              </div>
+              <div class="module-card-body">
+                <div class="list-item">
+                  <div class="list-item-left">
+                    <div class="list-dot" style="background:var(--accent)"></div>
+                    <span>Deploy v2.3 to staging</span>
+                  </div>
+                  <span style="font-size:11px;color:var(--textSecondary)">10:00</span>
+                </div>
+                <div class="list-item">
+                  <div class="list-item-left">
+                    <div class="list-dot" style="background:var(--warning)"></div>
+                    <span>Client call — Dupont</span>
+                  </div>
+                  <span style="font-size:11px;color:var(--textSecondary)">14:00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🏃 Running</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">23<span style="font-size:14px;color:var(--textSecondary)"> km</span></div>
+                    <div class="metric-label">This week</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">5:12</div>
+                    <div class="metric-label">Avg pace</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input class="chat-input-field" placeholder="Type anything..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="analysis">
+    <div class="analysis-col">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Zero navigation to learn — just scroll</li>
+        <li>Metamorphosis is seamless — chat naturally becomes dashboard</li>
+        <li>Messaging mental model — WhatsApp with superpowers</li>
+        <li>Simplest to build (solo dev advantage)</li>
+      </ul>
+    </div>
+    <div class="analysis-col">
+      <h4 class="cons">Risks</h4>
+      <ul>
+        <li>Old messages push modules down — finding a module means scrolling</li>
+        <li>25+ modules = very long scroll</li>
+        <li>No spatial organization (Seb can't group by category)</li>
+        <li>New messages at bottom push modules up constantly</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION B ==================== -->
+<section class="direction" id="dir-b">
+  <div class="direction-header">
+    <span class="direction-label">DIRECTION B</span>
+    <h2>Sheet + Canvas</h2>
+  </div>
+  <p>Modules live on a scrollable canvas (the main view). The chat is a bottom sheet that slides up when needed. Day 1: sheet is full-screen (no modules yet). As modules appear, the sheet recedes. The canvas grows with the user.</p>
+
+  <div class="mockup-row">
+    <div class="mockup-container">
+      <div class="mockup-label">Day 1 — Chat sheet dominant</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient-glow"></div>
+          <div style="padding: 80px 16px 0; text-align: center;">
+            <div style="font-size: 13px; color: var(--textSecondary);">No modules yet</div>
+          </div>
+          <div class="bottom-sheet" style="height: 420px;">
+            <div class="sheet-handle"></div>
+            <div style="padding: 0 16px;">
+              <div class="agent-msg" style="margin-left: 0;">What's on your mind?</div>
+              <div class="user-msg">Météo marine Audierne–Belle-Île</div>
+              <div class="agent-msg" style="margin-left: 0;">Searching for marine weather APIs...</div>
+              <div class="agent-thinking">
+                <div class="thinking-dots"><span></span><span></span><span></span></div>
+                Creating module...
+              </div>
+            </div>
+            <div class="chat-input" style="position: absolute; bottom: 0;">
+              <input class="chat-input-field" placeholder="Type anything..." disabled>
+              <button class="send-btn">↑</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">Week 2 — Canvas growing, sheet compact</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div style="padding: 8px 0 200px;">
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine Weather</span>
+                <span class="module-card-badge">Live</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">15<span style="font-size:14px;color:var(--textSecondary)"> kn</span></div>
+                    <div class="metric-label">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">1.2<span style="font-size:14px;color:var(--textSecondary)"> m</span></div>
+                    <div class="metric-label">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">💰 Stripe Revenue</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">€2.4k</div>
+                    <div class="metric-label">Week</div>
+                    <div class="metric-trend">↑ 12%</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">€9.1k</div>
+                    <div class="metric-label">MRR</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-sheet" style="height: 160px;">
+            <div class="sheet-handle"></div>
+            <div style="padding: 0 16px;">
+              <div style="font-size: 12px; color: var(--textSecondary); margin-bottom: 8px;">Pull up to chat ●</div>
+            </div>
+            <div class="chat-input" style="position: absolute; bottom: 0;">
+              <input class="chat-input-field" placeholder="Ask me anything..." disabled>
+              <button class="send-btn">↑</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">Month 3 — Full dashboard</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div style="padding: 8px 0 80px;">
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine</span>
+                <span style="font-size:10px;color:var(--success)">✓ Good</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value" style="font-size:18px">12 kn</div>
+                    <div class="metric-label">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value" style="font-size:18px">0.8 m</div>
+                    <div class="metric-label">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px;">
+              <div style="background:var(--surface);border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:20px;font-weight:700;">€9.1k</div>
+                <div style="font-size:10px;color:var(--textSecondary)">MRR</div>
+              </div>
+              <div style="background:var(--surface);border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:20px;font-weight:700;">23 km</div>
+                <div style="font-size:10px;color:var(--textSecondary)">Running</div>
+              </div>
+            </div>
+
+            <div class="module-card" style="margin-top:8px">
+              <div class="module-card-header">
+                <span class="module-card-title">📅 Today</span>
+              </div>
+              <div class="module-card-body">
+                <div class="list-item" style="padding:6px 0;">
+                  <span style="font-size:12px">Deploy v2.3</span>
+                  <span style="font-size:10px;color:var(--textSecondary)">10:00</span>
+                </div>
+                <div class="list-item" style="padding:6px 0;">
+                  <span style="font-size:12px">Client call</span>
+                  <span style="font-size:10px;color:var(--textSecondary)">14:00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fab" style="bottom: 24px;">●</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="analysis">
+    <div class="analysis-col">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Natural metamorphosis — sheet shrinks as canvas grows</li>
+        <li>Modules are always spatially stable (not pushed by messages)</li>
+        <li>Chat is always available (pull up) but not intrusive</li>
+        <li>Canvas supports future organization (tabs, drag-and-drop)</li>
+      </ul>
+    </div>
+    <div class="analysis-col">
+      <h4 class="cons">Risks</h4>
+      <ul>
+        <li>Bottom sheet interaction can feel fiddly on mobile</li>
+        <li>Day 1 experience feels empty (modules above, chat below)</li>
+        <li>More complex to build than unified stream</li>
+        <li>Sheet state management adds engineering complexity</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION C ==================== -->
+<section class="direction" id="dir-c">
+  <div class="direction-header">
+    <span class="direction-label">DIRECTION C</span>
+    <h2>Tab Split</h2>
+  </div>
+  <p>Two explicit tabs: Chat and Home. Chat is the conversation. Home is the module dashboard. Clean separation, clear mental model. Day 1 starts on Chat tab; as modules accumulate, Home becomes the default landing.</p>
+
+  <div class="mockup-row">
+    <div class="mockup-container">
+      <div class="mockup-label">Chat Tab — conversation view</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content" style="padding-bottom: 80px;">
+          <div style="padding-top: 8px;">
+            <div class="agent-msg">Your marine weather module is ready ●<br><span style="font-size:11px;color:var(--accent)">→ View on Home</span></div>
+            <div class="user-msg">Ajoute mes revenus Stripe</div>
+            <div class="agent-msg">I've connected to Stripe. Module created ●<br><span style="font-size:11px;color:var(--accent)">→ View on Home</span></div>
+            <div class="user-msg">Show only this week's revenue</div>
+            <div class="agent-msg">Done — Stripe module now shows weekly view only.</div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item"><div class="tab-icon">💬</div>Chat</div>
+            <div class="tab-item active"><div class="tab-icon">●</div>Home</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">Home Tab — module dashboard</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content" style="padding-bottom: 80px;">
+          <div style="padding: 8px 0;">
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine Weather</span>
+                <span class="module-card-badge">Live</span>
+              </div>
+              <div class="module-card-body">
+                <div class="map-placeholder">
+                  <div class="map-grid"></div>
+                  <div class="map-dot" style="top: 40%; left: 25%;"></div>
+                  <div class="map-dot" style="top: 35%; left: 70%;"></div>
+                  <div class="map-route" style="top: 39%; left: 29%; width: 130px; transform: rotate(-3deg);"></div>
+                </div>
+                <div class="metric-grid" style="margin-top: 8px;">
+                  <div class="metric-item">
+                    <div class="metric-value">15<span style="font-size:14px;color:var(--textSecondary)"> kn</span></div>
+                    <div class="metric-label">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">1.2<span style="font-size:14px;color:var(--textSecondary)"> m</span></div>
+                    <div class="metric-label">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">💰 Stripe Revenue</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">€2.4k</div>
+                    <div class="metric-label">This week</div>
+                    <div class="metric-trend">↑ 12%</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">€9.1k</div>
+                    <div class="metric-label">MRR</div>
+                    <div class="metric-trend">↑ 3%</div>
+                  </div>
+                </div>
+                <div class="chart-placeholder">
+                  <div class="chart-line"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item"><div class="tab-icon">💬</div>Chat</div>
+            <div class="tab-item active"><div class="tab-icon">●</div>Home</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="analysis">
+    <div class="analysis-col">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Crystal clear mental model — chat here, modules there</li>
+        <li>Home tab is a true dashboard — spatial, organized</li>
+        <li>Easy to add future tabs (Settings, Memory, Genome)</li>
+        <li>Familiar iOS/Android pattern — zero learning curve</li>
+      </ul>
+    </div>
+    <div class="analysis-col">
+      <h4 class="cons">Risks</h4>
+      <ul>
+        <li>Context switching — must leave chat to see module result</li>
+        <li>Breaks the "conversation produces visible result" flow</li>
+        <li>Day 1 Home tab is empty — where does user start?</li>
+        <li>Metamorphosis is abrupt (tab switch), not progressive</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION D ==================== -->
+<section class="direction" id="dir-d">
+  <div class="direction-header">
+    <span class="direction-label">DIRECTION D</span>
+    <h2>Contextual Shift</h2>
+  </div>
+  <p>One screen that reshapes itself. When no modules exist: full chat. When modules exist: dashboard with an inline chat input at bottom. Tapping a module opens a contextual conversation about that module. The app smoothly morphs between states based on content density.</p>
+
+  <div class="mockup-row">
+    <div class="mockup-container">
+      <div class="mockup-label">Day 1 — Pure conversation</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient-glow"></div>
+          <div style="padding-top: 8px;">
+            <div class="agent-msg">What's on your mind?</div>
+            <div class="user-msg">Météo marine Audierne–Belle-Île</div>
+            <div class="agent-msg">Searching for marine weather data...<br><br>Found Open-Meteo Marine — perfect for your route.</div>
+            <div class="creation-anim">
+              ● Your module is taking shape...
+            </div>
+          </div>
+          <div class="chat-input">
+            <input class="chat-input-field" placeholder="Type anything..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">Week 1 — Modules emerging from chat</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content" style="padding-bottom: 60px;">
+          <div style="padding: 8px 0;">
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine Weather</span>
+                <span class="module-card-badge">Live</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">15<span style="font-size:14px;color:var(--textSecondary)"> kn</span></div>
+                    <div class="metric-label">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">1.2<span style="font-size:14px;color:var(--textSecondary)"> m</span></div>
+                    <div class="metric-label">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="padding:0 16px; margin: 8px 0;">
+              <div style="height:1px; background: var(--surfaceElevated);"></div>
+              <div style="font-size:11px; color:var(--textSecondary); text-align:center; margin-top:4px;">Earlier today</div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">💰 Stripe</span>
+                <span style="font-size:10px;color:var(--textSecondary)">Created just now</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value">€2.4k</div>
+                    <div class="metric-label">Week</div>
+                    <div class="metric-trend">↑ 12%</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value">€9.1k</div>
+                    <div class="metric-label">MRR</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="agent-msg" style="font-size:12px;">
+              Both modules are set to refresh automatically ●
+            </div>
+          </div>
+
+          <div class="undo-toast" style="bottom: 62px;">
+            <span>Stripe module created</span>
+            <button class="undo-btn">Undo</button>
+          </div>
+          <div class="chat-input">
+            <input class="chat-input-field" placeholder="Refine a module or create new..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-container">
+      <div class="mockup-label">Month 3 — Dashboard dominant</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content" style="padding-bottom: 60px;">
+          <div style="padding: 8px 0;">
+            <div style="font-size:11px; color:var(--textSecondary); padding: 4px 16px; display:flex; justify-content:space-between;">
+              <span>Good morning Seb ●</span>
+              <span>All fresh</span>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">🌊 Marine</span>
+                <span style="font-size:10px;color:var(--success)">✓ Calm</span>
+              </div>
+              <div class="module-card-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-value" style="font-size:18px">12 kn</div>
+                    <div class="metric-label">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-value" style="font-size:18px">0.8 m</div>
+                    <div class="metric-label">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 16px;">
+              <div style="background:var(--surface);border-radius:12px;padding:12px;text-align:center;border:1px solid var(--surfaceElevated);">
+                <div style="font-size:20px;font-weight:700;">€9.1k</div>
+                <div style="font-size:10px;color:var(--textSecondary)">MRR ↑3%</div>
+              </div>
+              <div style="background:var(--surface);border-radius:12px;padding:12px;text-align:center;border:1px solid var(--surfaceElevated);">
+                <div style="font-size:20px;font-weight:700;">23 km</div>
+                <div style="font-size:10px;color:var(--textSecondary)">This week</div>
+              </div>
+            </div>
+
+            <div class="module-card" style="margin-top: 8px;">
+              <div class="module-card-header">
+                <span class="module-card-title">📅 Today</span>
+              </div>
+              <div class="module-card-body">
+                <div class="list-item" style="padding:6px 0;">
+                  <span style="font-size:12px">Deploy v2.3</span>
+                  <span style="font-size:10px;color:var(--textSecondary)">10:00</span>
+                </div>
+                <div class="list-item" style="padding:6px 0;">
+                  <span style="font-size:12px">Client call — Dupont</span>
+                  <span style="font-size:10px;color:var(--textSecondary)">14:00</span>
+                </div>
+                <div class="list-item" style="padding:6px 0;border:none;">
+                  <span style="font-size:12px">Léa — school pickup</span>
+                  <span style="font-size:10px;color:var(--textSecondary)">16:30</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="module-card">
+              <div class="module-card-header">
+                <span class="module-card-title">⚠️ Agent Alert</span>
+              </div>
+              <div class="module-card-body" style="font-size:13px; color:var(--warning);">
+                Wind shifting to force 7 on Saturday route. Consider postponing.
+              </div>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input class="chat-input-field" placeholder="Ask anything..." disabled>
+            <button class="send-btn">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="analysis">
+    <div class="analysis-col">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Truly progressive metamorphosis — one screen, continuous shift</li>
+        <li>Chat input always visible at bottom — no navigation needed</li>
+        <li>Module creation result visible immediately in context</li>
+        <li>Undo toast naturally fits the flow</li>
+        <li>Agent messages weave between modules naturally</li>
+      </ul>
+    </div>
+    <div class="analysis-col">
+      <h4 class="cons">Risks</h4>
+      <ul>
+        <li>Conversation history gets buried as modules grow</li>
+        <li>Full chat mode needed for extended conversations</li>
+        <li>Needs careful state management (when to show messages vs modules)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== COMPARISON ==================== -->
+<section class="direction" id="comparison">
+  <div class="direction-header">
+    <span class="direction-label">COMPARE</span>
+    <h2>Direction Comparison</h2>
+  </div>
+  <p>How each direction handles Self's core UX challenges.</p>
+
+  <div class="comparison">
+    <table>
+      <tr>
+        <th>Challenge</th>
+        <th>A: Unified Stream</th>
+        <th>B: Sheet + Canvas</th>
+        <th>C: Tab Split</th>
+        <th>D: Contextual Shift</th>
+      </tr>
+      <tr>
+        <td><strong>Day 1 Experience</strong></td>
+        <td class="check">✓ Natural chat</td>
+        <td class="warn">△ Empty canvas above</td>
+        <td class="warn">△ Empty Home tab</td>
+        <td class="check">✓ Natural chat</td>
+      </tr>
+      <tr>
+        <td><strong>First Module Moment</strong></td>
+        <td class="check">✓ Appears inline</td>
+        <td class="warn">△ Appears on canvas above</td>
+        <td class="warn">△ Must switch tabs</td>
+        <td class="check">✓ Appears in context</td>
+      </tr>
+      <tr>
+        <td><strong>Chat → Dashboard</strong></td>
+        <td class="warn">△ Stream gets long</td>
+        <td class="check">✓ Sheet shrinks naturally</td>
+        <td class="warn">△ Abrupt tab switch</td>
+        <td class="check">✓ Continuous morph</td>
+      </tr>
+      <tr>
+        <td><strong>25+ Modules</strong></td>
+        <td class="warn">△ Very long scroll</td>
+        <td class="check">✓ Canvas organizable</td>
+        <td class="check">✓ Dashboard with tabs</td>
+        <td class="check">✓ Dashboard with chat</td>
+      </tr>
+      <tr>
+        <td><strong>Module Modification</strong></td>
+        <td class="check">✓ Type in same stream</td>
+        <td class="check">✓ Pull up sheet</td>
+        <td class="warn">△ Switch to Chat tab</td>
+        <td class="check">✓ Type at bottom</td>
+      </tr>
+      <tr>
+        <td><strong>Build Complexity</strong></td>
+        <td class="check">✓ Simplest</td>
+        <td class="warn">△ Sheet state mgmt</td>
+        <td class="check">✓ Simple tabs</td>
+        <td class="warn">△ State transitions</td>
+      </tr>
+      <tr>
+        <td><strong>WhatsApp Mental Model</strong></td>
+        <td class="check">✓ Strongest match</td>
+        <td class="warn">△ Partial</td>
+        <td class="warn">△ Weak</td>
+        <td class="check">✓ Strong (chat always present)</td>
+      </tr>
+      <tr>
+        <td style="border-bottom: 2px solid var(--accent);"><strong>Overall Fit</strong></td>
+        <td style="border-bottom: 2px solid var(--accent);">Great start, scales poorly</td>
+        <td style="border-bottom: 2px solid var(--accent);">Good balance, complex build</td>
+        <td style="border-bottom: 2px solid var(--accent);">Clear but breaks flow</td>
+        <td style="border-bottom: 2px solid var(--accent);color:var(--accent);font-weight:600;">Best metamorphosis</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<div style="text-align: center; padding: 60px 24px; color: var(--textSecondary); font-size: 13px;">
+  Self — UX Design Direction Exploration • Terra Theme • 2026
+</div>
+
+<script>
+function scrollTo(id) {
+  document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
