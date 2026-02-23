@@ -1,7 +1,50 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23 | **Updated by:** Bob (SM)
+> **Last updated:** 2026-02-23T13:00 | **Updated by:** Bob (SM)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
+
+## Dashboard
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║  WAVE 1 · Story 1.5 · BACKLOG                              ║
+║  Next milestone: Wave 3 — First Module Test (3.4)           ║
+╚══════════════════════════════════════════════════════════════╝
+
+TOTAL   [▓▓░░░░░░░░░░░░░░░░░░]  5/56 done (9%)
+
+─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
+
+W1  Bootstrap      ▓▓▓▓▓··                    5/7   << ICI
+W2  Chat+Render    ····                        0/4
+W3  First Module   ·                           0/1   * VALIDATION
+W4  Backfill       ······                      0/6   * FIRST LIGHT
+W5  MVP Core       ··············              0/14
+W6  Security       ·····                       0/5   * MVP DONE
+W7  Growth         ···················         0/19  * GROWTH
+
+─── Epics (vue feature) ──────────────────────────────────────
+
+E1  Bootstrap      ▓▓▓▓▓··    5/7  <<
+E2  Conversation   ····       0/4       ┐
+E3  Creation       ····       0/4       ├ First Light
+E4  Freshness      ···        0/3       ┘
+E5  Memory         ···        0/3  ┐
+E6  Onboarding     ····       0/4  │
+E7  Interaction    ····       0/4  ├ MVP
+E8  Failure        ···        0/3  │
+E9  Providers      ···        0/3  │
+E10 Heartbeat      ··         0/2  ┘
+E11 Lifecycle      ····       0/4  ┐
+E12 Genome         ···        0/3  │
+E13 Notifs         ···        0/3  ├ Growth
+E14 Intelligence   ·····      0/5  │
+E15 Admin          ····       0/4  ┘
+
+Legend: ▓ done  ~ review/wip  · backlog
+```
+
+---
 
 ## Legend
 
@@ -15,172 +58,209 @@
 
 ---
 
-## Project Progress
+## Execution Strategy
+
+Stories are **not** executed epic-by-epic. They follow the **critical path** to the First Module Test (story 3.4), then fan out into parallel streams.
 
 ```
-[▓▓▓░░░░░░░░░░░░░░░░░] 4/56 stories done (7%)
+                ┌─ 1.6 ── 2.1 ─────────────┐
+1.4 (done)    ──┤                            ├── 3.4 FIRST MODULE TEST
+                └─ 3.1 ── 3.2 ── 3.3 ───────┘
 ```
 
-| Phase | Stories | Done | Status |
-|-------|---------|------|--------|
-| ⚡ First Light | 18 | 4 | **In Progress** |
-| 🚀 MVP | 19 | 0 | Backlog |
-| 📈 Growth | 19 | 0 | Backlog |
+### Waves
 
-**Current focus:** Epic 1 — Project Bootstrap & Developer Connection
-**Next up:** Story 1.4 (Mobile App Shell & WebSocket Connection)
+| Wave | Goal | Stories | Milestone |
+|------|------|---------|-----------|
+| **1** | Finish Bootstrap | 1.4, 1.5, 1.6 | Mobile connected + authenticated |
+| **2** | Chat + Primitives | 3.1, 3.2, 2.1, 3.3 | Agent talks + modules render |
+| **3** | Module Creation E2E | 3.4 | **First Module Test** |
+| **4** | Backfill First Light | 2.2, 2.3, 2.4, 4.1, 4.2, 4.3 | First Light complete |
+| **5** | MVP Core | 5.x, 6.x, 7.x, 8.x | Memory + onboarding + interactions |
+| **6** | MVP Security | 9.x, 10.x | Multi-provider + heartbeat |
+| **7** | Growth | 11.x–15.x | Lifecycle + genome + admin |
 
 ---
 
-## Phase 1 — First Light ⚡
+## Wave 1 — Finish Bootstrap (Epic 1)
 
-> Foundation: monorepo, backend, mobile shell, chat interface, SDUI primitives, data refresh
-> 18 stories | 4 done
-
-### Epic 1: Project Bootstrap & Developer Connection `in-progress`
-
-> 4/7 done | FRs: FR36, FR39, FR49, FR55–58
+> Goal: mobile app connected, authenticated, offline-capable
+> 2 stories remaining | 5/7 done
 
 - `[x]` **1.1** — Initialize Monorepo & Module Definition Schema
 - `[x]` **1.1b** — CI Pipeline
 - `[x]` **1.2** — Backend Skeleton & Single-Command Deployment
 - `[x]` **1.3** — LLM Provider Abstraction & BYOK Configuration
-- `[ ]` **1.4** — Mobile App Shell & WebSocket Connection
-- `[ ]` **1.5** — Offline Message Queue & Cached Data Rendering
+- `[x]` **1.4** — Mobile App Shell & WebSocket Connection
+- `[ ]` **1.5** — Offline Message Queue & Cached Data Rendering ← **next**
 - `[ ]` **1.6** — Session Authentication & Mobile-Backend Pairing
 
-### Epic 2: Conversational Shell & Agent Identity `backlog`
+> **Shortcut option:** skip 1.5, do 1.4 → 1.6 directly to unblock Wave 2 faster. Come back to 1.5 in Wave 4.
 
-> 0/4 done | FRs: FR1, FR2, FR5, FR8, FR29
+---
 
-- `[ ]` **2.1** — Real-Time Chat Interface with Streaming
-- `[ ]` **2.2** — Agent Identity Persistence
-- `[ ]` **2.3** — Persona Preset Selection
-- `[ ]` **2.4** — Contextual Empty State
+## Wave 2 — Chat + Primitives (Epics 2 & 3 interleaved)
 
-### Epic 3: Autonomous Module Creation & Native Rendering `backlog`
+> Goal: agent can talk, modules can render natively
+> 4 stories | Two dependency chains converge on 3.4
 
-> 0/4 done | FRs: FR9–11, FR17–18, FR28
+**Chain A — Rendering** (needs 1.4):
 
 - `[ ]` **3.1** — SDUI Primitive Registry & Simple Primitives
 - `[ ]` **3.2** — Composite Primitives (Card, List)
 - `[ ]` **3.3** — Module Rendering Pipeline
-- `[ ]` **3.4** — Module Creation End-to-End
 
-### Epic 4: Module Data Freshness & Management `backlog`
+**Chain B — Conversation** (needs 1.4 + 1.6):
 
-> 0/3 done | FRs: FR23, FR26, FR40
+- `[ ]` **2.1** — Real-Time Chat Interface with Streaming
 
-- `[ ]` **4.1** — Cron-Based Background Refresh
-- `[ ]` **4.2** — Module Vitality Scoring
-- `[ ]` **4.3** — Module Delete, Archive & Restore
+> Recommended order: `3.1 → 3.2 → 2.1 → 3.3` (start rendering while auth settles)
 
 ---
 
-## Phase 2 — MVP 🚀
+## Wave 3 — First Module Test (Epic 3 finale)
 
-> Core product: memory, onboarding, interactions, failure handling, multi-provider, heartbeat
-> 19 stories | 0 done
+> **THE milestone.** User types → agent creates → module appears.
+> 1 story | Depends on: 2.1 + 3.3 + 1.3
 
-### Epic 5: Agent Memory & Never-Repeat Promise `backlog`
+- `[ ]` **3.4** — Module Creation End-to-End
 
-> 0/3 done | FRs: FR30–31
+> If this works, the product thesis is validated. Everything after builds on this.
+
+---
+
+## Wave 4 — Backfill First Light (Epics 2 & 4)
+
+> Goal: complete all First Light stories skipped during the sprint to 3.4
+> 6 stories (+ 1.5 if skipped in Wave 1)
+
+- `[ ]` **2.2** — Agent Identity Persistence (SOUL.md) — *blocks Epic 5*
+- `[ ]` **2.3** — Persona Preset Selection — *blocks Epic 6*
+- `[ ]` **2.4** — Contextual Empty State
+- `[ ]` **4.1** — Cron-Based Background Refresh — *blocks 4.2, 10.1*
+- `[ ]` **4.2** — Module Vitality Scoring — *blocks 11.1*
+- `[ ]` **4.3** — Module Delete, Archive & Restore
+
+> **Milestone: First Light complete.** The app works end-to-end.
+
+---
+
+## Wave 5 — MVP Core (Epics 5, 6, 7, 8)
+
+> Goal: memory, onboarding, interactions, failure handling
+> 14 stories across 4 parallel streams
+
+### Stream A — Memory (Epic 5) `needs 2.2`
 
 - `[ ]` **5.1** — 4-Layer Memory Architecture
 - `[ ]` **5.2** — Memory Classification Pipeline
 - `[ ]` **5.3** — Context Recall & Anti-Repetition
 
-### Epic 6: Polished Onboarding & Trust Architecture `backlog`
-
-> 0/4 done | FRs: FR3, FR6, FR54
+### Stream B — Onboarding (Epic 6) `needs 2.3`
 
 - `[ ]` **6.1** — Branded Onboarding Animation
 - `[ ]` **6.2** — Persona & Theme Selection During Onboarding
 - `[ ]` **6.3** — Creation Ceremony Animation
-- `[ ]` **6.4** — Trust-Before-Access Pattern
+- `[ ]` **6.4** — Trust-Before-Access Pattern — *blocks Epic 9*
 
-### Epic 7: Module Interaction & Refinement `backlog`
-
-> 0/4 done | FRs: FR16, FR19, FR21, FR53
+### Stream C — Interaction (Epic 7) `needs 3.3`
 
 - `[ ]` **7.1** — Module Interaction
 - `[ ]` **7.2** — Conversational Module Refinement
-- `[ ]` **7.3** — Offline Cached Module View
-- `[ ]` **7.4** — Undo Last Agent Action
+- `[ ]` **7.3** — Offline Cached Module View — *needs 1.5*
+- `[ ]` **7.4** — Undo Last Agent Action — *needs 4.3*
 
-### Epic 8: Intelligent Failure & Proactive Suggestions `backlog`
-
-> 0/3 done | FRs: FR12, FR14–15
+### Stream D — Failure Handling (Epic 8) `needs 3.4`
 
 - `[ ]` **8.1** — Transparent Failure Communication
 - `[ ]` **8.2** — Semi-Automatic Creation Fallback
-- `[ ]` **8.3** — Proactive Module Proposals
+- `[ ]` **8.3** — Proactive Module Proposals — *needs 5.1 + 2.3*
 
-### Epic 9: Multi-Provider Routing & API Key Management `backlog`
+> Recommended interleaving: `5.1 → 6.1 → 8.1 → 7.1 → 5.2 → 6.2 → 8.2 → 7.2 → 5.3 → 6.3 → 6.4 → 7.3 → 7.4 → 8.3`
 
-> 0/3 done | FRs: FR34, FR37, FR59
+---
+
+## Wave 6 — MVP Security & Proactivity (Epics 9, 10)
+
+> Goal: secure API key management, proactive heartbeat
+> 5 stories
+
+### Epic 9: Multi-Provider Routing `needs 6.4`
 
 - `[ ]` **9.1** — Secure API Key Storage
 - `[ ]` **9.2** — Multi-Provider Selection & Routing
 - `[ ]` **9.3** — API Key Validation on First Use
 
-### Epic 10: Proactive Heartbeat & Pre-Computation `backlog`
-
-> 0/2 done | FRs: FR41, FR45
+### Epic 10: Proactive Heartbeat `needs 4.1`
 
 - `[ ]` **10.1** — Heartbeat Module State Evaluation
-- `[ ]` **10.2** — Pre-Computation Before Usage Time
+- `[ ]` **10.2** — Pre-Computation Before Usage Time — *needs 5.1*
+
+> **Milestone: MVP complete.** The product is usable daily.
 
 ---
 
-## Phase 3 — Growth 📈
+## Wave 7 — Growth (Epics 11–15)
 
-> Enrichment: lifecycle, genome sharing, notifications, advanced AI, admin
-> 19 stories | 0 done
+> Goal: lifecycle management, genome sharing, notifications, advanced AI, admin
+> 19 stories across 5 parallel streams
 
-### Epic 11: Module Lifecycle & Organization `backlog`
-
-> 0/4 done | FRs: FR20, FR22, FR24–25, FR27
+### Stream E — Lifecycle (Epic 11) `needs 4.2`
 
 - `[ ]` **11.1** — Lifecycle State Transitions
-- `[ ]` **11.2** — Dormancy Notification & Revival
+- `[ ]` **11.2** — Dormancy Notification & Revival — *needs 13.1*
 - `[ ]` **11.3** — Cleanup Recommendations
 - `[ ]` **11.4** — Module Organization (Categories, Tabs, Reordering)
 
-### Epic 12: Genome Sharing & Community `backlog`
-
-> 0/3 done | FRs: FR46–48, FR52, FR60–61
+### Stream F — Genome (Epic 12) `needs 3.4 + 2.2 + 5.1`
 
 - `[ ]` **12.1** — Genome Export & Data Portability
 - `[ ]` **12.2** — Genome Import & Security Validation
 - `[ ]` **12.3** — Guided Genome Review
 
-### Epic 13: Notifications & Active Hours `backlog`
-
-> 0/3 done | FRs: FR42–44
+### Stream G — Notifications (Epic 13) `needs 10.1`
 
 - `[ ]` **13.1** — Push Notification Delivery
 - `[ ]` **13.2** — Active Hours Configuration
 - `[ ]` **13.3** — Per-Module Notification Muting
 
-### Epic 14: Advanced Agent Intelligence `backlog`
+### Stream H — Advanced Intelligence (Epic 14)
 
-> 0/5 done | FRs: FR4, FR7, FR13, FR32–33
+- `[ ]` **14.1** — Warm-Up Conversational Mode — *needs 8.3*
+- `[ ]` **14.2** — Post-Onboarding Persona Change — *needs 2.3*
+- `[ ]` **14.3** — Manual Data Input Fallback — *needs 8.2*
+- `[ ]` **14.4** — Agent Knowledge Summary — *needs 5.1*
+- `[ ]` **14.5** — Memory Correction & Deletion — *needs 14.4*
 
-- `[ ]` **14.1** — Warm-Up Conversational Mode
-- `[ ]` **14.2** — Post-Onboarding Persona Change
-- `[ ]` **14.3** — Manual Data Input Fallback
-- `[ ]` **14.4** — Agent Knowledge Summary
-- `[ ]` **14.5** — Memory Correction & Deletion
+### Stream I — Admin (Epic 15)
 
-### Epic 15: Administration & Integrations `backlog`
-
-> 0/4 done | FRs: FR35, FR38, FR50–51
-
-- `[ ]` **15.1** — OAuth Proxy for External Services
-- `[ ]` **15.2** — Cost Monitoring & Transparency
+- `[ ]` **15.1** — OAuth Proxy for External Services — *needs 6.4 + 9.1*
+- `[ ]` **15.2** — Cost Monitoring & Transparency — *needs 9.3*
 - `[ ]` **15.3** — Detailed Admin Decision Logs
-- `[ ]` **15.4** — Admin Configuration Panel
+- `[ ]` **15.4** — Admin Configuration Panel — *needs 9.2 + 10.1 + 13.2* (last story)
+
+> Recommended order: `11.4 → 12.1 → 13.1 → 14.2 → 15.3 → 11.1 → 12.2 → 13.2 → 14.4 → 15.1 → 11.3 → 12.3 → 13.3 → 14.5 → 15.2 → 14.1 → 14.3 → 11.2 → 15.4`
+>
+> 11.2 and 15.4 are last — they depend on nearly everything else.
+
+---
+
+## Dependency Map (key cross-epic blockers)
+
+```
+1.4  ──→ 1.5, 1.6, 3.1           (mobile shell unlocks everything)
+1.6  ──→ 2.1                      (auth unlocks conversation)
+2.1  ──→ 2.2, 3.4, 8.1           (chat unlocks agent features)
+2.2  ──→ 2.3, 5.1, 6.1           (SOUL unlocks memory + onboarding)
+2.3  ──→ 6.2, 8.3, 14.2          (persona unlocks onboarding + proactive)
+3.4  ──→ 4.1, 8.1, everything    (creation unlocks the product)
+4.1  ──→ 4.2, 10.1               (cron unlocks vitality + heartbeat)
+4.2  ──→ 11.1                    (vitality unlocks lifecycle)
+5.1  ──→ 5.2, 8.3, 10.2, 14.4   (memory unlocks intelligence)
+6.4  ──→ 9.1, 15.1               (trust unlocks security features)
+10.1 ──→ 10.2, 13.1              (heartbeat unlocks notifications)
+13.1 ──→ 11.2, 13.2, 13.3        (push unlocks notification features)
+```
 
 ---
 

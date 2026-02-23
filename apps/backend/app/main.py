@@ -1,14 +1,17 @@
 """FastAPI application entry point with lifespan management.
 
 Handles startup (logging, migrations, DB health) and shutdown.
+The WebSocket endpoint (/ws) is the ONLY communication channel
+between mobile and backend (except /health for Docker healthcheck).
 """
 
+import json
 import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from app.config import settings
 from app.db import get_connection, get_schema_version, run_migrations
@@ -83,3 +86,75 @@ async def health():
         "uptime": round(uptime, 1),
         "providers": providers,
     }
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    """WebSocket endpoint — the sole mobile-backend communication channel.
+
+    Message routing:
+      - chat → echo stub via chat_stream (full agent integration in later story)
+      - log  → forward to backend structured logging
+      - sync → respond with empty module_list (no modules exist yet)
+      - *    → error with WS_UNKNOWN_TYPE
+    """
+    await ws.accept()
+    log.info("ws_connected")
+    try:
+        while True:
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                await ws.send_json({
+                    "type": "error",
+                    "payload": {
+                        "code": "WS_INVALID_JSON",
+                        "message": "Invalid JSON received",
+                        "agent_action": "Check message serialization on mobile client",
+                    },
+                })
+                continue
+
+            if not isinstance(msg, dict):
+                await ws.send_json({
+                    "type": "error",
+                    "payload": {
+                        "code": "WS_INVALID_JSON",
+                        "message": "Message must be a JSON object, not "
+                        + type(msg).__name__,
+                        "agent_action": "Ensure messages are JSON objects with type and payload keys",
+                    },
+                })
+                continue
+
+            msg_type = msg.get("type")
+            payload = msg.get("payload", {})
+
+            if msg_type == "chat":
+                # Stub: echo back as chat_stream (full agent integration later)
+                await ws.send_json({
+                    "type": "chat_stream",
+                    "payload": {
+                        "delta": f"Echo: {payload.get('message', '')}",
+                        "done": True,
+                    },
+                })
+            elif msg_type == "log":
+                log.info("mobile_log", mobile_payload=payload)
+            elif msg_type == "sync":
+                await ws.send_json({
+                    "type": "module_list",
+                    "payload": {"modules": []},
+                })
+            else:
+                await ws.send_json({
+                    "type": "error",
+                    "payload": {
+                        "code": "WS_UNKNOWN_TYPE",
+                        "message": f"Unknown message type: {msg_type}",
+                        "agent_action": "Check WSMessage type enum in types/ws.ts",
+                    },
+                })
+    except WebSocketDisconnect as e:
+        log.info("ws_disconnected", close_code=e.code)

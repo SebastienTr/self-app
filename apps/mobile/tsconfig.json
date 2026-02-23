@@ -6,7 +6,9 @@
       "@self/module-schema": ["../../packages/module-schema/src"],
       "@/components/*": ["./components/*"],
       "@/services/*": ["./services/*"],
-      "@/stores/*": ["./stores/*"]
+      "@/stores/*": ["./stores/*"],
+      "@/types/*": ["./types/*"],
+      "@/utils/*": ["./utils/*"]
     }
   }
 }

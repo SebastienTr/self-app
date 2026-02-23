@@ -21,17 +21,17 @@ Most apps decide what you can do before you even open them. Self-App starts empt
 ## Project Status
 
 ```
-[▓▓▓░░░░░░░░░░░░░░░░░] 4/56 stories done (7%)
+[▓▓░░░░░░░░░░░░░░░░░░] 5/56 stories done (9%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 18 | 4 | **In Progress** |
+| First Light | 18 | 5 | **In Progress** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
 **Current focus:** Epic 1 — Project Bootstrap & Developer Connection
-**Next up:** Story 1.4 — Mobile App Shell & WebSocket Connection
+**Next up:** Story 1.5 — Offline Message Queue & Cached Data Rendering
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
 
@@ -162,6 +162,7 @@ The app uses the **Twilight** theme: deep navy backgrounds with warm amber accen
 | [Story 1.1b — CI Pipeline](_bmad-output/implementation-artifacts/1-1b-ci-pipeline.md) | Done |
 | [Story 1.2 — Backend Skeleton](_bmad-output/implementation-artifacts/1-2-backend-skeleton-and-single-command-deployment.md) | Done |
 | [Story 1.3 — LLM Provider Abstraction](_bmad-output/implementation-artifacts/1-3-llm-provider-abstraction-and-byok-configuration.md) | Done |
+| [Story 1.4 — Mobile App Shell & WebSocket](_bmad-output/implementation-artifacts/1-4-mobile-app-shell-and-websocket-connection.md) | Done |
 
 </details>
 
