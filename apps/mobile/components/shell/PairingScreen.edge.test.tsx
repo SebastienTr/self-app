@@ -25,8 +25,8 @@ const mockSetSessionToken = jest.fn(async () => {});
 const mockGenerateSessionToken = jest.fn(() => 'mock-uuid-token');
 
 jest.mock('@/services/auth', () => ({
-  setSessionToken: mockSetSessionToken,
-  setStoredBackendUrl: mockSetStoredBackendUrl,
+  setSessionToken: (...args: unknown[]) => (mockSetSessionToken as (...a: unknown[]) => Promise<void>)(...args),
+  setStoredBackendUrl: (...args: unknown[]) => (mockSetStoredBackendUrl as (...a: unknown[]) => Promise<void>)(...args),
   generateSessionToken: () => mockGenerateSessionToken(),
 }));
 
