@@ -105,8 +105,6 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > 🔄 **Retro E1** — done (`/bmad-bmm-retrospective`)
 
-> 🔄 **Retro E1** — done (`/bmad-bmm-retrospective`)
-
 ---
 
 ## Wave 2 — Chat + Primitives (Epics 2 & 3 interleaved)

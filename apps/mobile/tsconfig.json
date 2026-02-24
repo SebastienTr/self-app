@@ -9,7 +9,8 @@
       "@/services/*": ["./services/*"],
       "@/stores/*": ["./stores/*"],
       "@/types/*": ["./types/*"],
-      "@/utils/*": ["./utils/*"]
+      "@/utils/*": ["./utils/*"],
+      "@/hooks/*": ["./hooks/*"]
     }
   }
 }

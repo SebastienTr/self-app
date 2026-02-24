@@ -8,7 +8,12 @@
 jest.spyOn(console, 'log').mockImplementation(() => {});
 jest.spyOn(console, 'error').mockImplementation(() => {});
 
-import { useChatStore } from './chatStore';
+import { useChatStore, type ChatMessageChat } from './chatStore';
+
+/** Helper to narrow ChatMessage to ChatMessageChat for type-safe test assertions. */
+function asChat(msg: unknown): ChatMessageChat {
+  return msg as ChatMessageChat;
+}
 
 describe('chatStore', () => {
   beforeEach(() => {
@@ -39,8 +44,8 @@ describe('chatStore', () => {
       useChatStore.getState().addUserMessage('Hello');
       const messages = useChatStore.getState().messages;
       expect(messages).toHaveLength(1);
-      expect(messages[0].role).toBe('user');
-      expect(messages[0].content).toBe('Hello');
+      expect(asChat(messages[0]).role).toBe('user');
+      expect(asChat(messages[0]).content).toBe('Hello');
     });
 
     it('generates a unique id for each message', () => {
@@ -59,20 +64,20 @@ describe('chatStore', () => {
 
     it('sets role to user', () => {
       useChatStore.getState().addUserMessage('Hello');
-      expect(useChatStore.getState().messages[0].role).toBe('user');
+      expect(asChat(useChatStore.getState().messages[0]).role).toBe('user');
     });
 
     it('does not set isError', () => {
       useChatStore.getState().addUserMessage('Hello');
-      expect(useChatStore.getState().messages[0].isError).toBeUndefined();
+      expect(asChat(useChatStore.getState().messages[0]).isError).toBeUndefined();
     });
 
     it('appends multiple messages in order', () => {
       useChatStore.getState().addUserMessage('First');
       useChatStore.getState().addUserMessage('Second');
       const messages = useChatStore.getState().messages;
-      expect(messages[0].content).toBe('First');
-      expect(messages[1].content).toBe('Second');
+      expect(asChat(messages[0]).content).toBe('First');
+      expect(asChat(messages[1]).content).toBe('Second');
     });
   });
 
@@ -122,8 +127,8 @@ describe('chatStore', () => {
       useChatStore.getState().finalizeAgentMessage();
       const messages = useChatStore.getState().messages;
       expect(messages).toHaveLength(1);
-      expect(messages[0].content).toBe('Agent response');
-      expect(messages[0].role).toBe('agent');
+      expect(asChat(messages[0]).content).toBe('Agent response');
+      expect(asChat(messages[0]).role).toBe('agent');
     });
 
     it('sets streamingMessage to null', () => {
@@ -174,17 +179,17 @@ describe('chatStore', () => {
 
     it('sets role to agent for error messages', () => {
       useChatStore.getState().addErrorMessage('Error occurred');
-      expect(useChatStore.getState().messages[0].role).toBe('agent');
+      expect(asChat(useChatStore.getState().messages[0]).role).toBe('agent');
     });
 
     it('sets isError to true', () => {
       useChatStore.getState().addErrorMessage('Error occurred');
-      expect(useChatStore.getState().messages[0].isError).toBe(true);
+      expect(asChat(useChatStore.getState().messages[0]).isError).toBe(true);
     });
 
     it('sets content to the provided message', () => {
       useChatStore.getState().addErrorMessage('Provider failed');
-      expect(useChatStore.getState().messages[0].content).toBe('Provider failed');
+      expect(asChat(useChatStore.getState().messages[0]).content).toBe('Provider failed');
     });
 
     it('resets streaming state', () => {

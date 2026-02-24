@@ -49,8 +49,8 @@ describe('screenModeStore edge cases', () => {
       expect(useScreenModeStore.getState().evaluateMode('composing')).toBe('chat');
     });
 
-    it('returns chat when agent is error', () => {
-      expect(useScreenModeStore.getState().evaluateMode('error')).toBe('chat');
+    it('returns chat when agent is discovering', () => {
+      expect(useScreenModeStore.getState().evaluateMode('discovering')).toBe('chat');
     });
 
     it('returns dashboard only for idle', () => {

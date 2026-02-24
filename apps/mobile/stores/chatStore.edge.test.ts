@@ -16,7 +16,11 @@
 jest.spyOn(console, 'log').mockImplementation(() => {});
 jest.spyOn(console, 'error').mockImplementation(() => {});
 
-import { useChatStore } from './chatStore';
+import { useChatStore, type ChatMessageChat } from './chatStore';
+
+function asChat(msg: unknown): ChatMessageChat {
+  return msg as ChatMessageChat;
+}
 
 describe('chatStore — edge cases', () => {
   beforeEach(() => {
@@ -50,8 +54,8 @@ describe('chatStore — edge cases', () => {
       const messages = useChatStore.getState().messages;
       // Empty string is a valid content value — should create a message
       expect(messages).toHaveLength(1);
-      expect(messages[0].content).toBe('');
-      expect(messages[0].role).toBe('agent');
+      expect(asChat(messages[0]).content).toBe('');
+      expect(asChat(messages[0]).role).toBe('agent');
     });
 
     it('finalizeAgentMessage with empty string resets streamingMessage to null', () => {
@@ -77,10 +81,10 @@ describe('chatStore — edge cases', () => {
 
       const messages = useChatStore.getState().messages;
       expect(messages).toHaveLength(3);
-      expect(messages[0].content).toBe('Hello');
-      expect(messages[1].content).toBe('World');
-      expect(messages[2].content).toBe('Response');
-      expect(messages[2].role).toBe('agent');
+      expect(asChat(messages[0]).content).toBe('Hello');
+      expect(asChat(messages[1]).content).toBe('World');
+      expect(asChat(messages[2]).content).toBe('Response');
+      expect(asChat(messages[2]).role).toBe('agent');
     });
 
     it('finalized agent message is appended after user messages', () => {
@@ -90,8 +94,8 @@ describe('chatStore — edge cases', () => {
       useChatStore.getState().finalizeAgentMessage();
 
       const messages = useChatStore.getState().messages;
-      expect(messages[0].role).toBe('user');
-      expect(messages[1].role).toBe('agent');
+      expect(asChat(messages[0]).role).toBe('user');
+      expect(asChat(messages[1]).role).toBe('agent');
     });
 
     it('getIsStreaming is false before streaming, true during, false after', () => {
@@ -122,8 +126,8 @@ describe('chatStore — edge cases', () => {
       useChatStore.getState().addUserMessage('');
       const messages = useChatStore.getState().messages;
       expect(messages).toHaveLength(1);
-      expect(messages[0].content).toBe('');
-      expect(messages[0].role).toBe('user');
+      expect(asChat(messages[0]).content).toBe('');
+      expect(asChat(messages[0]).role).toBe('user');
     });
 
     it('empty string user message still gets a unique id and timestamp', () => {
@@ -211,13 +215,13 @@ describe('chatStore — edge cases', () => {
       useChatStore.getState().appendStreamDelta('Normal response');
       useChatStore.getState().finalizeAgentMessage();
       const msg = useChatStore.getState().messages[0];
-      expect(msg.isError).toBeUndefined();
+      expect(asChat(msg).isError).toBeUndefined();
     });
 
     it('user messages never have isError set', () => {
       useChatStore.getState().addUserMessage('Hello');
       const msg = useChatStore.getState().messages[0];
-      expect(msg.isError).toBeUndefined();
+      expect(asChat(msg).isError).toBeUndefined();
     });
 
     it('each addUserMessage call generates distinct UUIDs', () => {

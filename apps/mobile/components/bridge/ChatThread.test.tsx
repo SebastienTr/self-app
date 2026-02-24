@@ -57,6 +57,7 @@ describe('ChatThread', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'Hello agent',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -78,6 +79,7 @@ describe('ChatThread', () => {
             messages: [
               {
                 id: '2',
+                type: 'chat',
                 role: 'agent',
                 content: 'I can help you',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -99,12 +101,14 @@ describe('ChatThread', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'First message',
                 timestamp: '2026-01-01T00:00:00.000Z',
               },
               {
                 id: '2',
+                type: 'chat',
                 role: 'agent',
                 content: 'Second message',
                 timestamp: '2026-01-01T00:00:01.000Z',
@@ -127,6 +131,7 @@ describe('ChatThread', () => {
             messages: [
               {
                 id: '3',
+                type: 'chat',
                 role: 'agent',
                 content: 'Something went wrong',
                 timestamp: '2026-01-01T00:00:00.000Z',

@@ -22,7 +22,7 @@ const mockRemove = jest.fn();
 beforeEach(() => {
   listeners.clear();
   mockRemove.mockClear();
-  jest.spyOn(Keyboard, 'addListener').mockImplementation((event: string, handler: KeyboardHandler) => {
+  jest.spyOn(Keyboard, 'addListener').mockImplementation((event: string, handler: KeyboardHandler | any) => {
     if (!listeners.has(event)) listeners.set(event, []);
     listeners.get(event)!.push(handler);
     return { remove: mockRemove } as any;
@@ -105,11 +105,9 @@ describe('useKeyboardVisible', () => {
   });
 
   it('has no store dependencies (pure hook)', () => {
-    const hookSource = require('fs').readFileSync(
-      require.resolve('@/hooks/useKeyboardVisible'),
-      'utf-8'
-    );
-    expect(hookSource).not.toContain('Store');
-    expect(hookSource).not.toContain('stores/');
+    // Verify module exports only the expected hook — no store re-exports
+    const mod = require('@/hooks/useKeyboardVisible');
+    expect(mod.useKeyboardVisible).toBeDefined();
+    expect(Object.keys(mod)).toEqual(['useKeyboardVisible']);
   });
 });

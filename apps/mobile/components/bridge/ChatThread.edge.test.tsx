@@ -67,18 +67,21 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'Hello',
                 timestamp: '2026-01-01T00:00:00.000Z',
               },
               {
                 id: '2',
+                type: 'chat',
                 role: 'agent',
                 content: 'Hi there!',
                 timestamp: '2026-01-01T00:00:01.000Z',
               },
               {
                 id: '3',
+                type: 'chat',
                 role: 'agent',
                 content: 'Something went wrong',
                 timestamp: '2026-01-01T00:00:02.000Z',
@@ -103,18 +106,21 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'User question',
                 timestamp: '2026-01-01T00:00:00.000Z',
               },
               {
                 id: '2',
+                type: 'chat',
                 role: 'agent',
                 content: 'Agent answer',
                 timestamp: '2026-01-01T00:00:01.000Z',
               },
               {
                 id: '3',
+                type: 'chat',
                 role: 'agent',
                 content: 'Error: Provider unavailable',
                 timestamp: '2026-01-01T00:00:02.000Z',
@@ -141,6 +147,7 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'What is 2+2?',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -164,12 +171,14 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'Question',
                 timestamp: '2026-01-01T00:00:00.000Z',
               },
               {
                 id: '2',
+                type: 'chat',
                 role: 'agent',
                 content: 'Previous answer',
                 timestamp: '2026-01-01T00:00:01.000Z',
@@ -194,6 +203,7 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'agent',
                 content: 'Completed response',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -215,6 +225,7 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'agent',
                 content: 'LLM failed',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -235,6 +246,7 @@ describe('ChatThread — edge cases', () => {
     it('renders 50 messages without crashing', () => {
       const messages = Array.from({ length: 50 }, (_, i) => ({
         id: String(i),
+        type: 'chat' as const,
         role: (i % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
         content: `Message ${i}`,
         timestamp: `2026-01-01T00:${String(i).padStart(2, '0')}:00.000Z`,
@@ -274,6 +286,7 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'My question',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -305,6 +318,7 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'user',
                 content: 'New message',
                 timestamp: '2026-01-01T00:00:00.000Z',
@@ -334,6 +348,7 @@ describe('ChatThread — edge cases', () => {
             messages: [
               {
                 id: '1',
+                type: 'chat',
                 role: 'agent',
                 content: 'In progress...',
                 timestamp: '2026-01-01T00:00:00.000Z',
