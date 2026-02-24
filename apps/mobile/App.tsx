@@ -204,44 +204,24 @@ function AppContent() {
   }, [screenMode, chatOpacity, dashOpacity]);
 
   // --- Keyboard close transition logic (AC #3, #4, #11) ---
+  // Deps: keyboardVisible, moduleCount, agentStatus — so this re-evaluates when
+  // a module is created or the agent finishes streaming, not just on keyboard toggle.
   useEffect(() => {
-    if (!keyboardVisible) {
-      // Keyboard just closed
-      const currentModuleCount = useModuleStore.getState().modules.size;
-      const currentAgentStatus = useChatStore.getState().agentStatus;
-
-      if (currentModuleCount > 0 && currentAgentStatus === 'idle') {
-        // AC #3: modules exist + agent idle → transition to dashboard after delay
-        dashboardTimerRef.current = setTimeout(() => {
-          useScreenModeStore.getState().setMode('dashboard');
-          dashboardTimerRef.current = null;
-        }, DASHBOARD_TRANSITION_DELAY);
-      } else if (currentModuleCount > 0 && currentAgentStatus !== 'idle') {
-        // AC #11: agent is streaming → watch for idle, then transition
-        const unsub = useChatStore.subscribe((state) => {
-          if (state.agentStatus === 'idle') {
-            unsub();
-            // Only transition if modules still exist
-            const mods = useModuleStore.getState().modules.size;
-            if (mods > 0) {
-              dashboardTimerRef.current = setTimeout(() => {
-                useScreenModeStore.getState().setMode('dashboard');
-                dashboardTimerRef.current = null;
-              }, DASHBOARD_TRANSITION_DELAY);
-            }
-          }
-        });
-        // Clean up subscription if keyboard reopens
-        return () => unsub();
-      }
-      // AC #4: 0 modules → stay in chat (no action needed)
-    } else {
+    if (!keyboardVisible && moduleCount > 0 && agentStatus === 'idle') {
+      // AC #3: keyboard closed + modules exist + agent idle → dashboard after delay
+      dashboardTimerRef.current = setTimeout(() => {
+        useScreenModeStore.getState().setMode('dashboard');
+        dashboardTimerRef.current = null;
+      }, DASHBOARD_TRANSITION_DELAY);
+    } else if (keyboardVisible) {
       // Keyboard opened — cancel any pending dashboard transition
       if (dashboardTimerRef.current !== null) {
         clearTimeout(dashboardTimerRef.current);
         dashboardTimerRef.current = null;
       }
     }
+    // AC #4: 0 modules → stay in chat (no action needed)
+    // AC #11: agent streaming → effect will re-run when agentStatus becomes 'idle'
 
     return () => {
       if (dashboardTimerRef.current !== null) {
@@ -249,7 +229,7 @@ function AppContent() {
         dashboardTimerRef.current = null;
       }
     };
-  }, [keyboardVisible]);
+  }, [keyboardVisible, moduleCount, agentStatus]);
 
   /** Handle ChatInput focus → switch to Chat Mode (AC #2). */
   const handleInputFocus = useCallback(() => {
