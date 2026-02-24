@@ -1091,3 +1091,156 @@ class TestDeltaSync:
                 # Each returned module should have updated_at > 2024-06-15
                 assert "moduleId" in mod
                 assert "name" in mod
+
+
+# --- Module creation via chat message (Story 3.4) ---
+
+# Valid module spec JSON that the LLM would return
+_VALID_MODULE_SPEC = json.dumps({
+    "name": "Paris Weather",
+    "type": "metric",
+    "template": "metric-dashboard",
+    "data_sources": [
+        {
+            "id": "openmeteo-paris",
+            "type": "rest_api",
+            "config": {
+                "url": "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35",
+                "method": "GET",
+            },
+        }
+    ],
+    "refresh_interval": 3600,
+    "schema_version": 1,
+    "accessible_label": "Paris weather forecast",
+})
+
+_MODULE_CREATION_LLM_RESPONSE = (
+    "I'll create a weather module for you!\n\n"
+    f"```json\n{_VALID_MODULE_SPEC}\n```"
+)
+
+
+def _make_module_creation_provider() -> MagicMock:
+    """Create a mock LLM provider that returns a module creation response."""
+    provider = MagicMock()
+    provider.name = "mock-provider"
+    result = LLMResult(
+        content=_MODULE_CREATION_LLM_RESPONSE,
+        provider="mock-provider",
+        model="mock-model",
+        tokens_in=50,
+        tokens_out=200,
+        latency_ms=500,
+        cost_estimate=0.01,
+    )
+    provider.execute = AsyncMock(return_value=result)
+    return provider
+
+
+@pytest.fixture
+def module_client(test_settings, tmp_path):
+    """Create a test client with a mock provider that returns a module creation response."""
+    asyncio.run(_setup_ws_db(test_settings.db_path, _TEST_TOKEN))
+    import app.main as main_mod
+    importlib.reload(main_mod)
+    mock_provider = _make_module_creation_provider()
+    with patch.object(main_mod, "get_provider", return_value=mock_provider):
+        yield TestClient(main_mod.app)
+
+
+def _receive_n(ws, n: int) -> list[dict]:
+    """Receive exactly n messages from WebSocket."""
+    messages = []
+    for _ in range(n):
+        messages.append(ws.receive_json())
+    return messages
+
+
+class TestModuleCreationViaChat:
+    """Tests for module creation triggered by a chat message (Story 3.4).
+
+    User sends { type: 'chat', payload: { message: '...' } }
+    Agent detects module creation intent from LLM response (JSON code fence)
+    Backend sends module_created message with the full module spec.
+
+    Expected message sequence (7 messages):
+      1. status:thinking
+      2. chat_stream (delta with conversational text, done=False)
+      3. chat_stream (done=True)
+      4. status:discovering
+      5. status:composing
+      6. module_created
+      7. status:idle
+    """
+
+    def test_chat_triggers_module_created_message(self, module_client):
+        """Chat message that triggers module creation should send module_created."""
+        with module_client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Show me the weather"}})
+
+            messages = _receive_n(ws, 7)
+            types = [m["type"] for m in messages]
+            assert "module_created" in types
+
+    def test_module_created_has_correct_format(self, module_client):
+        """module_created payload should have module_id, name, type, template."""
+        with module_client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Show me weather"}})
+
+            messages = _receive_n(ws, 7)
+            module_msgs = [m for m in messages if m["type"] == "module_created"]
+            assert len(module_msgs) == 1
+            payload = module_msgs[0]["payload"]
+            assert "module_id" in payload
+            assert payload["name"] == "Paris Weather"
+            assert payload["type"] == "metric"
+            assert payload["template"] == "metric-dashboard"
+
+    def test_module_creation_sends_status_sequence(self, module_client):
+        """Status messages should be: thinking -> discovering -> composing -> idle."""
+        with module_client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Create weather module"}})
+
+            messages = _receive_n(ws, 7)
+            status_msgs = [m for m in messages if m["type"] == "status"]
+            states = [m["payload"]["state"] for m in status_msgs]
+            assert states == ["thinking", "discovering", "composing", "idle"]
+
+    def test_created_module_appears_in_sync(self, module_client, test_settings):
+        """After module creation, sync should return the new module."""
+        with module_client.websocket_connect("/ws") as ws:
+            _auth(ws)
+
+            # Step 1: Create a module via chat
+            ws.send_json({"type": "chat", "payload": {"message": "Create weather"}})
+            # Consume all 7 module creation messages
+            _receive_n(ws, 7)
+
+            # Step 2: Sync to get all modules
+            ws.send_json({"type": "sync", "payload": {}})
+            sync_response = ws.receive_json()
+
+            assert sync_response["type"] == "module_list"
+            modules = sync_response["payload"]["modules"]
+            assert len(modules) >= 1
+            # At least one module should be named "Paris Weather"
+            names = [m.get("name") for m in modules]
+            assert "Paris Weather" in names
+
+    def test_chat_stream_sent_before_module_created(self, module_client):
+        """Conversational text (chat_stream) should arrive before module_created."""
+        with module_client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "Weather please"}})
+
+            messages = _receive_n(ws, 7)
+            types = [m["type"] for m in messages]
+
+            # chat_stream should appear before module_created
+            first_stream = types.index("chat_stream")
+            module_idx = types.index("module_created")
+            assert first_stream < module_idx

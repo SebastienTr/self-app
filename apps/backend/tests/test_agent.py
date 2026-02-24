@@ -4,15 +4,18 @@ Tests handle_chat with mock provider:
   - Happy path: sends thinking status, chat_stream chunks, idle status
   - LLM error: sends error message and idle status
   - Streaming chunks: sends delta messages and done message
+  - Module creation: detects JSON spec in LLM response, creates module, sends module_created
 """
 
 import asyncio
+import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiosqlite
 import pytest
 
-from app.agent import handle_chat
+from app.agent import handle_chat, _extract_module_spec, _build_module_prompt
 from app.llm.base import LLMResult
 
 
@@ -289,10 +292,10 @@ class TestHandleChat:
             await db.close()
 
     @pytest.mark.asyncio
-    async def test_provider_called_with_message(
+    async def test_provider_called_with_enriched_prompt(
         self, ws, mock_provider, tmp_path
     ):
-        """provider.execute() must be called with the chat message as prompt."""
+        """provider.execute() must be called with an enriched prompt containing the user message."""
         db_path = str(tmp_path / "test.db")
 
         import aiosqlite
@@ -316,4 +319,386 @@ class TestHandleChat:
 
         await handle_chat(ws, "Tell me a story", mock_provider, db_path)
 
-        mock_provider.execute.assert_called_once_with(prompt="Tell me a story")
+        # Provider is called once with an enriched prompt containing the user message
+        mock_provider.execute.assert_called_once()
+        call_kwargs = mock_provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "Tell me a story" in prompt
+        # Prompt should include module creation system instructions
+        assert "data_sources" in prompt
+
+
+async def _setup_full_db(db_path: str) -> None:
+    """Create llm_usage + modules tables for module creation tests."""
+    db = await aiosqlite.connect(db_path)
+    try:
+        await db.execute("PRAGMA journal_mode=WAL;")
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS llm_usage (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                tokens_in INTEGER,
+                tokens_out INTEGER,
+                cost_estimate REAL,
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS modules (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                spec TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                vitality_score REAL DEFAULT 0,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"""
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+# --- Valid module spec JSON that the LLM would return ---
+_VALID_MODULE_SPEC_JSON = json.dumps({
+    "name": "Paris Weather",
+    "type": "metric",
+    "template": "metric-dashboard",
+    "data_sources": [
+        {
+            "id": "openmeteo-paris",
+            "type": "rest_api",
+            "config": {
+                "url": "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m",
+                "method": "GET",
+            },
+        }
+    ],
+    "refresh_interval": 3600,
+    "schema_version": 1,
+    "accessible_label": "Paris weather forecast showing current temperature",
+})
+
+# LLM response with conversational text AND a JSON code block
+_MODULE_CREATION_RESPONSE = (
+    "I'll create a weather module for you. Let me find the right data sources...\n\n"
+    "```json\n"
+    f"{_VALID_MODULE_SPEC_JSON}\n"
+    "```"
+)
+
+# LLM response with INVALID JSON in code block
+_INVALID_JSON_RESPONSE = (
+    "Sure, I'll create that module!\n\n"
+    "```json\n"
+    '{"name": "Bad Module", "type": "metric", INVALID}\n'
+    "```"
+)
+
+
+class TestExtractModuleSpec:
+    """Tests for _extract_module_spec helper."""
+
+    def test_extracts_json_from_code_fence(self):
+        """Extracts valid module spec JSON from markdown code fence."""
+        spec = json.dumps({
+            "name": "Test", "type": "metric", "template": "metric-dashboard",
+            "data_sources": [], "refresh_interval": 3600, "schema_version": 1,
+            "accessible_label": "test module"
+        })
+        text = f'Some text\n```json\n{spec}\n```\nMore text'
+        result = _extract_module_spec(text)
+        assert result is not None
+        assert result["name"] == "Test"
+
+    def test_returns_none_for_no_code_fence(self):
+        """Returns None when no JSON code fence is present."""
+        result = _extract_module_spec("Just a regular chat response with no JSON.")
+        assert result is None
+
+    def test_returns_none_for_invalid_json(self):
+        """Returns None when JSON code fence has invalid JSON."""
+        text = '```json\n{invalid json here}\n```'
+        result = _extract_module_spec(text)
+        assert result is None
+
+    def test_returns_none_for_missing_required_fields(self):
+        """Returns None when JSON is valid but missing required module fields."""
+        text = '```json\n{"random": "data"}\n```'
+        result = _extract_module_spec(text)
+        assert result is None
+
+    def test_extracts_valid_module_spec(self):
+        """Extracts a complete valid module spec."""
+        result = _extract_module_spec(_MODULE_CREATION_RESPONSE)
+        assert result is not None
+        assert result["name"] == "Paris Weather"
+        assert result["type"] == "metric"
+        assert result["template"] == "metric-dashboard"
+        assert len(result["data_sources"]) == 1
+        assert result["refresh_interval"] == 3600
+        assert result["schema_version"] == 1
+
+
+class TestBuildModulePrompt:
+    """Tests for _build_module_prompt helper."""
+
+    def test_includes_user_message(self):
+        """Prompt includes the user's original message."""
+        prompt = _build_module_prompt("Show me the weather in Paris")
+        assert "Show me the weather in Paris" in prompt
+
+    def test_includes_schema_instructions(self):
+        """Prompt includes schema field requirements."""
+        prompt = _build_module_prompt("Track my stocks")
+        assert "data_sources" in prompt
+        assert "refresh_interval" in prompt
+        assert "schema_version" in prompt
+        assert "accessible_label" in prompt
+
+
+class TestHandleChatModuleCreation:
+    """Tests for handle_chat with module creation flow."""
+
+    @pytest.mark.asyncio
+    async def test_module_creation_sends_status_sequence(self, ws, tmp_path):
+        """Module creation sends: thinking -> discovering -> composing -> idle."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_MODULE_CREATION_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Show me the weather in Paris", provider, db_path)
+
+        status_msgs = [
+            m for m in ws.sent if m.get("type") == "status"
+        ]
+        states = [m["payload"]["state"] for m in status_msgs]
+        assert states == ["thinking", "discovering", "composing", "idle"]
+
+    @pytest.mark.asyncio
+    async def test_module_creation_sends_chat_stream_before_module_created(self, ws, tmp_path):
+        """Conversational text is sent as chat_stream before module_created."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_MODULE_CREATION_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Show me the weather in Paris", provider, db_path)
+
+        # Find chat_stream messages
+        stream_msgs = [m for m in ws.sent if m.get("type") == "chat_stream"]
+        assert len(stream_msgs) >= 2  # At least delta + done
+
+        # Find module_created message
+        module_msgs = [m for m in ws.sent if m.get("type") == "module_created"]
+        assert len(module_msgs) == 1
+
+        # chat_stream done should come before module_created
+        stream_done_idx = next(
+            i for i, m in enumerate(ws.sent)
+            if m.get("type") == "chat_stream" and m["payload"].get("done") is True
+        )
+        module_created_idx = next(
+            i for i, m in enumerate(ws.sent)
+            if m.get("type") == "module_created"
+        )
+        assert stream_done_idx < module_created_idx
+
+    @pytest.mark.asyncio
+    async def test_module_creation_sends_module_created_with_spec(self, ws, tmp_path):
+        """module_created message contains the full spec with server-generated id."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_MODULE_CREATION_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Show me the weather in Paris", provider, db_path)
+
+        module_msgs = [m for m in ws.sent if m.get("type") == "module_created"]
+        assert len(module_msgs) == 1
+
+        payload = module_msgs[0]["payload"]
+        assert "module_id" in payload
+        assert payload["name"] == "Paris Weather"
+        assert payload["type"] == "metric"
+        assert payload["template"] == "metric-dashboard"
+        assert payload["schema_version"] == 1
+
+    @pytest.mark.asyncio
+    async def test_module_creation_saves_to_db(self, ws, tmp_path):
+        """Module is saved to the modules table on creation."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_MODULE_CREATION_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Show me the weather in Paris", provider, db_path)
+
+        # Verify module is in DB
+        db = await aiosqlite.connect(db_path)
+        try:
+            cursor = await db.execute("SELECT COUNT(*) FROM modules")
+            row = await cursor.fetchone()
+            assert row[0] == 1
+        finally:
+            await db.close()
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_sends_error(self, ws, tmp_path):
+        """Invalid JSON in LLM response sends MODULE_CREATION_FAILED error."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_INVALID_JSON_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Create a broken module", provider, db_path)
+
+        error_msgs = [m for m in ws.sent if m.get("type") == "error"]
+        assert len(error_msgs) == 1
+        assert error_msgs[0]["payload"]["code"] == "MODULE_CREATION_FAILED"
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_still_sends_idle(self, ws, tmp_path):
+        """Invalid module JSON still ends with status:idle."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_INVALID_JSON_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Create a broken module", provider, db_path)
+
+        assert ws.sent[-1] == {
+            "type": "status",
+            "payload": {"state": "idle"},
+        }
+
+    @pytest.mark.asyncio
+    async def test_regular_chat_still_works(self, ws, tmp_path):
+        """Regular chat (no JSON code block) still works as before."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content="Just a normal chat response with no JSON block.",
+            provider="test-provider",
+            model="test-model",
+            tokens_in=10,
+            tokens_out=20,
+            latency_ms=100,
+            cost_estimate=0.001,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Hello there", provider, db_path)
+
+        types = [m["type"] for m in ws.sent]
+        assert "module_created" not in types
+        assert types == ["status", "chat_stream", "chat_stream", "status"]
+
+    @pytest.mark.asyncio
+    async def test_module_created_spec_has_snake_case_keys(self, ws, tmp_path):
+        """module_created payload uses snake_case keys on the wire."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        result = LLMResult(
+            content=_MODULE_CREATION_RESPONSE,
+            provider="test-provider",
+            model="test-model",
+            tokens_in=50,
+            tokens_out=200,
+            latency_ms=500,
+            cost_estimate=0.01,
+        )
+        provider.execute = AsyncMock(return_value=result)
+
+        await handle_chat(ws, "Show me the weather", provider, db_path)
+
+        module_msgs = [m for m in ws.sent if m.get("type") == "module_created"]
+        assert len(module_msgs) == 1
+        payload = module_msgs[0]["payload"]
+
+        # Keys should be snake_case
+        assert "module_id" in payload
+        assert "data_sources" in payload
+        assert "refresh_interval" in payload
+        assert "schema_version" in payload
+        assert "accessible_label" in payload
+
+        # camelCase keys should NOT be present
+        assert "moduleId" not in payload
+        assert "dataSources" not in payload
+        assert "refreshInterval" not in payload

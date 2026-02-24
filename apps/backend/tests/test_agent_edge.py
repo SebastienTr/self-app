@@ -85,14 +85,18 @@ class TestHandleChatEdgeCases:
 
     @pytest.mark.asyncio
     async def test_empty_message_still_calls_provider(self, ws, tmp_path):
-        """handle_chat with empty message still calls provider.execute(prompt='')."""
+        """handle_chat with empty message still calls provider.execute with enriched prompt."""
         db_path = str(tmp_path / "test.db")
         await _create_db_with_usage_table(db_path)
 
         provider = _make_provider("Response to empty message")
         await handle_chat(ws, "", provider, db_path)
 
-        provider.execute.assert_called_once_with(prompt="")
+        provider.execute.assert_called_once()
+        # The prompt is enriched with module creation system instructions
+        call_kwargs = provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "User message:" in prompt
 
     @pytest.mark.asyncio
     async def test_empty_message_completes_full_protocol(self, ws, tmp_path):

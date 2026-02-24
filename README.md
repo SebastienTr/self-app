@@ -43,17 +43,17 @@ Most apps decide what you can do before you open them. Self flips that:
 ## Project Status
 
 ```
-[▓▓▓▓░░░░░░░░░░░░░░░░] 11/56 stories (20%)
+[▓▓▓▓░░░░░░░░░░░░░░░░] 12/56 stories (21%)
 ```
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 18 | 11 | **In Progress** |
+| First Light | 18 | 12 | **In Progress** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
-**Current focus:** Story 3.4 — Module Creation End-to-End
-**Next milestone:** Story 3.4 — First Module Creation End-to-End
+**Current focus:** Wave 4 — Backfill First Light (Story 2.2 next)
+**Next milestone:** First Light Complete
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
 
@@ -188,6 +188,7 @@ See the [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep
 | [Story 3.2 — Composite Primitives](_bmad-output/implementation-artifacts/3-2-composite-primitives-card-list.md) | Done |
 | [Story 3.3 — Module Rendering Pipeline](_bmad-output/implementation-artifacts/3-3-module-rendering-pipeline.md) | Done |
 | [Story 2.1 — Real-Time Chat Interface with Streaming](_bmad-output/implementation-artifacts/2-1-real-time-chat-interface-with-streaming.md) | Done |
+| [Story 3.4 — Module Creation End-to-End](_bmad-output/implementation-artifacts/3-4-module-creation-end-to-end.md) | Done |
 
 </details>
 

@@ -3,11 +3,13 @@
 This module is the bridge between the WebSocket handler (main.py) and the LLM
 provider layer (llm/). It manages the chat lifecycle:
   1. Sends status:thinking before calling provider
-  2. Calls provider.execute(prompt=message)
-  3. Streams response back as chat_stream messages
-  4. Logs LLM usage to llm_usage table
-  5. Sends status:idle in finally (always)
-  6. On error: sends structured error message (NFR22)
+  2. Calls provider.execute(prompt=message) with module creation system prompt
+  3. Parses LLM response for module spec JSON (code fence detection)
+  4. If module spec found: validates, saves to DB, sends module_created
+  5. If no spec: streams response as regular chat_stream
+  6. Logs LLM usage to llm_usage table
+  7. Sends status:idle in finally (always)
+  8. On error: sends structured error message (NFR22)
 
 Architecture mandates:
   - main.py is the ONLY file that touches the WebSocket object directly —
@@ -17,6 +19,8 @@ Architecture mandates:
   - Per-request DB connections (never session-scoped — see fix(1-5))
 """
 
+import json
+import re
 import uuid
 from datetime import UTC, datetime
 
@@ -25,6 +29,152 @@ from fastapi import WebSocket
 from app.db import get_connection
 from app.llm.base import LLMProvider, LLMResult
 from app.logging import log
+from app.modules import create_module
+
+# Required fields for a valid module spec from the LLM
+_REQUIRED_SPEC_FIELDS = {"name", "type", "template", "data_sources", "refresh_interval", "schema_version", "accessible_label"}
+
+# Regex to extract JSON from a markdown code fence
+_JSON_CODE_FENCE_RE = re.compile(r"```json\s*\n(.*?)\n\s*```", re.DOTALL)
+
+
+class _SpecResult:
+    """Result of module spec extraction attempt."""
+
+    __slots__ = ("spec", "error", "has_code_fence")
+
+    def __init__(self, spec: dict | None, error: str | None, has_code_fence: bool):
+        self.spec = spec
+        self.error = error
+        self.has_code_fence = has_code_fence
+
+
+def _extract_module_spec(content: str) -> dict | None:
+    """Extract and validate a module spec from LLM response content.
+
+    Looks for a JSON code block (```json ... ```) in the response.
+    If found, parses the JSON and validates required fields.
+
+    Args:
+        content: The full LLM response text.
+
+    Returns:
+        Parsed module spec dict if valid, None otherwise.
+    """
+    result = _try_extract_module_spec(content)
+    return result.spec
+
+
+def _try_extract_module_spec(content: str) -> _SpecResult:
+    """Try to extract a module spec, returning detailed result with error info.
+
+    Used internally to distinguish between:
+    - No JSON code fence found (regular chat)
+    - JSON code fence found but invalid (error)
+    - Valid module spec found (success)
+
+    Args:
+        content: The full LLM response text.
+
+    Returns:
+        _SpecResult with spec, error message, and whether a code fence was found.
+    """
+    match = _JSON_CODE_FENCE_RE.search(content)
+    if not match:
+        return _SpecResult(spec=None, error=None, has_code_fence=False)
+
+    json_str = match.group(1).strip()
+    try:
+        spec = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        return _SpecResult(spec=None, error=f"Invalid JSON in module spec: {e}", has_code_fence=True)
+
+    if not isinstance(spec, dict):
+        return _SpecResult(spec=None, error="Module spec must be a JSON object", has_code_fence=True)
+
+    missing = _REQUIRED_SPEC_FIELDS - spec.keys()
+    if missing:
+        return _SpecResult(
+            spec=None,
+            error=f"Module spec missing required fields: {', '.join(sorted(missing))}",
+            has_code_fence=True,
+        )
+
+    return _SpecResult(spec=spec, error=None, has_code_fence=True)
+
+
+def _extract_chat_text(content: str) -> str:
+    """Extract the conversational text from LLM response (everything outside the JSON block).
+
+    Args:
+        content: The full LLM response text.
+
+    Returns:
+        The text portion with the JSON code block removed and stripped.
+    """
+    # Remove the JSON code fence block
+    text = _JSON_CODE_FENCE_RE.sub("", content).strip()
+    return text
+
+
+def _build_module_prompt(message: str) -> str:
+    """Build the prompt for the LLM that enables module creation.
+
+    Includes system instructions for module creation, schema requirements,
+    and examples. The LLM will respond with both conversational text and
+    a JSON module spec code block when appropriate.
+
+    Args:
+        message: The user's chat message.
+
+    Returns:
+        The full prompt string for the LLM provider.
+    """
+    return f"""You are Self, an AI agent that creates native mobile modules. When the user describes a need that can be fulfilled by a data module (data tracking, monitoring, dashboards, weather, stocks, news, etc.), respond with BOTH:
+1. A conversational acknowledgment (friendly, brief)
+2. A valid module spec JSON block wrapped in ```json ... ```
+
+If the user's message is just conversation (greeting, question, etc.) and NOT a module request, respond normally without any JSON block.
+
+MODULE SPEC REQUIREMENTS:
+The JSON block must contain these fields:
+- "name": string — display name for the module
+- "type": one of "metric", "list", "text", "card"
+- "template": one of "metric-dashboard", "data-card", "simple-list"
+- "data_sources": array of objects, each with "id" (string), "type" (string, e.g. "rest_api"), "config" (object with "url" and "method")
+- "refresh_interval": integer (seconds) — weather: 3600, stocks: 300, news: 1800
+- "schema_version": always 1
+- "accessible_label": string — accessibility description of the module
+
+IMPORTANT:
+- Use snake_case for ALL JSON field names (data_sources, refresh_interval, schema_version, accessible_label)
+- Do NOT include an "id" field — the server generates UUIDs
+- Find publicly available free APIs (like Open-Meteo for weather, no API key required)
+- The JSON must be valid and parseable
+
+EXAMPLE (weather module):
+```json
+{{
+  "name": "Paris Weather",
+  "type": "metric",
+  "template": "metric-dashboard",
+  "data_sources": [
+    {{
+      "id": "openmeteo-paris",
+      "type": "rest_api",
+      "config": {{
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m,wind_speed_10m",
+        "method": "GET"
+      }}
+    }}
+  ],
+  "refresh_interval": 3600,
+  "schema_version": 1,
+  "accessible_label": "Paris weather forecast showing current temperature and wind speed"
+}}
+```
+
+User message: {message}"""
 
 
 async def _log_llm_usage(result: LLMResult, db_path: str) -> None:
@@ -68,6 +218,79 @@ async def _log_llm_usage(result: LLMResult, db_path: str) -> None:
         )
 
 
+async def _handle_module_creation(
+    ws: WebSocket,
+    result: LLMResult,
+    module_spec: dict,
+    db_path: str,
+) -> None:
+    """Handle the module creation pipeline after a module spec is detected.
+
+    Sends status updates, saves to DB, sends module_created message.
+    Called from handle_chat when _extract_module_spec finds a valid spec.
+
+    Status sequence: discovering -> composing -> module_created
+    (thinking is sent before this, idle is sent after in handle_chat's finally)
+
+    Args:
+        ws:          WebSocket connection.
+        result:      LLM result (for text extraction).
+        module_spec: Validated module spec dict from LLM.
+        db_path:     Path to SQLite database.
+    """
+    # Send conversational text as chat_stream (before module_created)
+    chat_text = _extract_chat_text(result.content)
+    if chat_text:
+        await ws.send_json({
+            "type": "chat_stream",
+            "payload": {"delta": chat_text, "done": False},
+        })
+    await ws.send_json({
+        "type": "chat_stream",
+        "payload": {"delta": "", "done": True},
+    })
+
+    # Status: discovering (after parsing LLM response)
+    await ws.send_json({"type": "status", "payload": {"state": "discovering"}})
+
+    # Status: composing (during DB save)
+    await ws.send_json({"type": "status", "payload": {"state": "composing"}})
+
+    # Save module to database
+    module_name = module_spec.get("name", "Unnamed Module")
+    # Enforce reasonable name length (LLM output can be unpredictable)
+    if len(module_name) > 200:
+        module_name = module_name[:200]
+    saved = await create_module(db_path, module_name, module_spec)
+
+    # Build the wire-format payload (snake_case) with server-generated id
+    wire_spec = {**module_spec, "module_id": saved["id"]}
+
+    # Send module_created message — module is already persisted at this point,
+    # so WS send failure should not be reported as MODULE_CREATION_FAILED
+    try:
+        await ws.send_json({
+            "type": "module_created",
+            "payload": wire_spec,
+        })
+    except Exception as ws_err:
+        log.warning(
+            "module_created_ws_send_failed",
+            module_id=saved["id"],
+            module_name=module_name,
+            error=str(ws_err),
+            agent_action="Module was saved to DB but the WS notification failed. "
+            "The module will appear on next sync.",
+        )
+        # Don't re-raise — the module IS created, just the notification failed
+
+    log.info(
+        "module_creation_complete",
+        module_id=saved["id"],
+        module_name=module_name,
+    )
+
+
 async def handle_chat(
     ws: WebSocket,
     message: str,
@@ -76,13 +299,16 @@ async def handle_chat(
 ) -> None:
     """Handle a chat message: call LLM provider and stream response back.
 
-    Sends status:thinking before calling provider.
-    Sends full response as a single chat_stream delta, then done:True.
-    Sends status:idle in finally block (always, even on error).
-    On error: sends structured error message (NFR22, LLM_CHAT_FAILED).
+    Detects module creation intent from LLM response (JSON code fence).
+    If module spec found: validates, saves to DB, sends module_created.
+    If no spec found: sends response as regular chat_stream.
 
-    First Light streaming pattern: full response as single chunk, then done:True.
-    True token-by-token streaming is deferred to MVP (AnthropicAPI with stream=True).
+    Status sequence:
+      - Regular chat: thinking -> chat_stream -> idle
+      - Module creation: thinking -> discovering -> composing -> module_created -> idle
+      - Error: thinking -> error -> idle
+
+    Sends status:idle in finally block (always, even on error).
 
     Args:
         ws:       WebSocket — the sole communication channel (from main.py)
@@ -94,20 +320,74 @@ async def handle_chat(
     await ws.send_json({"type": "status", "payload": {"state": "thinking"}})
 
     try:
-        # Call provider with the user's message as the prompt
-        result = await provider.execute(prompt=message)
+        # Build prompt with module creation instructions
+        prompt = _build_module_prompt(message)
 
-        # Send full response as a single stream chunk (First Light pattern)
-        await ws.send_json({
-            "type": "chat_stream",
-            "payload": {"delta": result.content, "done": False},
-        })
+        # Call provider with the enriched prompt
+        result = await provider.execute(prompt=prompt)
 
-        # Signal stream completion
-        await ws.send_json({
-            "type": "chat_stream",
-            "payload": {"delta": "", "done": True},
-        })
+        # Check if response contains a module spec
+        spec_result = _try_extract_module_spec(result.content)
+
+        if spec_result.spec is not None:
+            # Module creation pipeline — valid spec found
+            try:
+                await _handle_module_creation(ws, result, spec_result.spec, db_path)
+            except Exception as e:
+                log.error(
+                    "module_creation_failed",
+                    module_name=spec_result.spec.get("name", "unknown"),
+                    error=str(e),
+                    agent_action="Check LLM output format. Expected valid JSON with fields: "
+                    "name, type, template, data_sources, refresh_interval, schema_version, accessible_label",
+                )
+                await ws.send_json({
+                    "type": "error",
+                    "payload": {
+                        "code": "MODULE_CREATION_FAILED",
+                        "message": f"Module creation failed: {e}",
+                        "agent_action": "Check LLM output format. Expected valid JSON with fields: "
+                        "name, type, template, data_sources, refresh_interval, schema_version, accessible_label",
+                    },
+                })
+        elif spec_result.has_code_fence and spec_result.error:
+            # JSON code fence found but invalid — this is a module creation failure
+            log.error(
+                "module_creation_failed",
+                error=spec_result.error,
+                agent_action="Check LLM output format. Expected valid JSON with fields: "
+                "name, type, template, data_sources, refresh_interval, schema_version, accessible_label",
+            )
+            # Still send the conversational text portion
+            chat_text = _extract_chat_text(result.content)
+            if chat_text:
+                await ws.send_json({
+                    "type": "chat_stream",
+                    "payload": {"delta": chat_text, "done": False},
+                })
+                await ws.send_json({
+                    "type": "chat_stream",
+                    "payload": {"delta": "", "done": True},
+                })
+            await ws.send_json({
+                "type": "error",
+                "payload": {
+                    "code": "MODULE_CREATION_FAILED",
+                    "message": f"Module spec validation failed: {spec_result.error}",
+                    "agent_action": "Check LLM output format. Expected valid JSON with fields: "
+                    "name, type, template, data_sources, refresh_interval, schema_version, accessible_label",
+                },
+            })
+        else:
+            # Regular chat — no JSON code fence, send full response as stream
+            await ws.send_json({
+                "type": "chat_stream",
+                "payload": {"delta": result.content, "done": False},
+            })
+            await ws.send_json({
+                "type": "chat_stream",
+                "payload": {"delta": "", "done": True},
+            })
 
         # Log LLM usage asynchronously (per-request connection)
         await _log_llm_usage(result, db_path)
@@ -116,6 +396,7 @@ async def handle_chat(
             "chat_handled",
             provider=provider.name,
             latency_ms=result.latency_ms,
+            has_module=spec_result.spec is not None,
         )
 
     except Exception as e:

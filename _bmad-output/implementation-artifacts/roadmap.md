@@ -1,33 +1,33 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-23T18:45 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-24T09:30 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 3 · Story 3.4 · BACKLOG                              ║
-║  Next milestone: Wave 3 — First Module Test (3.4)           ║
+║  WAVE 4 · Story 2.2 · BACKLOG                              ║
+║  Next milestone: Wave 4 — First Light Complete              ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  11/56 done (20%)
+TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  12/56 done (21%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
-W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE
+W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE        🔄 E1 retro ✓
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
-W3  First Module   ·                           0/1   << ICI * VALIDATION
-W4  Backfill       ······                      0/6   * FIRST LIGHT
-W5  MVP Core       ··············              0/14
-W6  Security       ·····                       0/5   * MVP DONE
-W7  Growth         ···················         0/19  * GROWTH
+W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro
+W4  Backfill       ······                      0/6   << ICI        🔄 E2+E4, First Light retro
+W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
+W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
+W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
 
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
 E2  Conversation   ▓···       1/4   <<    ┐
-E3  Creation       ▓▓▓·       3/4         ├ First Light
+E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
 E4  Freshness      ···        0/3         ┘
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
@@ -70,15 +70,15 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 ### Waves
 
-| Wave | Goal | Stories | Milestone |
-|------|------|---------|-----------|
-| **1** | Finish Bootstrap | 1.4, 1.5, 1.6 | Mobile connected + authenticated |
-| **2** | Chat + Primitives | 3.1, 3.2, 2.1, 3.3 | Agent talks + modules render |
-| **3** | Module Creation E2E | 3.4 | **First Module Test** |
-| **4** | Backfill First Light | 2.2, 2.3, 2.4, 4.1, 4.2, 4.3 | First Light complete |
-| **5** | MVP Core | 5.x, 6.x, 7.x, 8.x | Memory + onboarding + interactions |
-| **6** | MVP Security | 9.x, 10.x | Multi-provider + heartbeat |
-| **7** | Growth | 11.x–15.x | Lifecycle + genome + admin |
+| Wave | Goal | Stories | Milestone | Retros |
+|------|------|---------|-----------|--------|
+| **1** | Finish Bootstrap | 1.4, 1.5, 1.6 | Mobile connected + authenticated | E1 retro ✓ |
+| **2** | Chat + Primitives | 3.1, 3.2, 2.1, 3.3 | Agent talks + modules render | — |
+| **3** | Module Creation E2E | 3.4 | **First Module Test** | E3 retro |
+| **4** | Backfill First Light | 2.2, 2.3, 2.4, 4.1, 4.2, 4.3 | First Light complete | E2 + E4 retro, **First Light retro** |
+| **5** | MVP Core | 5.x, 6.x, 7.x, 8.x | Memory + onboarding + interactions | E5, E6, E7, E8 retros |
+| **6** | MVP Security | 9.x, 10.x | Multi-provider + heartbeat | E9 + E10 retro, **MVP retro** |
+| **7** | Growth | 11.x–15.x | Lifecycle + genome + admin | E11–E15 retros, **Growth retro** |
 
 ---
 
@@ -94,6 +94,8 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 - `[x]` **1.4** — Mobile App Shell & WebSocket Connection
 - `[x]` **1.5** — Offline Message Queue & Cached Data Rendering
 - `[x]` **1.6** — Session Authentication & Mobile-Backend Pairing
+
+> 🔄 **Retro E1** — done (`/bmad-bmm-retrospective`)
 
 ---
 
@@ -121,9 +123,11 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 > **THE milestone.** User types → agent creates → module appears.
 > 1 story | Depends on: 2.1 + 3.3 + 1.3
 
-- `[ ]` **3.4** — Module Creation End-to-End
+- `[x]` **3.4** — Module Creation End-to-End
 
 > If this works, the product thesis is validated. Everything after builds on this.
+>
+> 🔄 **Retro E3** — à lancer après 3.4 done (dernier story de l'Epic 3)
 
 ---
 
@@ -139,6 +143,10 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 - `[ ]` **4.2** — Module Vitality Scoring — *blocks 11.1*
 - `[ ]` **4.3** — Module Delete, Archive & Restore
 
+> 🔄 **Retro E2** — à lancer après 2.4 done (dernier story de l'Epic 2)
+> 🔄 **Retro E4** — à lancer après 4.3 done (dernier story de l'Epic 4)
+> 🔄 **Retro First Light** — milestone retro à lancer quand W4 complet (`/bmad-bmm-retrospective`)
+>
 > **Milestone: First Light complete.** The app works end-to-end.
 
 ---
@@ -175,6 +183,8 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 - `[ ]` **8.3** — Proactive Module Proposals — *needs 5.1 + 2.3*
 
 > Recommended interleaving: `5.1 → 6.1 → 8.1 → 7.1 → 5.2 → 6.2 → 8.2 → 7.2 → 5.3 → 6.3 → 6.4 → 7.3 → 7.4 → 8.3`
+>
+> 🔄 **Retro E5** — après 5.3 | **Retro E6** — après 6.4 | **Retro E7** — après 7.4 | **Retro E8** — après 8.3
 
 ---
 
@@ -194,6 +204,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 - `[ ]` **10.1** — Heartbeat Module State Evaluation
 - `[ ]` **10.2** — Pre-Computation Before Usage Time — *needs 5.1*
 
+> 🔄 **Retro E9** — après 9.3 | **Retro E10** — après 10.2
+> 🔄 **Retro MVP** — milestone retro à lancer quand W6 complet (`/bmad-bmm-retrospective`)
+>
 > **Milestone: MVP complete.** The product is usable daily.
 
 ---
@@ -240,6 +253,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 > Recommended order: `11.4 → 12.1 → 13.1 → 14.2 → 15.3 → 11.1 → 12.2 → 13.2 → 14.4 → 15.1 → 11.3 → 12.3 → 13.3 → 14.5 → 15.2 → 14.1 → 14.3 → 11.2 → 15.4`
 >
 > 11.2 and 15.4 are last — they depend on nearly everything else.
+>
+> 🔄 **Retro E11–E15** — après chaque dernier story d'epic
+> 🔄 **Retro Growth** — milestone retro finale quand W7 complet (`/bmad-bmm-retrospective`)
 
 ---
 
@@ -259,6 +275,21 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 10.1 ──→ 10.2, 13.1              (heartbeat unlocks notifications)
 13.1 ──→ 11.2, 13.2, 13.3        (push unlocks notification features)
 ```
+
+---
+
+## Retrospective Policy
+
+🔄 Deux types de rétros sont planifiées :
+
+| Type | Quand | Commande |
+|------|-------|----------|
+| **Epic retro** | Après la dernière story d'un epic (E1–E15) | `/bmad-bmm-retrospective` |
+| **Milestone retro** | Aux jalons majeurs : First Light (W4), MVP (W6), Growth (W7) | `/bmad-bmm-retrospective` |
+
+Les rétros épiques sont rapides (15-20 min) et focalisées sur l'epic terminé. Les rétros milestone sont plus approfondies et couvrent tout le travail depuis le dernier jalon.
+
+> Le SM rappelle automatiquement de lancer la rétro quand une wave se termine.
 
 ---
 
