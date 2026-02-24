@@ -34,6 +34,7 @@ from app.llm.base import LLMResult
 _TEST_SOUL = "# Test SOUL\n\nYou are a test agent."
 
 
+
 class MockWebSocket:
     """Minimal mock WebSocket that records sent messages."""
 
