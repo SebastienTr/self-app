@@ -11,6 +11,10 @@ set -euo pipefail
 #   status             Check backend health, Metro, adb device
 #   device-info        Show connected device details
 #   clear-logs         Clear logcat buffer
+#   emulator-start     Boot Android emulator (headless, no window)
+#   emulator-stop      Kill the Android emulator
+#   app-launch         All-in-one: emulator + backend + app on emulator
+#   app-stop           Kill everything: self.sh + emulator
 #   --help             Show usage
 #
 # Architecture: Standalone shell script, no backend dependencies.
@@ -20,6 +24,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
+
+# ── Android SDK ───────────────────────────────────────────────────
+export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
+export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+AVD_NAME="self-app-dev"
 
 # ── Colors ──────────────────────────────────────────────────────────
 RED=$'\033[0;31m'
@@ -219,10 +228,185 @@ cmd_clear_logs() {
   log_ok "Logcat buffer cleared"
 }
 
+# ── Emulator commands ─────────────────────────────────────────────
+
+cmd_emulator_start() {
+  # Check if emulator already running
+  if adb devices 2>/dev/null | grep -q 'emulator'; then
+    log_ok "Emulator already running"
+    adb devices 2>/dev/null | grep 'emulator'
+    return 0
+  fi
+
+  local EMU="$ANDROID_HOME/emulator/emulator"
+  if [[ ! -x "$EMU" ]]; then
+    log_err "Emulator not found at $EMU"
+    log_err "Install: sdkmanager 'emulator' 'system-images;android-35;google_apis;arm64-v8a'"
+    exit 1
+  fi
+
+  # Verify AVD exists
+  if ! "$EMU" -list-avds 2>/dev/null | grep -q "^${AVD_NAME}$"; then
+    log_err "AVD '$AVD_NAME' not found. Create it:"
+    log_err "  avdmanager create avd -n $AVD_NAME -k 'system-images;android-35;google_apis;arm64-v8a' --device 'pixel_6'"
+    exit 1
+  fi
+
+  log "Starting emulator '$AVD_NAME' (headless, no window)..."
+  "$EMU" -avd "$AVD_NAME" -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect 2>"$RUN_DIR/emulator.log" &
+  local emu_pid=$!
+  echo "$emu_pid" > "$RUN_DIR/emulator.pid"
+
+  log "Waiting for emulator to boot (PID $emu_pid)..."
+  adb wait-for-device
+
+  local retries=0
+  while [[ $retries -lt 90 ]]; do
+    local boot_complete
+    boot_complete=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n') || true
+    if [[ "$boot_complete" == "1" ]]; then
+      log_ok "Emulator booted and ready (PID $emu_pid)"
+      return 0
+    fi
+    sleep 2; ((retries++))
+  done
+
+  log_err "Emulator boot timed out after 180s"
+  log_err "Check logs: $RUN_DIR/emulator.log"
+  exit 1
+}
+
+cmd_emulator_stop() {
+  # Try graceful shutdown via adb first
+  if adb devices 2>/dev/null | grep -q 'emulator'; then
+    log "Sending shutdown to emulator via adb..."
+    adb emu kill 2>/dev/null || true
+    sleep 2
+  fi
+
+  # Kill by PID if still running
+  if [[ -f "$RUN_DIR/emulator.pid" ]]; then
+    local pid
+    pid=$(cat "$RUN_DIR/emulator.pid")
+    if kill -0 "$pid" 2>/dev/null; then
+      log "Force killing emulator (PID $pid)..."
+      kill -TERM "$pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    rm -f "$RUN_DIR/emulator.pid"
+  fi
+
+  rm -f "$RUN_DIR/emulator.log"
+  log_ok "Emulator stopped"
+}
+
+cmd_app_launch() {
+  # 1. Start emulator if no device connected
+  if ! adb devices 2>/dev/null | grep -q 'device$\|emulator'; then
+    cmd_emulator_start
+  else
+    log_ok "Device/emulator already connected"
+  fi
+
+  # 2. Kill any existing self.sh
+  "$ROOT_DIR/self.sh" --kill 2>/dev/null || true
+  sleep 1
+
+  # 3. Set emulator-specific env: emulator reaches host via 10.0.2.2
+  export EXPO_PUBLIC_DEV_BACKEND_URL="ws://10.0.2.2:${BACKEND_PORT}/ws"
+
+  # 4. Start backend in background
+  log "Starting backend..."
+  cd "$ROOT_DIR"
+  "$ROOT_DIR/self.sh" --backend &>"$RUN_DIR/backend-agent.log" &
+  local backend_sh_pid=$!
+  echo "$backend_sh_pid" > "$RUN_DIR/app-launch.pid"
+
+  # Wait for backend health
+  local retries=0
+  while [[ $retries -lt 30 ]]; do
+    if curl -sf "http://localhost:${BACKEND_PORT}/health" >/dev/null 2>&1; then
+      log_ok "Backend healthy"
+      break
+    fi
+    sleep 1; ((retries++))
+  done
+  if [[ $retries -ge 30 ]]; then
+    log_err "Backend failed to start. Check $RUN_DIR/backend-agent.log"
+    exit 1
+  fi
+
+  # 5. Pairing token
+  if [[ -f "$RUN_DIR/pairing-token" ]]; then
+    export EXPO_PUBLIC_DEV_PAIRING_TOKEN
+    EXPO_PUBLIC_DEV_PAIRING_TOKEN=$(cat "$RUN_DIR/pairing-token")
+    log_ok "Pairing token loaded"
+  fi
+
+  # 6. Launch metro + install Expo Go + open on emulator
+  log "Launching app on emulator (first run installs Expo Go automatically)..."
+  cd "$ROOT_DIR/apps/mobile"
+  npx expo start --android --no-dev --no-minify 2>&1 | sed -u "s/^/${GREEN}[expo]${NC} /" &
+  local expo_pid=$!
+  echo "$expo_pid" > "$RUN_DIR/expo-agent.pid"
+  cd "$ROOT_DIR"
+
+  # Wait for Metro to be ready
+  retries=0
+  while [[ $retries -lt 60 ]]; do
+    if curl -sf "http://localhost:8081/status" >/dev/null 2>&1; then
+      log_ok "Metro bundler ready"
+      break
+    fi
+    sleep 2; ((retries++))
+  done
+
+  echo ""
+  log_ok "═══════════════════════════════════════════════"
+  log_ok "  App running on emulator!"
+  log_ok "  Backend:  http://localhost:${BACKEND_PORT}"
+  log_ok "  Metro:    http://localhost:8081"
+  log_ok "  Emulator: ws://10.0.2.2:${BACKEND_PORT}/ws"
+  log_ok ""
+  log_ok "  ./dev-tools.sh screenshot   — capture screen"
+  log_ok "  ./dev-tools.sh logs         — JS logs"
+  log_ok "  ./dev-tools.sh app-stop     — kill everything"
+  log_ok "═══════════════════════════════════════════════"
+}
+
+cmd_app_stop() {
+  log "Stopping all agent services..."
+
+  # Stop expo
+  if [[ -f "$RUN_DIR/expo-agent.pid" ]]; then
+    local pid
+    pid=$(cat "$RUN_DIR/expo-agent.pid")
+    kill "$pid" 2>/dev/null || true
+    rm -f "$RUN_DIR/expo-agent.pid"
+  fi
+
+  # Stop self.sh (backend)
+  "$ROOT_DIR/self.sh" --kill 2>/dev/null || true
+
+  if [[ -f "$RUN_DIR/app-launch.pid" ]]; then
+    local pid
+    pid=$(cat "$RUN_DIR/app-launch.pid")
+    kill "$pid" 2>/dev/null || true
+    rm -f "$RUN_DIR/app-launch.pid"
+  fi
+
+  # Stop emulator
+  cmd_emulator_stop
+
+  rm -f "$RUN_DIR/backend-agent.log"
+  log_ok "All agent services stopped"
+}
+
 show_help() {
   echo "Usage: ./dev-tools.sh <command> [options]"
   echo ""
-  echo "Commands:"
+  echo "Debug commands:"
   echo "  screenshot         Capture device screenshot to .run/"
   echo "  logs               Dump mobile JS logs (ReactNativeJS)"
   echo "  logs --backend     Show backend uvicorn log"
@@ -231,16 +415,22 @@ show_help() {
   echo "  device-info        Show connected device details"
   echo "  clear-logs         Clear logcat buffer"
   echo ""
+  echo "Emulator commands:"
+  echo "  emulator-start     Boot Android emulator (headless, no window)"
+  echo "  emulator-stop      Kill the Android emulator"
+  echo "  app-launch         All-in-one: emulator + backend + app on emulator"
+  echo "  app-stop           Kill everything (backend + metro + emulator)"
+  echo ""
   echo "Options:"
   echo "  --help             Show this help message"
   echo ""
-  echo "Examples:"
-  echo "  ./dev-tools.sh screenshot          # Save screenshot to .run/"
-  echo "  ./dev-tools.sh logs                # Dump JS logs"
-  echo "  ./dev-tools.sh logs --backend      # Show backend logs"
-  echo "  ./dev-tools.sh status              # Check all services"
-  echo "  ./dev-tools.sh device-info         # Device screen size, density"
-  echo "  ./dev-tools.sh clear-logs          # Clear logcat before test"
+  echo "Agent workflow:"
+  echo "  ./dev-tools.sh app-launch          # Boot emulator + start everything"
+  echo "  ./dev-tools.sh screenshot          # Capture & analyze screen"
+  echo "  ./dev-tools.sh logs                # Read JS logs"
+  echo "  # ... fix code, wait for hot reload ..."
+  echo "  ./dev-tools.sh screenshot          # Verify fix"
+  echo "  ./dev-tools.sh app-stop            # Clean up"
 }
 
 # ── Main dispatch ───────────────────────────────────────────────────
@@ -250,11 +440,15 @@ if [[ $# -eq 0 ]]; then
 fi
 
 case "$1" in
-  screenshot)   shift; cmd_screenshot "$@" ;;
-  logs)         shift; cmd_logs "$@" ;;
-  status)       cmd_status ;;
-  device-info)  cmd_device_info ;;
-  clear-logs)   cmd_clear_logs ;;
-  --help|-h)    show_help ;;
-  *)            log_err "Unknown command: $1"; show_help; exit 1 ;;
+  screenshot)      shift; cmd_screenshot "$@" ;;
+  logs)            shift; cmd_logs "$@" ;;
+  status)          cmd_status ;;
+  device-info)     cmd_device_info ;;
+  clear-logs)      cmd_clear_logs ;;
+  emulator-start)  cmd_emulator_start ;;
+  emulator-stop)   cmd_emulator_stop ;;
+  app-launch)      cmd_app_launch ;;
+  app-stop)        cmd_app_stop ;;
+  --help|-h)       show_help ;;
+  *)               log_err "Unknown command: $1"; show_help; exit 1 ;;
 esac
