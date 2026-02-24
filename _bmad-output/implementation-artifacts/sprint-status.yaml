@@ -1,4 +1,4 @@
-# generated: 2026-02-23
+# generated: 2026-02-24
 # project: self-app
 # project_key: NOKEY
 # tracking_system: file-system
@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-02-23
+generated: 2026-02-24
 project: self-app
 project_key: NOKEY
 tracking_system: file-system
@@ -52,6 +52,7 @@ development_status:
   1-4-mobile-app-shell-and-websocket-connection: done
   1-5-offline-message-queue-and-cached-data-rendering: done
   1-6-session-authentication-and-mobile-backend-pairing: done
+  1-7-observability-and-correlation-ids: done
   epic-1-retrospective: done
 
   # ═══════════════════════════════════════════════════════════════
@@ -60,9 +61,10 @@ development_status:
   # ═══════════════════════════════════════════════════════════════
   epic-2: in-progress
   2-1-real-time-chat-interface-with-streaming: done
-  2-2-agent-identity-persistence: backlog
+  2-2-agent-identity-persistence: done
   2-3-persona-preset-selection: backlog
-  2-4-contextual-empty-state: backlog
+  2-5-screen-mode-architecture: ready-for-dev    # NEW — Chat/Dashboard two-mode layout (blocks 2-4)
+  2-4-contextual-empty-state: backlog             # depends on 2-5 (empty state = Chat Mode with 0 modules)
   epic-2-retrospective: optional
 
   # ═══════════════════════════════════════════════════════════════
@@ -81,7 +83,7 @@ development_status:
   # Source: Epic 3 Retrospective Action Item #1
   # Blocker: Must complete before Epic 4 starts
   # ═══════════════════════════════════════════════════════════════
-  prep-1-agent-dev-autonomy: ready-for-dev
+  prep-1-agent-dev-autonomy: done
 
   # ═══════════════════════════════════════════════════════════════
   # Epic 4: Module Data Freshness & Management (⚡ First Light + 🚀 MVP)

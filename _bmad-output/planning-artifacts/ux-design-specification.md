@@ -913,33 +913,46 @@ flowchart TD
     G3 -->|No after 2 attempts| I3[Agent asks clarifying question instead of guessing]
 ```
 
-### Flow P1-B: Metamorphosis Thresholds (Direction D)
+### Flow P1-B: Two-Mode Screen Architecture (Direction D — revised)
 
-The app's visual transformation from chat-dominant to dashboard-dominant is not a single event but a series of imperceptible transitions tied to module count.
+The app has **two exclusive display modes** — Chat Mode and Dashboard Mode — that are **never shown simultaneously**. The chat input bar is the constant anchor at the bottom of both modes. No tabs, no navigation.
 
 ```mermaid
 flowchart LR
-    S0[Phase 0 — 0 modules — MAGICAL FIRST SCREEN — Orb + greeting + chips]
-    S1[Phase 1 — 1-3 modules — CHAT + INLINE MODULES — Modules born in conversation]
-    S2[Phase 2 — 4-8 modules — MIXED VIEW — Module feed 60% / chat 40% — Status line appears]
-    S3[Phase 3 — 9+ modules — DASHBOARD DOMINANT — Module grid 80% / chat bar 20%]
+    CM[Chat Mode — Full-screen conversation + inline module cards]
+    DM[Dashboard Mode — Full-screen module gallery + StatusLine]
 
-    S0 -->|1st module created| S1
-    S1 -->|4th module added| S2
-    S2 -->|9th module added| S3
+    CM -->|Keyboard closes + modules > 0| DM
+    DM -->|Tap input / Keyboard opens| CM
+    DM -->|Agent sends message| CM
 ```
 
-**Threshold Details:**
+**Mode definitions:**
 
-| Transition | Trigger | What Changes | What Stays |
+| Mode | When Active | Layout | Content |
 |---|---|---|---|
-| Phase 0 → 1 | First module created | Chips disappear, module appears inline in chat | Orb visible, input at bottom, Twilight ambiance |
-| Phase 1 → 2 | 4th module added | Modules migrate ABOVE chat. Status line appears ("Good morning Seb"). Conversation compresses to 2-3 recent messages | Input always at bottom, orb moves to status line |
-| Phase 2 → 3 | 9th module added | Module grid takes 80%+ of screen. Chat reduces to command bar (1 visible line + expand). Contextual greeting | Input always at bottom, same conversation pattern |
+| **Chat Mode** | 0 modules (always), keyboard open, active conversation | Full-screen ChatThread (scrollable) + ChatInput | Chat messages + inline ModuleCards in conversation flow |
+| **Dashboard Mode** | Modules exist + keyboard closed + no active conversation | Full-screen StatusLine + ModuleList (scrollable) + ChatInput | Module cards in feed/grid, no chat visible |
+
+**Transition rules:**
+
+| Trigger | From | To | Animation |
+|---|---|---|---|
+| Tap on chat input | Dashboard | Chat | Crossfade 250ms |
+| Keyboard opens | Dashboard | Chat | Crossfade 250ms |
+| Keyboard closes + modules > 0 | Chat | Dashboard | 1s delay + crossfade 250ms |
+| Keyboard closes + 0 modules | Chat | Chat | No transition |
+| Agent sends message | Dashboard | Chat | Crossfade 250ms |
+| App opens / foreground | — | Dashboard (if modules) or Chat (if none) | Instant |
+
+**Inline modules in Chat Mode:** When the agent creates a module during conversation, the ModuleCard is rendered inside the ChatThread scroll, immediately after the agent message that announced it. This uses the same ModuleCard component as Dashboard Mode.
 
 **Critical rules:**
-- Transitions are **imperceptible**. No modal "Your app has evolved!", no tutorial. The screen reorganizes gradually between sessions. The user opens the app and it's *just slightly different* — like a garden growing.
-- **Bidirectional:** If user deletes modules and drops below threshold (9 → 7), the app returns to Phase 2. The metamorphosis works both directions.
+- Chat and modules **never share screen space simultaneously**. When the keyboard is open, only the chat thread and input are visible — no cramped split layout.
+- Transitions are **smooth and intent-driven**. Tap the input → you want to talk (Chat Mode). Close the keyboard → you want to browse (Dashboard Mode after 1s delay).
+- **Bidirectional:** Deleting all modules transitions back to Chat Mode. Creating the first module enables Dashboard Mode on keyboard close.
+
+**Visual reference:** See `_bmad-output/planning-artifacts/ux-twilight-deep-dive.html` section "Screen Architecture: Chat & Dashboard" for mockups and before/after comparison.
 
 ### Design Notes: P2 Flows
 
@@ -1010,7 +1023,7 @@ Components in Self are organized in three distinct layers. The critical insight:
 
 #### ChatInputBar
 
-The most-used component in the app. Always visible at the bottom of the screen across all metamorphosis phases.
+The most-used component in the app. Always visible at the bottom of the screen in both Chat Mode and Dashboard Mode — the constant anchor.
 
 **States:**
 
@@ -1019,7 +1032,7 @@ The most-used component in the app. Always visible at the bottom of the screen a
 | `idle` | Placeholder "Type anything...", send button dimmed (#1E2E44) | No text entered |
 | `typing` | Text visible, send button amber (#E8A84C) active | User typing |
 | `agent-working` | Input disabled, miniature orb pulses in field | Agent processing a request |
-| `expanded` | Phase 3 only: tap to expand, shows 3 recent messages above | Dashboard-dominant layout, chat compressed |
+| `focused` | Tapping input in Dashboard Mode triggers transition to Chat Mode | User wants to type → mode switches to Chat |
 
 **Accessibility:** Send button minimum 44×44pt. Input field announces state changes to VoiceOver/TalkBack ("Agent is thinking", "Ready for input").
 
@@ -1060,7 +1073,7 @@ Tappable suggestion chips on the Magical First Screen. Disappear permanently aft
 
 #### StatusLine
 
-Appears at Phase 2 (4+ modules). Contextual greeting + system status.
+Appears in Dashboard Mode (when modules exist and keyboard is closed). Contextual greeting + system status.
 
 **Format:** Left: "Good morning Seb ●" (orb-status). Right: "All fresh" (success color) or "2 updating..." (accent color).
 
@@ -1134,8 +1147,8 @@ Equal-weight presentation: no option is visually prioritized over another.
 | Phase | Components | Rationale |
 |---|---|---|
 | **First Light** | ChatInputBar (idle + typing + agent-working), AgentMessage + UserMessage, ModuleCard bridge (loading + ceremony + rendered), Orb (hero + creating), CreationCeremony | Absolute minimum for 5-minute magic. 5 components that enable the core loop. |
-| **MVP** | + StatusLine, UndoToast, PromptChips, FailureMessage (3 types), PersonaSelector, ThemeSelector, AgentTypingIndicator (orb-typing) | Full onboarding flow, failure handling, and Phase 2 metamorphosis support. |
-| **P1** | + ModuleActionSheet, ChatInputBar (expanded state), ModuleCard (stale + refreshing + error states), Orb (status variant) | Dashboard maturity: user sovereignty tools, heartbeat-driven freshness, Phase 3 support. |
+| **MVP** | + StatusLine, UndoToast, PromptChips, FailureMessage (3 types), PersonaSelector, ThemeSelector, AgentTypingIndicator (orb-typing) | Full onboarding flow, failure handling, and Dashboard Mode support. |
+| **P1** | + ModuleActionSheet, ModuleCard (stale + refreshing + error states), Orb (status variant) | Dashboard maturity: user sovereignty tools, heartbeat-driven freshness, module organization. |
 
 **First Light constraint:** 5 components, each with minimal state variants. The goal is a working core loop, not a complete design system. Every component added to First Light is a component that must work perfectly on Day 1 — keep the surface area small.
 
@@ -1173,15 +1186,14 @@ This is not a "nice to have" — it is the fundamental pattern that defines each
 
 The most frequent interaction in Self. How a module "lands" in the interface after the agent finishes creating it.
 
-**Phase-dependent behavior (same pattern, different rendering):**
+**Mode-dependent behavior:**
 
-| Phase | Module Appearance | Agent Message |
+| Mode | Module Appearance | Agent Message |
 |---|---|---|
-| **Phase 0-1** (chat-dominant, 0-3 modules) | Module appears **inline** in the conversation, directly after the agent message. Like a rich embed in Slack/Discord. | "Here's your module! Tap to explore." |
-| **Phase 2** (mixed, 4-8 modules) | Module appears **at the top** of the module feed above the chat. Brief amber flash on its border signals "new." | "Done — your module is ready ↑" (short, with up arrow indicating location) |
-| **Phase 3** (dashboard-dominant, 9+ modules) | Module appears at the top of the grid. Amber border flash. | "Module added." (minimal — the dashboard speaks for itself) |
+| **Chat Mode** (active conversation) | Module appears **inline** in the conversation, directly after the agent message. Like a rich embed in Slack/Discord. Same ModuleCard component as Dashboard. | "Here's your module! Tap to explore." |
+| **Dashboard Mode** (browsing, keyboard closed) | Module appears at the top of the module feed. Brief amber flash on its border signals "new." | When user returns to Chat Mode, the creation message and inline card are visible in the conversation history. |
 
-**The transition feels identical to the user** — they speak, the agent works, the module appears. Only the visual location shifts as the metamorphosis progresses.
+**The transition feels natural to the user** — they speak, the agent works, the module appears inline in the chat. When they close the keyboard, the module is also visible in the Dashboard alongside all other modules. The same ModuleCard component renders in both contexts.
 
 ### Chip Hierarchy
 
@@ -1306,7 +1318,7 @@ V1 ships one density. P1 introduces a compact/comfortable toggle affecting spaci
 
 iPad and Android tablets are not V1 targets. The single-column Direction D layout will render on tablets at phone width (centered with margins), which is functional but not optimized.
 
-**P1 tablet enhancement:** Two-column module grid for tablets in landscape. Chat input stays full-width at bottom. Modules arrange in a masonry-style grid. The metamorphosis thresholds adjust (Phase 3 at 6+ modules instead of 9+ because the grid shows more content per screen).
+**P1 tablet enhancement:** Two-column module grid for tablets in landscape (Dashboard Mode). Chat input stays full-width at bottom. Modules arrange in a masonry-style grid. The two-mode architecture (Chat / Dashboard) applies identically on tablets — only the Dashboard Mode module grid benefits from the wider viewport.
 
 ### Accessibility Compliance
 

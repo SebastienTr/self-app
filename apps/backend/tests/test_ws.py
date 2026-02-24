@@ -98,6 +98,9 @@ _TEST_TOKEN = "test-ws-token"
 def _auth(ws, token: str = _TEST_TOKEN) -> None:
     """Authenticate a WebSocket connection with the given token."""
     ws.send_json({"type": "auth", "payload": {"token": token}})
+    # Server sends status:idle after successful auth — consume it
+    ack = ws.receive_json()
+    assert ack == {"type": "status", "payload": {"state": "idle"}}
 
 
 @pytest.fixture

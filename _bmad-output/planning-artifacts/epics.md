@@ -206,8 +206,7 @@ This document provides the complete epic and story breakdown for self-app, decom
 
 **From UX Design Specification:**
 
-- Direction D morphing interface: single screen that transforms from chat-dominant (0 modules) to dashboard-dominant (9+ modules) with imperceptible transitions
-- Metamorphosis thresholds: Phase 0 (0 modules), Phase 1 (1-3), Phase 2 (4-8), Phase 3 (9+) — bidirectional
+- Two-mode screen architecture (Direction D revised): single screen with two exclusive display modes — Chat Mode (full-screen conversation with inline module cards) and Dashboard Mode (full-screen module gallery). Never shown simultaneously. Transitions driven by keyboard events and user intent (tap input → Chat, keyboard close + modules → Dashboard after 1s delay).
 - Twilight theme as default (deep navy #0C1420 + amber #E8A84C) — V1 ships Twilight only; additional themes (Ink, Moss, Dawn) deferred to P1 via token swapping
 - Theme selection deferred to P1 — V1 onboarding includes persona selection only
 - Orb as brand mark: amber pulsing circle communicating agent state (4s rest, 1.5s creating, static settled)
@@ -633,17 +632,41 @@ So that the agent matches my preferred communication tone. (FR2)
 **When** the agent communicates
 **Then** its tone, autonomy level, and proactivity match the persona definition (FR2)
 
+### Story 2.5: Screen Mode Architecture — Chat & Dashboard
+
+As a user,
+I want the app to show either a full-screen conversation (with modules inline) or a full-screen dashboard (with my module cards),
+so that I never see a cramped split of chat, modules, and keyboard competing for space. (FR8, FR17)
+
+**Acceptance Criteria:**
+
+**Given** the app has 0 modules **When** I open the app **Then** the app is in Chat Mode with the chat thread taking the full screen above the input bar
+
+**Given** the app is in Dashboard Mode **When** I tap the chat input field **Then** the app transitions to Chat Mode with a 250ms crossfade and the keyboard opens
+
+**Given** the app is in Chat Mode with keyboard open **When** the keyboard closes AND modules exist **Then** the app transitions to Dashboard Mode after a 1-second delay with a 250ms crossfade
+
+**Given** the app is in Chat Mode **When** the agent creates a module **Then** the module card is rendered inline in the chat thread, immediately after the agent message that announced it
+
+**Given** the app is in Dashboard Mode **When** I view my modules **Then** modules fill the full screen above the input bar (no chat thread visible) and modules are scrollable
+
+**Given** any screen mode **Then** the chat input bar is always visible at the bottom of the screen
+
+**Note:** Depends on Story 2.1 (ChatThread) and Story 3.3 (ModuleCard). Blocks Story 2.4 (empty state is Chat Mode with 0 modules).
+
 ### Story 2.4: Contextual Empty State
 
 As a user,
 I want to see an inviting empty state that guides me to start a conversation when no modules exist,
 So that I know what to do on first use. (FR8)
 
+**Note:** Depends on Story 2.5 (Screen Mode Architecture). The empty state IS Chat Mode with 0 modules.
+
 **Acceptance Criteria:**
 
 **Given** the app has no modules and no conversation history
 **When** the user opens the app
-**Then** a contextual empty state is displayed inviting the first conversation (FR8)
+**Then** the app is in Chat Mode with a contextual empty state inviting the first conversation (FR8)
 **And** the orb is visible with its ambient breathing animation (6s cycle, opacity 0.3→0.55)
 
 **Given** the empty state is displayed
@@ -1421,12 +1444,12 @@ So that my dashboard reflects my priorities and mental model. (FR20, FR22)
 **When** saved
 **Then** the order and categories persist across sessions
 
-**Given** the dashboard in different layout phases (Phase 1-3)
+**Given** the Dashboard Mode is active
 **When** reorganized
-**Then** the layout adapts to the current morphing phase
+**Then** the layout adapts within the full-screen module gallery
 
 **Given** "Reduce Motion" system setting is enabled
-**When** modules are added, removed, or phases transition
+**When** modules are added, removed, or modes transition (Chat ↔ Dashboard)
 **Then** layout changes are instant (no animated transitions)
 
 ---

@@ -30,6 +30,10 @@ from app.agent import (
 )
 from app.llm.base import LLMResult
 
+# Shared SOUL content for tests that call _build_module_prompt directly
+_TEST_SOUL = "# Test SOUL\n\nYou are a test agent."
+
+
 
 class MockWebSocket:
     """Minimal mock WebSocket that records sent messages."""
@@ -284,42 +288,42 @@ class TestBuildModulePromptEdgeCases:
 
     def test_includes_snake_case_instruction(self):
         """Prompt includes instruction to use snake_case for JSON fields."""
-        prompt = _build_module_prompt("weather")
+        prompt = _build_module_prompt("weather", _TEST_SOUL)
         assert "snake_case" in prompt
 
     def test_includes_example_json_block(self):
         """Prompt includes an example JSON code block."""
-        prompt = _build_module_prompt("weather")
+        prompt = _build_module_prompt("weather", _TEST_SOUL)
         assert "```json" in prompt
         assert "metric-dashboard" in prompt
 
     def test_includes_module_type_options(self):
         """Prompt includes the valid module type options."""
-        prompt = _build_module_prompt("stocks")
+        prompt = _build_module_prompt("stocks", _TEST_SOUL)
         assert "metric" in prompt
         assert "list" in prompt
 
     def test_includes_refresh_interval_defaults(self):
         """Prompt includes recommended refresh interval values."""
-        prompt = _build_module_prompt("news")
+        prompt = _build_module_prompt("news", _TEST_SOUL)
         assert "3600" in prompt  # weather
         assert "300" in prompt   # stocks
         assert "1800" in prompt  # news
 
     def test_includes_no_id_instruction(self):
         """Prompt tells LLM not to include an id field."""
-        prompt = _build_module_prompt("anything")
+        prompt = _build_module_prompt("anything", _TEST_SOUL)
         assert "Do NOT include" in prompt or "do NOT" in prompt.lower()
 
     def test_message_with_special_characters(self):
         """Prompt handles special characters in user message."""
-        prompt = _build_module_prompt('Track "big tech" stocks & bonds <2024>')
+        prompt = _build_module_prompt('Track "big tech" stocks & bonds <2024>', _TEST_SOUL)
         assert '"big tech"' in prompt
         assert "& bonds" in prompt
 
     def test_message_is_at_end_of_prompt(self):
         """User message appears at the end of the prompt after system instructions."""
-        prompt = _build_module_prompt("Show me the weather")
+        prompt = _build_module_prompt("Show me the weather", _TEST_SOUL)
         # User message should be at the end
         message_pos = prompt.rfind("Show me the weather")
         system_pos = prompt.find("You are Self")

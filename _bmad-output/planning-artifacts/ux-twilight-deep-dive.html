@@ -758,6 +758,407 @@
 
 <hr class="divider">
 
+<!-- ========== 3b. SCREEN ARCHITECTURE: TWO MODES ========== -->
+<div class="section">
+  <div class="section-title">Screen Architecture: Chat & Dashboard</div>
+  <div class="section-desc">The app has two distinct modes — never shown simultaneously. The chat input bar is the constant anchor at the bottom of both modes. Modules never compete with conversation for screen space.</div>
+
+  <div class="design-note" style="margin-bottom: 32px;">
+    <strong>The core problem we solved:</strong> Showing chat, modules, AND keyboard simultaneously creates an unusable sandwich. Instead, the app cleanly separates two contexts: <em>conversation</em> (where modules appear inline in the chat flow) and <em>dashboard</em> (where modules fill the screen for browsing). The user flows naturally between them.
+  </div>
+
+  <!-- Mode explanation cards -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px;">
+    <div style="background: #101C2C; border-radius: 16px; padding: 24px; border: 1px solid #1E2E44;">
+      <div style="font-size: 15px; font-weight: 600; color: #E8A84C; margin-bottom: 8px;">💬 Chat Mode</div>
+      <div style="font-size: 13px; color: #E4ECF4; margin-bottom: 12px;">Full-screen conversation. Modules appear <strong>inline</strong> in the chat thread, right after the agent message that created them. The whole thing scrolls naturally.</div>
+      <div style="font-size: 12px; color: #7899BB;">
+        <div style="margin-bottom: 4px;">→ Keyboard open: messages + input, modules scroll up</div>
+        <div style="margin-bottom: 4px;">→ Keyboard closed: full chat history with inline module cards</div>
+        <div>→ Active when: typing, during conversation, no modules yet</div>
+      </div>
+    </div>
+    <div style="background: #101C2C; border-radius: 16px; padding: 24px; border: 1px solid #1E2E44;">
+      <div style="font-size: 15px; font-weight: 600; color: #5CB8A0; margin-bottom: 8px;">📦 Dashboard Mode</div>
+      <div style="font-size: 13px; color: #E4ECF4; margin-bottom: 12px;">Full-screen module gallery. Cards, metrics, and alerts fill the screen. No chat thread visible — just the input bar at the bottom for new requests.</div>
+      <div style="font-size: 12px; color: #7899BB;">
+        <div style="margin-bottom: 4px;">→ Default home view when modules exist</div>
+        <div style="margin-bottom: 4px;">→ Modules displayed as rich cards in scrollable list</div>
+        <div>→ Active when: browsing, returning to app, keyboard closed + has modules</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transition rules -->
+  <div style="margin-bottom: 40px;">
+    <div style="font-size: 15px; font-weight: 600; color: #E4ECF4; margin-bottom: 12px;">Transition Rules</div>
+    <table class="token-table">
+      <thead>
+        <tr><th>Trigger</th><th>From</th><th>To</th><th>Animation</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="color: #E4ECF4;">Tap on chat input</td>
+          <td><span style="color: #5CB8A0;">Dashboard</span></td>
+          <td><span style="color: #E8A84C;">Chat</span></td>
+          <td style="color: #7899BB;">Crossfade, 250ms</td>
+        </tr>
+        <tr>
+          <td style="color: #E4ECF4;">Keyboard opens</td>
+          <td><span style="color: #5CB8A0;">Dashboard</span></td>
+          <td><span style="color: #E8A84C;">Chat</span></td>
+          <td style="color: #7899BB;">Crossfade, 250ms</td>
+        </tr>
+        <tr>
+          <td style="color: #E4ECF4;">Keyboard closes + modules exist</td>
+          <td><span style="color: #E8A84C;">Chat</span></td>
+          <td><span style="color: #5CB8A0;">Dashboard</span></td>
+          <td style="color: #7899BB;">Crossfade after 1s delay</td>
+        </tr>
+        <tr>
+          <td style="color: #E4ECF4;">Keyboard closes + 0 modules</td>
+          <td><span style="color: #E8A84C;">Chat</span></td>
+          <td><span style="color: #E8A84C;">Chat</span></td>
+          <td style="color: #7899BB;">No transition (stay in chat)</td>
+        </tr>
+        <tr>
+          <td style="color: #E4ECF4;">Agent sends message</td>
+          <td><span style="color: #5CB8A0;">Dashboard</span></td>
+          <td><span style="color: #E8A84C;">Chat</span></td>
+          <td style="color: #7899BB;">Crossfade, 250ms</td>
+        </tr>
+        <tr>
+          <td style="color: #E4ECF4;">App opens / returns to foreground</td>
+          <td><span style="color: #7899BB;">—</span></td>
+          <td><span style="color: #5CB8A0;">Dashboard</span> (if modules) / <span style="color: #E8A84C;">Chat</span> (if none)</td>
+          <td style="color: #7899BB;">Instant</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Two-mode phone mockups -->
+<div class="phones-row">
+
+  <!-- DASHBOARD MODE -->
+  <div class="phone-wrapper">
+    <div class="phone-label" style="color: #5CB8A0;">Dashboard Mode</div>
+    <div class="phone-sublabel">Modules fill the screen — the home view</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div style="padding: 6px 0 60px;">
+          <div class="status-line">
+            <span>Good morning Seb <span class="self-orb-sm" style="width:10px;height:10px;vertical-align:middle;animation:none;box-shadow:0 0 6px rgba(232,168,76,0.4);"></span></span><span style="color:#5CB8A0;">All fresh</span>
+          </div>
+
+          <div class="mod-card">
+            <div class="mod-header">
+              <span class="mod-title">🌊 Météo Marine</span>
+              <span style="font-size:10px;color:#5CB8A0;">&#10003; Live</span>
+            </div>
+            <div class="mod-body">
+              <div class="metric-grid">
+                <div class="metric-item">
+                  <div class="metric-val" style="font-size:18px;">14 kn</div>
+                  <div class="metric-lbl">Vent NW</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-val" style="font-size:18px;">0.6 m</div>
+                  <div class="metric-lbl">Houle</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 14px;">
+            <div style="background:#101C2C;border-radius:10px;padding:12px;text-align:center;border:1px solid #1E2E44;">
+              <div style="font-size:18px;font-weight:700;color:#E4ECF4;">&euro;9.1k</div>
+              <div style="font-size:10px;color:#7899BB;">MRR</div>
+              <div style="font-size:10px;color:#5CB8A0;">&#8593; 3%</div>
+            </div>
+            <div style="background:#101C2C;border-radius:10px;padding:12px;text-align:center;border:1px solid #1E2E44;">
+              <div style="font-size:18px;font-weight:700;color:#E4ECF4;">23 km</div>
+              <div style="font-size:10px;color:#7899BB;">Running</div>
+              <div style="font-size:10px;color:#5CB8A0;">&#8593; 12%</div>
+            </div>
+          </div>
+
+          <div class="mod-card" style="margin-top:6px;">
+            <div class="mod-header">
+              <span class="mod-title">📅 Today</span>
+            </div>
+            <div class="mod-body">
+              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1E2E44;font-size:12px;color:#E4ECF4;">
+                <span>Deploy v2.3</span><span style="color:#7899BB;">10:00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:#E4ECF4;">
+                <span>Client call</span><span style="color:#7899BB;">14:00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Tap hint on input -->
+        <div class="chat-input-bar">
+          <input class="chat-field" placeholder="Ask anything..." disabled style="opacity:0.7;">
+          <button class="send-btn" style="opacity:0.5;">&#8593;</button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#7899BB; margin-top:8px; text-align:center;">Tap input → switches to Chat Mode</div>
+  </div>
+
+  <!-- TRANSITION: TAP INPUT -->
+  <div class="phone-wrapper" style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="font-size: 48px; color: #E8A84C; margin-bottom: 16px;">→</div>
+    <div style="font-size: 13px; color: #E8A84C; font-weight: 600; margin-bottom: 4px;">User taps input</div>
+    <div style="font-size: 11px; color: #7899BB; text-align: center; max-width: 120px;">Crossfade 250ms<br>Keyboard opens<br>Dashboard fades out<br>Chat fades in</div>
+    <div style="font-size: 48px; color: #5CB8A0; margin-top: 40px;">←</div>
+    <div style="font-size: 13px; color: #5CB8A0; font-weight: 600; margin-bottom: 4px;">Keyboard closes</div>
+    <div style="font-size: 11px; color: #7899BB; text-align: center; max-width: 120px;">1s delay<br>then crossfade<br>back to Dashboard</div>
+  </div>
+
+  <!-- CHAT MODE (keyboard closed, inline module) -->
+  <div class="phone-wrapper">
+    <div class="phone-label" style="color: #E8A84C;">Chat Mode</div>
+    <div class="phone-sublabel">Conversation with inline modules</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div class="ambient" style="background:radial-gradient(ellipse at 50% 30%, rgba(26,40,68,0.5) 0%, transparent 60%); opacity: 0.4;"></div>
+        <div style="padding: 16px 0 60px;">
+          <div class="user-msg">Donne-moi la météo marine pour la traversée Audierne → Belle-Île</div>
+          <div class="agent-msg">
+            Voici ton module météo marine pour la traversée ! Vue sur 7 jours pour identifier la meilleure fenêtre de navigation.
+          </div>
+          <!-- Inline module card in chat -->
+          <div class="mod-card" style="margin: 4px 14px 8px;">
+            <div class="mod-header">
+              <span class="mod-title">🌊 Audierne → Belle-Île</span>
+              <span style="font-size:10px;color:#5CB8A0;">&#10003; Live</span>
+            </div>
+            <div class="mod-body">
+              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1E2E44;font-size:12px;color:#E4ECF4;">
+                <span>Ven 27 fév <span style="color:#7899BB;font-size:10px;">Houle 2.1m · W 22kt</span></span><span style="color:#CC5F5F;">✗ Mauvais</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1E2E44;font-size:12px;color:#E4ECF4;">
+                <span>Sam 28 fév <span style="color:#7899BB;font-size:10px;">Houle 1.4m · NW 14kt</span></span><span style="color:#5CB8A0;">✓✓ Bon</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:#E4ECF4;">
+                <span>Dim 1 mars <span style="color:#7899BB;font-size:10px;">Houle 1.6m · NW 16kt</span></span><span style="color:#5CB8A0;">✓ Correct</span>
+              </div>
+            </div>
+          </div>
+          <div class="agent-msg" style="font-size:12px; color: #7899BB;">
+            Samedi est ta meilleure fenêtre. Vent portant NW, houle raisonnable.
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-field" placeholder="Message..." disabled>
+          <button class="send-btn">&#8593;</button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#7899BB; margin-top:8px; text-align:center;">Module lives inside the chat flow</div>
+  </div>
+</div>
+
+<!-- Second row: keyboard open state -->
+<div class="phones-row" style="padding-top: 32px;">
+
+  <!-- CHAT MODE: KEYBOARD OPEN -->
+  <div class="phone-wrapper">
+    <div class="phone-label" style="color: #E8A84C;">Chat Mode — Keyboard Open</div>
+    <div class="phone-sublabel">Clean focus: just conversation + input</div>
+    <div class="phone" style="height: 680px;">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div style="padding: 16px 0 0; display: flex; flex-direction: column; height: calc(100% - 26px);">
+          <!-- Chat area (top portion) -->
+          <div style="flex: 1; overflow-y: auto; padding-bottom: 8px;">
+            <div class="user-msg" style="font-size: 13px;">Donne-moi la météo marine pour Audierne → Belle-Île</div>
+            <div class="agent-msg" style="font-size: 13px;">
+              Voici ton module météo marine ! Samedi est ta meilleure fenêtre.
+            </div>
+            <div style="padding: 6px 14px; font-size: 11px; color: #7899BB; font-style: italic;">
+              📦 Module météo marine créé
+            </div>
+            <div class="user-msg" style="font-size: 13px;">Et pour dimanche, c'est jouable ?</div>
+            <div class="agent-msg" style="font-size: 13px;">
+              Dimanche est correct mais la houle monte à 1.6m avec du vent NW 16 nœuds. Ça reste faisable mais moins confortable que samedi.
+            </div>
+          </div>
+          <!-- Input area -->
+          <div style="padding: 10px 14px; display: flex; align-items: center; gap: 8px; background: #101C2C; border-top: 1px solid #1E2E44;">
+            <input class="chat-field" value="Et lundi ?" disabled style="font-size: 14px;">
+            <button class="send-btn">&#8593;</button>
+          </div>
+          <!-- Simulated keyboard -->
+          <div style="background: #2A2A2E; padding: 8px 4px 4px; flex-shrink: 0;">
+            <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 4px;">
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">A</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">Z</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">E</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">R</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">T</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">Y</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">U</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">I</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">O</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">P</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 4px;">
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">Q</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">S</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">D</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">F</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">G</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">H</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">J</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">K</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">L</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">M</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1.5fr repeat(7, 1fr) 1.5fr; gap: 4px;">
+              <div style="background:#636366;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">⇧</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">W</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">X</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">C</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">V</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">B</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">N</div>
+              <div style="background:#636366;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">⌫</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 3fr 1fr; gap: 4px; margin-top: 4px;">
+              <div style="background:#636366;border-radius:6px;padding:10px 0;text-align:center;font-size:11px;color:#FFF;">123</div>
+              <div style="background:#4A4A4E;border-radius:6px;padding:10px 0;text-align:center;font-size:13px;color:#FFF;">espace</div>
+              <div style="background:#E8A84C;border-radius:6px;padding:10px 0;text-align:center;font-size:11px;color:#0C1420;font-weight:700;">Send</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#7899BB; margin-top:8px; text-align:center;">Zero clutter — keyboard + chat only</div>
+  </div>
+
+  <!-- BEFORE vs AFTER comparison -->
+  <div class="phone-wrapper">
+    <div class="phone-label" style="color: #CC5F5F;">❌ Before (Problem)</div>
+    <div class="phone-sublabel">Chat + Modules + Keyboard = unusable</div>
+    <div class="phone" style="height: 680px;">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div style="display: flex; flex-direction: column; height: calc(100% - 26px);">
+          <!-- Header -->
+          <div style="padding: 8px 14px; display:flex; align-items:center; gap:8px;">
+            <div class="self-orb-sm" style="width:16px;height:16px;"></div>
+            <span style="font-size:14px;font-weight:600;">Self</span>
+            <span style="margin-left:auto;font-size:10px;color:#5CB8A0;">● Connected</span>
+          </div>
+          <!-- Chat (squished) -->
+          <div style="flex: 1; overflow: hidden; min-height: 0;">
+            <div class="agent-msg" style="font-size: 11px; padding: 8px 10px; margin: 4px 10px;">
+              Voici un module de météo marine pour la traversée Audierne → Belle-Île...
+            </div>
+          </div>
+          <!-- Modules (squished) -->
+          <div style="flex: 1; overflow: hidden; min-height: 0; border-top: 1px dashed #CC5F5F; border-bottom: 1px dashed #CC5F5F; position: relative;">
+            <div style="position:absolute;top:4px;right:8px;font-size:9px;color:#CC5F5F;font-weight:600;">SQUISHED</div>
+            <div style="padding: 4px 10px; font-size: 11px;">
+              <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1E2E44;color:#E4ECF4;">
+                <span>Ven 27 fév</span><span style="color:#CC5F5F;">✗</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:4px 0;color:#E4ECF4;">
+                <span>Sam 28 fév</span><span style="color:#5CB8A0;">✓✓</span>
+              </div>
+              <div style="padding:4px 0;color:#7899BB;font-size:10px;">Content cut off...</div>
+            </div>
+          </div>
+          <!-- Input -->
+          <div style="padding: 8px 10px; display: flex; align-items: center; gap: 6px; background: #101C2C; border-top: 1px solid #1E2E44;">
+            <input class="chat-field" placeholder="Message..." disabled style="font-size: 12px; padding: 8px 12px;">
+            <button class="send-btn" style="width:30px;height:30px;font-size:12px;">▶</button>
+          </div>
+          <!-- Keyboard -->
+          <div style="background: #2A2A2E; padding: 6px 4px 4px; flex-shrink: 0;">
+            <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin-bottom: 3px;">
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">A</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">Z</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">E</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">R</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">T</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">Y</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">U</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">I</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">O</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">P</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin-bottom: 3px;">
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">Q</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">S</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">D</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">F</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">G</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">H</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">J</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">K</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">L</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">M</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 3fr 1fr; gap: 3px; margin-top: 3px;">
+              <div style="background:#636366;border-radius:4px;padding:8px 0;text-align:center;font-size:10px;color:#FFF;">123</div>
+              <div style="background:#4A4A4E;border-radius:4px;padding:8px 0;text-align:center;font-size:11px;color:#FFF;">espace</div>
+              <div style="background:#636366;border-radius:4px;padding:8px 0;text-align:center;font-size:10px;color:#FFF;">Send</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#CC5F5F; margin-top:8px; text-align:center;">Everything competing — nothing readable</div>
+  </div>
+
+  <!-- FIRST OPEN: No modules yet -->
+  <div class="phone-wrapper">
+    <div class="phone-label" style="color: #E8A84C;">First Open — Chat Mode</div>
+    <div class="phone-sublabel">No modules yet — stays in Chat</div>
+    <div class="phone" style="height: 680px;">
+      <div class="phone-notch"></div>
+      <div class="phone-content">
+        <div class="ambient" style="background:radial-gradient(ellipse at 50% 25%, #1A2844 0%, transparent 55%), radial-gradient(ellipse at 60% 80%, rgba(232,168,76,0.08) 0%, transparent 40%);"></div>
+        <div style="padding-top: 100px; text-align: center; position: relative; z-index: 1;">
+          <div style="margin-bottom: 16px; animation: float 4s ease-in-out infinite;"><div class="self-orb"></div></div>
+          <div style="font-size: 19px; font-weight: 300; padding: 0 32px; color:#E4ECF4;">What's on your mind?</div>
+          <div style="font-size: 13px; color: #7899BB; padding: 10px 32px 0;">I'm here to build whatever you need.</div>
+        </div>
+        <div style="position: absolute; bottom: 60px; left: 0; right: 0; z-index: 1;">
+          <div class="chip-row">
+            <span class="chip">☀️ Weather</span>
+            <span class="chip">📋 Track</span>
+          </div>
+          <div class="chip-row" style="padding-top:0;">
+            <span class="chip">📅 Organize</span>
+            <span class="chip chip-dashed">🌅 Discover</span>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:0;left:0;right:0; padding: 10px 14px; display: flex; align-items: center; gap: 8px; background: #101C2C; border-top: 1px solid #1E2E44;">
+          <input class="chat-field" placeholder="Type anything..." disabled>
+          <button class="send-btn">&#8593;</button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#7899BB; margin-top:8px; text-align:center;">0 modules → always Chat Mode</div>
+  </div>
+</div>
+
+<div class="section" style="padding-top: 16px;">
+  <div class="design-note">
+    <strong>Why this works:</strong> In Chat Mode, modules live inside the ScrollView as inline cards — when the keyboard opens, they simply scroll up with the rest of the conversation. No split screen, no competition for space. In Dashboard Mode, modules get the full screen they deserve. The transition is driven by natural user intent: tapping the input means "I want to talk", closing the keyboard means "I'm done talking, show me my stuff."
+  </div>
+</div>
+
+<hr class="divider">
+
 <!-- ========== 4. CONTRAST & ACCESSIBILITY ========== -->
 <div class="section">
   <div class="section-title">Accessibility & Contrast Ratios</div>

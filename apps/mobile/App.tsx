@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 
@@ -132,49 +132,54 @@ function AppContent() {
   const isInputDisabled = agentStatus !== 'idle' || status !== 'connected';
 
   return (
-    <View
-      style={[styles.container, { paddingTop: insets.top + tokens.spacing.sm }]}
+    <KeyboardAvoidingView
+      style={styles.flex1}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {initialized && showPairing ? (
-        <PairingScreen />
-      ) : (
-        <>
-          {/* Compact header: Orb + title + status on one line */}
-          <View style={styles.header}>
-            <Orb size={32} />
-            <Text style={styles.title}>Self</Text>
-            <View style={styles.statusBadge}>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: STATUS_COLORS[status] },
-                ]}
-              />
-              <Text style={styles.statusText}>
-                {STATUS_LABELS[status]}
-                {moduleCount > 0 ? ` \u00B7 ${moduleCount}` : ''}
-              </Text>
+      <View
+        style={[styles.container, { paddingTop: insets.top + tokens.spacing.sm }]}
+      >
+        {initialized && showPairing ? (
+          <PairingScreen />
+        ) : (
+          <>
+            {/* Compact header: Orb + title + status on one line */}
+            <View style={styles.header}>
+              <Orb size={32} />
+              <Text style={styles.title}>Self</Text>
+              <View style={styles.statusBadge}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: STATUS_COLORS[status] },
+                  ]}
+                />
+                <Text style={styles.statusText}>
+                  {STATUS_LABELS[status]}
+                  {moduleCount > 0 ? ` \u00B7 ${moduleCount}` : ''}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          {/* ChatThread: scrollable message list */}
-          {initialized && <ChatThread />}
+            {/* ChatThread: scrollable message list */}
+            {initialized && <ChatThread />}
 
-          {/* ModuleList: SDUI module rendering (Epic 3) */}
-          {initialized && <ModuleList />}
+            {/* ModuleList: SDUI module rendering (Epic 3) */}
+            {initialized && <ModuleList />}
 
-          {/* ChatInput: message input at bottom */}
-          {initialized && (
-            <ChatInput
-              onSend={handleSend}
-              disabled={isInputDisabled}
-            />
-          )}
-        </>
-      )}
+            {/* ChatInput: message input at bottom */}
+            {initialized && (
+              <ChatInput
+                onSend={handleSend}
+                disabled={isInputDisabled}
+              />
+            )}
+          </>
+        )}
 
-      <StatusBar style="light" />
-    </View>
+        <StatusBar style="light" />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -187,6 +192,9 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: tokens.colors.background,

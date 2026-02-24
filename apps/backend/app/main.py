@@ -95,6 +95,14 @@ async def lifespan(app: FastAPI):
     # Ensure data directory exists
     _ensure_data_dir()
 
+    # Ensure SOUL.md identity file exists (creates default on first boot)
+    soul_content = await agent.load_soul(settings.self_data_dir)
+    soul_is_default = soul_content == agent._DEFAULT_SOUL_CONTENT
+    if soul_is_default:
+        log.info("soul_loaded", status="default")
+    else:
+        log.info("soul_loaded", status="custom")
+
     # Run database migrations
     migrations_applied = await run_migrations(settings.db_path, _MIGRATIONS_DIR)
     _state["migrations_applied"] = migrations_applied
@@ -379,6 +387,11 @@ async def websocket_endpoint(ws: WebSocket):
                 if auth_result:
                     authenticated = True
                     session_id = sid
+                    # Send status so client can infer auth success
+                    await ws.send_json({
+                        "type": "status",
+                        "payload": {"state": "idle"},
+                    })
                 continue
 
             # --- Auth gate: reject all non-auth messages if not authenticated ---

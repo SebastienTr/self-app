@@ -9,8 +9,10 @@
  *   disabled — disables input and send button (e.g., when agent is processing)
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  Keyboard,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +23,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { tokens } from '@/constants/tokens';
 
+/**
+ * Keyboard avoidance is handled at the App.tsx level with a KeyboardAvoidingView
+ * wrapping the entire screen. ChatInput is a pure presentational component.
+ */
+
 export interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
@@ -28,9 +35,23 @@ export interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   const canSend = value.trim().length > 0 && !disabled;
+  // When keyboard is open, KAV already offsets for safe area — use minimal margin.
+  // When closed, use insets.bottom so input sits above home indicator / nav bar.
+  const bottomMargin = keyboardVisible
+    ? tokens.spacing.xs
+    : Math.max(insets.bottom, tokens.spacing.sm);
 
   function handleSend() {
     if (!canSend) return;
@@ -39,7 +60,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   }
 
   return (
-    <View style={[styles.container, { marginBottom: Math.max(insets.bottom, tokens.spacing.sm) }]}>
+    <View style={[styles.container, { marginBottom: bottomMargin }]}>
       <TextInput
         style={styles.input}
         value={value}

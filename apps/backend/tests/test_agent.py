@@ -7,16 +7,22 @@ Tests handle_chat with mock provider:
   - Module creation: detects JSON spec in LLM response, creates module, sends module_created
 """
 
-import asyncio
 import json
-import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import aiosqlite
 import pytest
 
-from app.agent import handle_chat, _extract_module_spec, _build_module_prompt
+from app.agent import (
+    _DEFAULT_SOUL_CONTENT,
+    _build_module_prompt,
+    _extract_module_spec,
+    handle_chat,
+)
 from app.llm.base import LLMResult
+
+# Shared SOUL content for tests that call _build_module_prompt directly
+_TEST_SOUL = "# Test SOUL\n\nYou are a test agent."
 
 
 class MockWebSocket:
@@ -447,16 +453,41 @@ class TestBuildModulePrompt:
 
     def test_includes_user_message(self):
         """Prompt includes the user's original message."""
-        prompt = _build_module_prompt("Show me the weather in Paris")
+        prompt = _build_module_prompt("Show me the weather in Paris", _TEST_SOUL)
         assert "Show me the weather in Paris" in prompt
 
     def test_includes_schema_instructions(self):
         """Prompt includes schema field requirements."""
-        prompt = _build_module_prompt("Track my stocks")
+        prompt = _build_module_prompt("Track my stocks", _TEST_SOUL)
         assert "data_sources" in prompt
         assert "refresh_interval" in prompt
         assert "schema_version" in prompt
         assert "accessible_label" in prompt
+
+    def test_soul_content_at_top_of_prompt(self):
+        """SOUL content appears at the beginning of the prompt, before instructions."""
+        soul = "# My Custom SOUL\n\nI am unique."
+        prompt = _build_module_prompt("hello", soul)
+        soul_pos = prompt.find("# My Custom SOUL")
+        instructions_pos = prompt.find("# Instructions")
+        user_msg_pos = prompt.find("hello")
+        assert soul_pos < instructions_pos < user_msg_pos
+
+    def test_soul_content_injected_in_prompt(self):
+        """SOUL content is injected into the prompt."""
+        soul = "# Agent Identity\n\nSpecial personality trait XYZ."
+        prompt = _build_module_prompt("test message", soul)
+        assert "Special personality trait XYZ" in prompt
+
+    def test_prompt_contains_agent_identity_header(self):
+        """Prompt starts with '# Agent Identity' header."""
+        prompt = _build_module_prompt("test", _TEST_SOUL)
+        assert prompt.strip().startswith("# Agent Identity")
+
+    def test_prompt_contains_instructions_header(self):
+        """Prompt contains '# Instructions' header after SOUL."""
+        prompt = _build_module_prompt("test", _TEST_SOUL)
+        assert "# Instructions" in prompt
 
 
 class TestHandleChatModuleCreation:
@@ -702,3 +733,85 @@ class TestHandleChatModuleCreation:
         assert "moduleId" not in payload
         assert "dataSources" not in payload
         assert "refreshInterval" not in payload
+
+
+class TestHandleChatSoulInjection:
+    """Tests for SOUL.md content injection into LLM prompt (Story 2.2, AC: #2, #5, #6)."""
+
+    @pytest.mark.asyncio
+    async def test_prompt_contains_soul_content(self, ws, mock_provider, tmp_path):
+        """handle_chat loads SOUL and passes it to the LLM prompt."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        # Write a custom SOUL.md so we can verify it's in the prompt
+        soul_file = tmp_path / "SOUL.md"
+        soul_file.write_text(
+            "# Unique Test SOUL\n\nI am a very unique test agent.",
+            encoding="utf-8",
+        )
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        # Verify the prompt passed to provider contains SOUL content
+        mock_provider.execute.assert_called_once()
+        call_kwargs = mock_provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "Unique Test SOUL" in prompt
+        assert "very unique test agent" in prompt
+
+    @pytest.mark.asyncio
+    async def test_soul_content_before_module_instructions(self, ws, mock_provider, tmp_path):
+        """SOUL content appears before module creation instructions in prompt."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        soul_file = tmp_path / "SOUL.md"
+        soul_file.write_text("# SOUL MARKER CONTENT", encoding="utf-8")
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        call_kwargs = mock_provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        soul_pos = prompt.find("SOUL MARKER CONTENT")
+        instructions_pos = prompt.find("# Instructions")
+        user_msg_pos = prompt.find("User message: Hello")
+        assert soul_pos < instructions_pos < user_msg_pos
+
+    @pytest.mark.asyncio
+    async def test_missing_soul_file_creates_default(self, ws, mock_provider, tmp_path):
+        """handle_chat with missing SOUL.md creates default and still works."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+        # Don't create SOUL.md — it should be auto-created
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        # Should not crash
+        assert ws.sent[0]["payload"]["state"] == "thinking"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
+
+        # Default SOUL.md should have been created
+        soul_file = tmp_path / "SOUL.md"
+        assert soul_file.exists()
+
+        # Verify prompt contains default SOUL content
+        call_kwargs = mock_provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "Self" in prompt
+        assert "# Agent Identity" in prompt
+
+    @pytest.mark.asyncio
+    async def test_handle_chat_with_default_soul_no_crash(self, ws, mock_provider, tmp_path):
+        """handle_chat with default SOUL.md does not crash."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_full_db(db_path)
+
+        # Write default SOUL content
+        soul_file = tmp_path / "SOUL.md"
+        soul_file.write_text(_DEFAULT_SOUL_CONTENT, encoding="utf-8")
+
+        await handle_chat(ws, "Tell me a joke", mock_provider, db_path)
+
+        types = [m["type"] for m in ws.sent]
+        assert types == ["status", "chat_stream", "chat_stream", "status"]
