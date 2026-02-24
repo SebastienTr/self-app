@@ -694,7 +694,7 @@ When in doubt about whether a feature belongs in the current phase, apply these 
 - **FR19** `🚀`: User can interact with rendered modules (tap, scroll, expand details, navigate within module content)
 - **FR20** `📈`: User can organize modules into user-defined categories or tabs
 - **FR21** `🚀`: User can view the last cached state of modules when the backend is unreachable, with a clear indication of when data was last refreshed
-- **FR22** `📈`: User can reorder and arrange modules on their home view
+- **FR22** `📈`: User can reorder and arrange modules on their dashboard view (Dashboard Mode — full-screen module gallery)
 
 ### Connection Resilience & Offline
 

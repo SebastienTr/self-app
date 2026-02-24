@@ -222,7 +222,8 @@ if $RESET; then
   if [[ -f "$DB_FILE" ]]; then
     rm -f "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm"
     rm -f "$RUN_DIR/pairing-token"
-    log_ok "Database purged — mobile will need to re-pair"
+    rm -f "$ROOT_DIR/apps/backend/data/SOUL.md"
+    log_ok "Database + SOUL.md purged — mobile will need to re-pair"
   else
     log_warn "No database found at $DB_FILE"
   fi

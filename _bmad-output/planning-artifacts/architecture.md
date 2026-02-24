@@ -588,40 +588,50 @@ Normalise sur 0-100. Recalcul : cron backend quotidien a 03:00 UTC. Pas d'appel 
 - **Data errors:** `try/catch` dans `ModuleCard` autour du data fetching → etat "Donnees indisponibles" affiche dans la card sans crash du composant.
 - Le `moduleStore` distingue ces deux cas via `dataStatus: 'ok' | 'stale' | 'error'`, distinct du lifecycle `status`. Un module peut etre `status: 'active'` mais `dataStatus: 'error'` si son dernier refresh a echoue.
 
-### Phase Morphing Interface (Direction D)
+### Two-Mode Screen Architecture (Direction D — revised)
 
-The app is a single screen (`index.tsx`) that transforms from pure chat to dashboard-dominant based on module count. No tabs, no navigation — the chat input is always at the bottom, the content above it evolves.
+The app has a single screen with **two exclusive display modes** — Chat Mode and Dashboard Mode. They are **never shown simultaneously**. The chat input bar is the constant anchor at the bottom of both modes. No tabs, no navigation — the content above the input evolves based on user intent.
 
-**Phase thresholds and layout rules:**
+**Mode definitions:**
 
-| Phase | Module Count | Layout | Chat Behavior |
-|-------|-------------|--------|---------------|
-| **Phase 0** | 0 | Full-screen: Orb + greeting + prompt chips + ChatInput | Primary interface — everything is conversation |
-| **Phase 1** | 1-3 | Conversation + inline module cards in chat flow | Modules appear within conversation, persist above |
-| **Phase 2** | 4-8 | ModuleZone (70%) + ChatZone (30%) + StatusLine | Conversation compresses — modules are the content |
-| **Phase 3** | 9+ | StatusLine + module grid (80%) + ChatInput as command bar (20%) | Chat is a command bar — quick refinements and requests |
+| Mode | When Active | Layout | Content |
+|------|-------------|--------|---------|
+| **Chat Mode** | 0 modules (always), keyboard open, active conversation | Full-screen: ChatThread (scrollable) + ChatInput | Chat messages + inline module cards in conversation flow |
+| **Dashboard Mode** | Modules exist + keyboard closed + no active conversation | Full-screen: StatusLine + ModuleList (scrollable) + ChatInput | Module cards in feed/grid layout, no chat visible |
+
+**Inline modules in Chat Mode:** When the agent creates a module during conversation, the ModuleCard is rendered **inside the ChatThread scroll**, immediately after the agent message that announced it. This reuses the same `ModuleCard` bridge component as Dashboard Mode. When the keyboard opens, inline modules scroll up naturally with the rest of the conversation — no layout competition.
+
+**Transition rules:**
+
+| Trigger | From | To | Animation |
+|---------|------|----|-----------|
+| Tap on chat input | Dashboard | Chat | Crossfade 250ms |
+| Keyboard opens | Dashboard | Chat | Crossfade 250ms |
+| Keyboard closes + modules > 0 | Chat | Dashboard | 1s delay + crossfade 250ms |
+| Keyboard closes + 0 modules | Chat | Chat | No transition |
+| Agent sends message | Dashboard | Chat | Crossfade 250ms |
+| App opens / foreground resume | — | Dashboard (if modules) or Chat (if none) | Instant |
 
 **Implementation pattern:**
 
 ```typescript
-// layout/PhaseController.tsx
-type LayoutPhase = 0 | 1 | 2 | 3;
+// stores/screenModeStore.ts
+type ScreenMode = 'chat' | 'dashboard';
 
-const getPhase = (moduleCount: number): LayoutPhase => {
-  if (moduleCount === 0) return 0;
-  if (moduleCount <= 3) return 1;
-  if (moduleCount <= 8) return 2;
-  return 3;
-};
+// hooks/useKeyboardVisible.ts — keyboard event listener
+// App.tsx — conditional render: mode === 'chat' ? <ChatThread /> : <ModuleList />
+// ChatInput.tsx — onFocus triggers setMode('chat')
 ```
 
-`PhaseController` is a pure function of `moduleStore.modules.length`. The `index.tsx` screen renders different layout compositions based on the current phase. Transitions are bidirectional — deleting modules can move from Phase 3 back to Phase 2.
+`screenModeStore` is the source of truth for which mode is active. Transitions are driven by keyboard events (via `useKeyboardVisible` hook) and user intent (tapping input). Mode is **not persisted** — it is derived from state on every app open.
 
-**Transition strategy:** Phase changes use `LayoutAnimation.configureNext()` (React Native built-in) for smooth, imperceptible resizing. No animated transitions between phases — the layout quietly reshapes. When `Reduce Motion` is enabled, layout changes are instant (no animation).
+**Transition strategy:** Mode changes use `Animated.View` opacity crossfade (250ms ease-in-out). When `Reduce Motion` is enabled, mode changes are instant (no animation). The 1-second delay before switching from Chat → Dashboard prevents jarring transitions when the user briefly dismisses the keyboard.
 
-**StatusLine component (Phase 2+):**
+**StatusLine component (Dashboard Mode):**
 
-Contextual greeting + system status bar appearing above the module zone. Content: time-aware greeting ("Good morning {user_name}"), connection status indicator, module count. Component: `layout/StatusLine.tsx`. Hidden in Phase 0-1, visible from Phase 2.
+Contextual greeting + system status bar appearing above the module list in Dashboard Mode. Content: time-aware greeting ("Good morning {user_name}"), connection status indicator, module freshness summary. Hidden in Chat Mode, visible in Dashboard Mode.
+
+**UX reference:** See `_bmad-output/planning-artifacts/ux-twilight-deep-dive.html` section "Screen Architecture: Chat & Dashboard" for visual mockups, transition diagrams, and before/after comparison.
 
 **Data freshness indicators per module:**
 
@@ -1149,7 +1159,7 @@ self-app/
 │   ├── mobile/                       # Expo SDK 54, RN 0.81, React 19.1
 │   │   ├── app/                      # Expo Router — pages only, minimal logic
 │   │   │   ├── _layout.tsx           # Root layout (Orb, connection status)
-│   │   │   └── index.tsx             # Single screen (Direction D)
+│   │   │   └── index.tsx             # Single screen — two-mode rendering (Chat / Dashboard)
 │   │   ├── components/
 │   │   │   ├── shell/                # Static UI — always visible
 │   │   │   │   ├── Orb.tsx           # Pulsing brand mark + agent state
@@ -1175,24 +1185,20 @@ self-app/
 │   │   │       ├── UnknownPrimitive.tsx
 │   │   │       ├── templates.ts     # Composition template registry
 │   │   │       └── index.ts
-│   │   ├── layout/                  # Phase morphing system
-│   │   │   ├── PhaseController.tsx  # Phase threshold logic + transitions
-│   │   │   ├── StatusLine.tsx       # Contextual greeting + system status (Phase 2+)
-│   │   │   ├── ChatZone.tsx         # Chat area with phase-aware sizing
-│   │   │   ├── ModuleZone.tsx       # Module display area (inline → feed → grid)
-│   │   │   └── index.ts
+│   │   ├── hooks/                    # Custom React hooks
+│   │   │   ├── useKeyboardVisible.ts # Keyboard visibility detection for mode transitions
+│   │   │   └── useModuleLifecycle.ts # Module state transitions
 │   │   ├── services/                 # Singletons
 │   │   │   ├── logger.ts             # Structured JSON → WS to backend
 │   │   │   ├── wsClient.ts           # WebSocket + reconnection + message queue
 │   │   │   └── auth.ts               # UUID token management (SecureStore)
 │   │   ├── stores/                   # Zustand — one per domain
 │   │   │   ├── moduleStore.ts        # Module specs, lifecycle state, dataStatus
-│   │   │   ├── chatStore.ts          # Chat messages, streaming state
+│   │   │   ├── chatStore.ts          # Chat messages, streaming state, inline module_card entries
+│   │   │   ├── screenModeStore.ts    # Screen mode: 'chat' | 'dashboard' + transitions
 │   │   │   ├── connectionStore.ts    # WS status, reconnection
 │   │   │   ├── authStore.ts          # Session token, API keys
 │   │   │   └── errorStore.ts         # Error accumulation for UI
-│   │   ├── hooks/                    # Custom React hooks
-│   │   │   └── useModuleLifecycle.ts # Module state transitions
 │   │   ├── types/                    # TypeScript type definitions
 │   │   │   ├── ws.ts                 # WSMessage discriminated union
 │   │   │   └── module.ts             # ModuleState, LifecycleStatus, AgentState

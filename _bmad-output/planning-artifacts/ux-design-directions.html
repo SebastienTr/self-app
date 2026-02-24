@@ -897,12 +897,18 @@
 </section>
 
 <!-- ==================== DIRECTION D ==================== -->
+<!-- NOTE (2026-02-24): Direction D was selected and refined into the Two-Mode Screen Architecture
+     (Story 2.5). The original exploration below shows the initial "Contextual Shift" concept with
+     progressive morphing. The final implementation uses two exclusive modes (Chat Mode / Dashboard Mode)
+     with crossfade transitions instead of continuous morphing. See ux-twilight-deep-dive.html
+     "Screen Architecture: Chat & Dashboard" section for the final design. -->
 <section class="direction" id="dir-d">
   <div class="direction-header">
-    <span class="direction-label">DIRECTION D</span>
+    <span class="direction-label">DIRECTION D — SELECTED ✓</span>
     <h2>Contextual Shift</h2>
   </div>
   <p>One screen that reshapes itself. When no modules exist: full chat. When modules exist: dashboard with an inline chat input at bottom. Tapping a module opens a contextual conversation about that module. The app smoothly morphs between states based on content density.</p>
+  <p style="background: var(--surfaceElevated); border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; font-size: 12px; border-radius: 4px;"><strong>Refined (Story 2.5):</strong> Two exclusive modes — <strong>Chat Mode</strong> (full-screen conversation with inline module cards) and <strong>Dashboard Mode</strong> (full-screen module gallery). Transitions via keyboard open/close + 250ms crossfade. See <em>ux-twilight-deep-dive.html</em> for final mockups.</p>
 
   <div class="mockup-row">
     <div class="mockup-container">
