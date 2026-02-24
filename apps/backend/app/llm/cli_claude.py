@@ -16,7 +16,7 @@ class ClaudeCodeCLI(CLIProvider):
     _cli_binary = "claude"
 
     def _build_command(self, prompt: str) -> list[str]:
-        return ["claude", "-p", prompt, "--output-format", "json"]
+        return ["claude", "-p", prompt, "--output-format", "json", "--model", "claude-sonnet-4-6"]
 
     def _parse_output(self, stdout: str) -> LLMResult:
         data = json.loads(stdout)

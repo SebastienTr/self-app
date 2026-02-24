@@ -7,7 +7,7 @@ RUN_DIR="$ROOT_DIR/.run"
 LOCK_FILE="$RUN_DIR/self.lock"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 MOBILE_PID_FILE="$RUN_DIR/mobile.pid"
-NGROK_PID_FILE="$RUN_DIR/ngrok-backend.pid"
+TUNNEL_PID_FILE="$RUN_DIR/tunnel-backend.pid"
 BACKEND_PORT=8000
 BACKEND_ONLY=false
 MOBILE_ONLY=false
@@ -16,7 +16,6 @@ KILL_ONLY=false
 STATUS_ONLY=false
 RESET=false
 TUNNEL_MODE=false
-NGROK_API_PORT=4041
 
 # ── Colors ───────────────────────────────────────────────────────────
 RED=$'\033[0;31m'
@@ -52,7 +51,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --mobile      Start mobile only"
       echo "  --status      Show running services"
       echo "  --no-schema   Skip schema:generate"
-      echo "  --tunnel      Use ngrok tunnels (for phones that can't reach LAN)"
+      echo "  --tunnel      Use tunnels (cloudflared + expo --tunnel) for phones off LAN"
       echo "  --reset       Purge backend DB (forces re-pairing on mobile)"
       echo "  --port PORT   Override backend port (default: 8000)"
       echo "  -h, --help    Show this help"
@@ -82,13 +81,6 @@ get_lan_ip() {
   fi
 }
 
-find_ngrok_bin() {
-  local bin
-  bin=$(find "$ROOT_DIR/node_modules/.pnpm" -path "*/@expo/ngrok-bin-darwin-arm64/ngrok" -type f 2>/dev/null | head -1)
-  if [[ -n "$bin" && -x "$bin" ]]; then echo "$bin"; return; fi
-  if command -v ngrok &>/dev/null; then echo "ngrok"; return; fi
-  return 1
-}
 
 kill_pid() {
   local pid=$1 name=${2:-process}
@@ -132,7 +124,7 @@ kill_zombies() {
   local found=false
 
   # Layer 1: PID files
-  for pidfile in "$BACKEND_PID_FILE" "$MOBILE_PID_FILE" "$NGROK_PID_FILE"; do
+  for pidfile in "$BACKEND_PID_FILE" "$MOBILE_PID_FILE" "$TUNNEL_PID_FILE"; do
     if [[ -f "$pidfile" ]]; then
       local pid; pid=$(cat "$pidfile")
       if kill -0 "$pid" 2>/dev/null; then
@@ -148,7 +140,7 @@ kill_zombies() {
   fi
 
   # Layer 3: Process name patterns
-  for pattern in "uvicorn app.main:app" "expo start" "ngrok http.*$BACKEND_PORT"; do
+  for pattern in "uvicorn app.main:app" "expo start" "cloudflared tunnel.*$BACKEND_PORT"; do
     local pids; pids=$(pgrep -f "$pattern" 2>/dev/null || true)
     if [[ -n "$pids" ]]; then
       found=true; kill_by_pattern "$pattern" "$pattern"
@@ -156,7 +148,7 @@ kill_zombies() {
   done
 
   if $found; then log_ok "Zombie processes cleaned up"; fi
-  rm -f "$LOCK_FILE" "$RUN_DIR/backend-tunnel-url" "$RUN_DIR/ngrok-backend.yml"
+  rm -f "$LOCK_FILE" "$RUN_DIR/backend-tunnel-url" "$RUN_DIR/cloudflared.log"
 }
 
 # ── Status ───────────────────────────────────────────────────────────
@@ -215,11 +207,11 @@ CHILDREN=()
 cleanup() {
   log "Shutting down..."
   for pid in "${CHILDREN[@]}"; do kill_pid "$pid" "child"; done
-  if [[ -f "$NGROK_PID_FILE" ]]; then
-    kill_pid "$(cat "$NGROK_PID_FILE")" "ngrok-backend"
+  if [[ -f "$TUNNEL_PID_FILE" ]]; then
+    kill_pid "$(cat "$TUNNEL_PID_FILE")" "cloudflared"
   fi
-  rm -f "$BACKEND_PID_FILE" "$MOBILE_PID_FILE" "$NGROK_PID_FILE" "$LOCK_FILE" \
-        "$RUN_DIR/backend-tunnel-url" "$RUN_DIR/ngrok-backend.yml"
+  rm -f "$BACKEND_PID_FILE" "$MOBILE_PID_FILE" "$TUNNEL_PID_FILE" "$LOCK_FILE" \
+        "$RUN_DIR/backend-tunnel-url" "$RUN_DIR/cloudflared.log"
   log_ok "Goodbye"
 }
 trap cleanup EXIT INT TERM
@@ -277,38 +269,34 @@ start_backend() {
   log_warn "Backend health check timed out (may still be starting)"
 }
 
-# ── Start backend tunnel ─────────────────────────────────────────────
+# ── Start backend tunnel (cloudflared — free, no auth needed) ────────
 start_backend_tunnel() {
-  local ngrok_bin
-  ngrok_bin=$(find_ngrok_bin) || {
-    log_err "ngrok not found (need @expo/ngrok in mobile devDeps)"
+  if ! command -v cloudflared &>/dev/null; then
+    log_err "cloudflared not found — install: brew install cloudflared"
     return 1
-  }
+  fi
 
-  # Config with separate API port to avoid conflict with Expo's ngrok on 4040
-  cat > "$RUN_DIR/ngrok-backend.yml" <<EOF
-web_addr: 127.0.0.1:${NGROK_API_PORT}
-EOF
+  log "Starting cloudflared tunnel for backend (port $BACKEND_PORT)..."
+  cloudflared tunnel --url "http://localhost:$BACKEND_PORT" --no-autoupdate 2>"$RUN_DIR/cloudflared.log" &
+  local cf_pid=$!
+  echo "$cf_pid" > "$TUNNEL_PID_FILE"
 
-  log "Starting ngrok tunnel for backend (port $BACKEND_PORT)..."
-  "$ngrok_bin" http "$BACKEND_PORT" --config="$RUN_DIR/ngrok-backend.yml" &>/dev/null &
-  local ngrok_pid=$!
-  echo "$ngrok_pid" > "$NGROK_PID_FILE"
-
+  # Parse tunnel URL from cloudflared stderr log
   local retries=0 tunnel_url=""
   while [[ $retries -lt 30 ]]; do
-    tunnel_url=$(curl -sf "http://127.0.0.1:${NGROK_API_PORT}/api/tunnels" 2>/dev/null \
-      | grep -o '"public_url":"https://[^"]*"' | head -1 | cut -d'"' -f4) || true
+    tunnel_url=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$RUN_DIR/cloudflared.log" 2>/dev/null | head -1) || true
     if [[ -n "$tunnel_url" ]]; then break; fi
-    if ! kill -0 "$ngrok_pid" 2>/dev/null; then
-      log_err "ngrok process died"; return 1
+    if ! kill -0 "$cf_pid" 2>/dev/null; then
+      log_err "cloudflared process died"
+      cat "$RUN_DIR/cloudflared.log" 2>/dev/null | tail -5
+      return 1
     fi
     sleep 0.5; ((retries++))
   done
 
   if [[ -z "$tunnel_url" ]]; then
-    log_err "Failed to get ngrok tunnel URL after 15s"
-    kill "$ngrok_pid" 2>/dev/null || true
+    log_err "Failed to get cloudflared tunnel URL after 15s"
+    kill "$cf_pid" 2>/dev/null || true
     return 1
   fi
 
@@ -326,13 +314,15 @@ start_mobile() {
   local mobile_script="dev:mobile"
 
   if $TUNNEL_MODE; then
-    # Start backend tunnel
+    # Backend tunnel via cloudflared (free, no session limit)
     if start_backend_tunnel; then
       local tunnel_url
       tunnel_url=$(cat "$RUN_DIR/backend-tunnel-url")
       export EXPO_PUBLIC_DEV_BACKEND_URL="wss://${tunnel_url#https://}/ws"
+      # Metro tunnel via Expo's built-in --tunnel (uses @expo/ngrok)
       mobile_script="dev:mobile:tunnel"
-      log_ok "Metro will start in tunnel mode"
+      log_ok "Backend WS: wss://${tunnel_url#https://}/ws"
+      log_ok "Metro will start in tunnel mode (expo --tunnel)"
     else
       log_warn "Backend tunnel failed — falling back to LAN"
       TUNNEL_MODE=false
@@ -348,6 +338,11 @@ start_mobile() {
       export EXPO_PUBLIC_DEV_BACKEND_URL="ws://${lan_ip}:${BACKEND_PORT}/ws"
       log_ok "Metro host forced to $lan_ip (VPN-safe)"
     fi
+  fi
+
+  # Do NOT set REACT_NATIVE_PACKAGER_HOSTNAME in tunnel mode — Expo --tunnel handles it
+  if $TUNNEL_MODE; then
+    unset REACT_NATIVE_PACKAGER_HOSTNAME
   fi
 
   # Pairing token auto-fill

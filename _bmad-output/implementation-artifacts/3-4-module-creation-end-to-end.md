@@ -353,7 +353,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 ### Debug Log References
 
-- Backend test suite: 612 passed in 4.11s (excluding pre-existing test_module_schema.py import error)
+- Backend test suite: 678 passed in 4.31s (excluding pre-existing test_module_schema.py import error)
 - Mobile test suite: 1035 passed, 26 pre-existing failures (ChatInput SafeAreaProvider — not from this story)
 - Module-schema test suite: 152 passed
 - New tests added: 12 (test_modules.py) + 15 (test_agent.py additions) + 5 (test_ws.py additions) + 12 (test_module_creation_e2e.py) + 3 (moduleSync.test.ts additions) = 47 new tests
@@ -375,12 +375,15 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 - [ ] [AI-Review][LOW] `discovering` and `composing` statuses are sent back-to-back with no actual async work between them — consider adding validation/discovery logic between the two states in a future story [agent.py:254-257]
 - [ ] [AI-Review][LOW] `_JSON_CODE_FENCE_RE` only matches ` ```json ` fences — a plain ` ``` ` block from the LLM would not be detected. This is strict-by-design but could miss edge cases from some providers [agent.py:38]
-- [ ] [AI-Review][LOW] Backend test count in Dev Agent Record is outdated (claims 612, actual is 678 after TEA expansion) — cosmetic only [story file]
+- [x] [AI-Review][LOW] Backend test count in Dev Agent Record is outdated (claims 612, actual is 678 after TEA expansion) — cosmetic only [story file]
 
 ### Change Log
 
 - 2026-02-24: Implemented story 3-4 — module creation end-to-end pipeline (all 5 tasks)
 - 2026-02-24: Code review (adversarial) — 3 MEDIUM issues fixed, 3 LOW documented as follow-ups
+- 2026-02-24: Fixed AC #4 — `_build_module_prompt()` now includes SDUI display content fields (value/label/unit/trend for metric, items for list, text for text, title/children for card) so modules render with visible content instead of empty cards
+- 2026-02-24: Switched LLM to claude-sonnet-4-6 via `--model` flag in cli_claude.py
+- 2026-02-24: Manual E2E validation — metric (Météo Göteborg: 3°C), list (News Tech with articles+timestamps), chat normal all confirmed working on Android via tunnel
 
 ### File List
 
@@ -394,6 +397,7 @@ New files:
 
 Modified files:
 - apps/backend/app/agent.py
+- apps/backend/app/llm/cli_claude.py
 - apps/backend/tests/test_agent.py
 - apps/backend/tests/test_agent_edge.py
 - apps/backend/tests/test_ws.py

@@ -1,24 +1,25 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-24T09:30 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-24T13:00 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 4 · Story 2.2 · BACKLOG                              ║
-║  Next milestone: Wave 4 — First Light Complete              ║
+║  PREP · Story Prep.1 · READY-FOR-DEV                       ║
+║  Next milestone: Agent Dev Autonomy → Wave 4                ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  12/56 done (21%)
+TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  12/57 done (21%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
 W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE        🔄 E1 retro ✓
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
-W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro
-W4  Backfill       ······                      0/6   << ICI        🔄 E2+E4, First Light retro
+W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro ✓
+PP  Preparation    -                           0/1   << ICI
+W4  Backfill       ······                      0/6                 🔄 E2+E4, First Light retro
 W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
 W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
 W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
@@ -26,9 +27,10 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
-E2  Conversation   ▓···       1/4   <<    ┐
+E2  Conversation   ▓···       1/4         ┐
 E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
 E4  Freshness      ···        0/3         ┘
+PP  Preparation    -          0/1  <<  (critical path before W4)
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
 E7  Interaction    ····       0/4  ├ MVP
@@ -41,7 +43,7 @@ E13 Notifs         ···        0/3  ├ Growth
 E14 Intelligence   ·····      0/5  │
 E15 Admin          ····       0/4  ┘
 
-Legend: ▓ done  ~ review/wip  · backlog
+Legend: ▓ done  ~ review/wip  - ready-for-dev  · backlog
 ```
 
 ---
@@ -74,7 +76,8 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 |------|------|---------|-----------|--------|
 | **1** | Finish Bootstrap | 1.4, 1.5, 1.6 | Mobile connected + authenticated | E1 retro ✓ |
 | **2** | Chat + Primitives | 3.1, 3.2, 2.1, 3.3 | Agent talks + modules render | — |
-| **3** | Module Creation E2E | 3.4 | **First Module Test** | E3 retro |
+| **3** | Module Creation E2E | 3.4 | **First Module Test** | E3 retro ✓ |
+| **Prep** | Agent Dev Autonomy | Prep.1 | Agent can test, screenshot, debug autonomously | — |
 | **4** | Backfill First Light | 2.2, 2.3, 2.4, 4.1, 4.2, 4.3 | First Light complete | E2 + E4 retro, **First Light retro** |
 | **5** | MVP Core | 5.x, 6.x, 7.x, 8.x | Memory + onboarding + interactions | E5, E6, E7, E8 retros |
 | **6** | MVP Security | 9.x, 10.x | Multi-provider + heartbeat | E9 + E10 retro, **MVP retro** |
@@ -86,6 +89,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > Goal: mobile app connected, authenticated, offline-capable
 > **Complete** | 7/7 done ✓
+> Features clés: monorepo, backend, abstraction LLM/BYOK, shell mobile, sync WebSocket, cache offline, pairing session.
+> Objectif: sécuriser la fondation technique et la boucle de connexion mobile ↔ backend avant toute feature produit avancée.
+> Sortie attendue: application mobile stable, authentifiée et capable de reprendre l'expérience même en contexte réseau imparfait.
 
 - `[x]` **1.1** — Initialize Monorepo & Module Definition Schema
 - `[x]` **1.1b** — CI Pipeline
@@ -103,6 +109,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > Goal: agent can talk, modules can render natively
 > 4 stories | Two dependency chains converge on 3.4
+> Features clés: chat temps réel en streaming + registre de primitives SDUI + composants composites + pipeline de rendu.
+> Objectif: rendre visible la valeur produit (conversation + UI dynamique) avec une base de rendu native réutilisable.
+> Sortie attendue: l'agent répond en temps réel et les modules peuvent être affichés correctement côté mobile.
 
 **Chain A — Rendering** (needs 1.4):
 
@@ -122,12 +131,27 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > **THE milestone.** User types → agent creates → module appears.
 > 1 story | Depends on: 2.1 + 3.3 + 1.3
+> Features clés: création de module end-to-end depuis le prompt utilisateur jusqu'au rendu du module généré.
+> Objectif: valider la thèse produit et l'intégration complète des briques backend, LLM, chat et rendu.
+> Sortie attendue: démo fiable du flux "je demande → l'agent crée → le module apparaît", prête à être consolidée.
 
 - `[x]` **3.4** — Module Creation End-to-End
 
 > If this works, the product thesis is validated. Everything after builds on this.
 >
-> 🔄 **Retro E3** — à lancer après 3.4 done (dernier story de l'Epic 3)
+> 🔄 **Retro E3** — done ✓
+
+---
+
+## Preparation — Agent Dev Autonomy (Critical Path)
+
+> **Blocker for Wave 4.** The dev agent must be able to test, screenshot, and debug autonomously before continuing.
+> Source: Epic 3 Retrospective Action Item #1
+> 1 story | First use case: fix keyboard avoidance bug on Android
+
+- `[-]` **Prep.1** — Agent Dev Autonomy (dev-tools.sh, adb screenshots, log reading, keyboard bug fix)
+
+> Without this, every visual bug requires a 6-step manual feedback loop (screenshot on phone → Messenger → Mac → download → send to agent). This story eliminates that friction.
 
 ---
 
@@ -135,6 +159,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > Goal: complete all First Light stories skipped during the sprint to 3.4
 > 6 stories (+ 1.5 if skipped in Wave 1)
+> Features clés: persistance d'identité agent, presets de persona, empty state contextuel, refresh cron, scoring de vitalité, archive/restore.
+> Objectif: terminer le socle "First Light" laissé de côté pour débloquer proprement memory, onboarding, lifecycle et proactivité.
+> Sortie attendue: First Light complet avec dépendances critiques levées pour accélérer les waves MVP suivantes.
 
 - `[ ]` **2.2** — Agent Identity Persistence (SOUL.md) — *blocks Epic 5*
 - `[ ]` **2.3** — Persona Preset Selection — *blocks Epic 6*
@@ -155,6 +182,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > Goal: memory, onboarding, interactions, failure handling
 > 14 stories across 4 parallel streams
+> Features clés: mémoire (capture/rappel), onboarding guidé, interactions et raffinements de modules, gestion d'échec/fallbacks.
+> Objectif: transformer le prototype validé en expérience MVP cohérente, personnalisée et robuste au quotidien.
+> Sortie attendue: cœur produit complet avec création, personnalisation, interaction, résilience et signaux de valeur récurrents.
 
 ### Stream A — Memory (Epic 5) `needs 2.2`
 
@@ -192,6 +222,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > Goal: secure API key management, proactive heartbeat
 > 5 stories
+> Features clés: stockage sécurisé des clés API, routing multi-provider, validation BYOK, heartbeat proactif, pré-calculs.
+> Objectif: renforcer confiance/sécurité et améliorer la réactivité perçue via des traitements en arrière-plan.
+> Sortie attendue: MVP prêt pour usage quotidien avec garde-fous de sécurité et comportements proactifs utiles.
 
 ### Epic 9: Multi-Provider Routing `needs 6.4`
 
@@ -215,6 +248,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 > Goal: lifecycle management, genome sharing, notifications, advanced AI, admin
 > 19 stories across 5 parallel streams
+> Features clés: lifecycle & organisation, export/import genome, notifications, capacités IA avancées, admin & observabilité.
+> Objectif: préparer la phase de croissance avec rétention, portabilité, contrôle utilisateur et outillage d'exploitation.
+> Sortie attendue: plateforme extensible orientée scale, avec gouvernance, engagement et opérations mieux maîtrisés.
 
 ### Stream E — Lifecycle (Epic 11) `needs 4.2`
 
@@ -290,6 +326,35 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 Les rétros épiques sont rapides (15-20 min) et focalisées sur l'epic terminé. Les rétros milestone sont plus approfondies et couvrent tout le travail depuis le dernier jalon.
 
 > Le SM rappelle automatiquement de lancer la rétro quand une wave se termine.
+
+---
+
+## Dev Infrastructure Notes
+
+### Tunnel Mode Required for Android Physical Device
+
+**Problème récurrent :** L'erreur "Failed to download remote update" dans Expo Go sur Android signifie que le téléphone ne peut pas atteindre l'IP LAN du Mac. Cela arrive systématiquement avec certaines configurations réseau (Wi-Fi isolant les clients, firewall, etc.).
+
+**Cause :** `./self.sh` utilise le mode LAN par défaut. Metro expose le bundle sur `http://<IP_LAN>:8081` et le backend sur `ws://<IP_LAN>:8000/ws`. Si le téléphone ne peut pas joindre cette IP, le bundle ne se télécharge pas.
+
+**Solution :** Toujours lancer avec le flag `--tunnel` :
+
+```bash
+./self.sh --tunnel
+```
+
+Cela crée deux tunnels ngrok :
+1. **Backend tunnel** — `ngrok http 8000` (API port 4041, évite le conflit avec Expo sur 4040)
+2. **Metro tunnel** — via `expo start --tunnel` (utilise `@expo/ngrok` dans les devDependencies)
+
+Le mode tunnel set automatiquement `EXPO_PUBLIC_DEV_BACKEND_URL=wss://<tunnel>/ws` et passe le pairing token via `EXPO_PUBLIC_DEV_PAIRING_TOKEN`.
+
+**Historique :** Découvert et corrigé dans `d9adb6e fix(dev): simplify self.sh, add tunnel mode, fix Hermes crypto`. Inclut aussi le fix pour `crypto.randomUUID()` absent dans Hermes (chatStore.ts).
+
+**Autres fixes liés (même session) :**
+- `04b0308 fix(ui): compact header, keyboard handling, Android edge-to-edge polish`
+- `softInputMode: "adjustResize"` dans app.json pour le clavier Android avec `edgeToEdgeEnabled`
+- Lazy require dans CardPrimitive.tsx pour casser le cycle registry ↔ CardPrimitive
 
 ---
 

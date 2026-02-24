@@ -137,7 +137,7 @@ def _build_module_prompt(message: str) -> str:
 If the user's message is just conversation (greeting, question, etc.) and NOT a module request, respond normally without any JSON block.
 
 MODULE SPEC REQUIREMENTS:
-The JSON block must contain these fields:
+The JSON block must contain these metadata fields:
 - "name": string — display name for the module
 - "type": one of "metric", "list", "text", "card"
 - "template": one of "metric-dashboard", "data-card", "simple-list"
@@ -146,18 +146,42 @@ The JSON block must contain these fields:
 - "schema_version": always 1
 - "accessible_label": string — accessibility description of the module
 
+DISPLAY CONTENT (required — this is what the user sees on screen):
+Depending on "type", you MUST include initial display content:
+
+If type is "metric":
+- "value": string or number — the main displayed value (use a realistic placeholder, e.g. "22°C")
+- "label": string — short description shown below the value (e.g. "Temperature actuelle")
+- "unit": string — unit displayed next to value (e.g. "°C", "km/h", "%")
+- "trend": one of "up", "down", "stable" — optional trend indicator
+
+If type is "list":
+- "items": array of objects, each with "title" (string), "subtitle" (string, optional), "trailing" (string, optional — right-aligned text like a value or time)
+
+If type is "text":
+- "text": string — the text content to display
+
+If type is "card":
+- "title": string — card header
+- "children": array of primitive objects, each with "type" and its own content fields
+
 IMPORTANT:
 - Use snake_case for ALL JSON field names (data_sources, refresh_interval, schema_version, accessible_label)
 - Do NOT include an "id" field — the server generates UUIDs
 - Find publicly available free APIs (like Open-Meteo for weather, no API key required)
 - The JSON must be valid and parseable
+- Always include realistic placeholder content — modules must look good immediately
 
-EXAMPLE (weather module):
+EXAMPLE (weather metric):
 ```json
 {{
-  "name": "Paris Weather",
+  "name": "Météo Paris",
   "type": "metric",
   "template": "metric-dashboard",
+  "value": "18°C",
+  "label": "Température actuelle",
+  "unit": "°C",
+  "trend": "stable",
   "data_sources": [
     {{
       "id": "openmeteo-paris",
@@ -170,7 +194,32 @@ EXAMPLE (weather module):
   ],
   "refresh_interval": 3600,
   "schema_version": 1,
-  "accessible_label": "Paris weather forecast showing current temperature and wind speed"
+  "accessible_label": "Météo Paris indiquant la température et le vent actuels"
+}}
+```
+
+EXAMPLE (news list):
+```json
+{{
+  "name": "Tech News",
+  "type": "list",
+  "template": "simple-list",
+  "items": [
+    {{"title": "Loading latest news...", "subtitle": "Refreshing", "trailing": "now"}}
+  ],
+  "data_sources": [
+    {{
+      "id": "hackernews-top",
+      "type": "rest_api",
+      "config": {{
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json?limitToFirst=10&orderBy=%22$key%22",
+        "method": "GET"
+      }}
+    }}
+  ],
+  "refresh_interval": 1800,
+  "schema_version": 1,
+  "accessible_label": "Latest technology news headlines"
 }}
 ```
 
