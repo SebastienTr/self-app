@@ -1,6 +1,6 @@
 # Story 2.5: Screen Mode Architecture — Chat & Dashboard
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -36,55 +36,55 @@ so that I never see a cramped split of chat, modules, and keyboard competing for
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create screen mode state management (AC: #1, #8)
-  - [ ] 1.1 Create `apps/mobile/stores/screenModeStore.ts` with Zustand store: `mode: 'chat' | 'dashboard'`, `setMode(mode)`, `hasModules: boolean` (derived from moduleStore)
-  - [ ] 1.2 Implement initial mode logic: on app start, if `moduleStore.modules.size > 0` → dashboard, else → chat
-  - [ ] 1.3 Export `useScreenMode()` selector hook following existing store conventions
-  - [ ] 1.4 In `App.tsx`, add `AppState.addEventListener('change', ...)` listener: on transition from `background` → `active` (after >5s in background), re-evaluate mode based on module count and agent status. If modules > 0 and agent idle → dashboard; if 0 modules → chat; otherwise keep current mode
+- [x] Task 1: Create screen mode state management (AC: #1, #8)
+  - [x] 1.1 Create `apps/mobile/stores/screenModeStore.ts` with Zustand store: `mode: 'chat' | 'dashboard'`, `setMode(mode)`, `hasModules: boolean` (derived from moduleStore)
+  - [x] 1.2 Implement initial mode logic: on app start, if `moduleStore.modules.size > 0` → dashboard, else → chat
+  - [x] 1.3 Export `useScreenMode()` selector hook following existing store conventions
+  - [x] 1.4 In `App.tsx`, add `AppState.addEventListener('change', ...)` listener: on transition from `background` → `active` (after >5s in background), re-evaluate mode based on module count and agent status. If modules > 0 and agent idle → dashboard; if 0 modules → chat; otherwise keep current mode
 
-- [ ] Task 2: Create `useKeyboardVisible` hook (AC: #2, #3, #4, #7)
-  - [ ] 2.1 Create `apps/mobile/hooks/useKeyboardVisible.ts` — listens to `keyboardWillShow`/`keyboardWillHide` (iOS) and `keyboardDidShow`/`keyboardDidHide` (Android)
-  - [ ] 2.2 Returns `{ keyboardVisible: boolean }` — pure observation hook, no side effects, no store dependencies
-  - [ ] 2.3 Refactor `ChatInput.tsx` to use `useKeyboardVisible()` instead of its internal keyboard listener (deduplicate existing code)
-  - [ ] 2.4 Wire transition logic **in `App.tsx`** (not in the hook): on keyboard close, if `modules.size > 0` AND `agentStatus === 'idle'` → `setTimeout(() => setMode('dashboard'), 1000)` with cleanup on unmount or re-open. Cancel timer if keyboard reopens or agent starts streaming
+- [x] Task 2: Create `useKeyboardVisible` hook (AC: #2, #3, #4, #7)
+  - [x] 2.1 Create `apps/mobile/hooks/useKeyboardVisible.ts` — listens to `keyboardWillShow`/`keyboardWillHide` (iOS) and `keyboardDidShow`/`keyboardDidHide` (Android)
+  - [x] 2.2 Returns `{ keyboardVisible: boolean }` — pure observation hook, no side effects, no store dependencies
+  - [x] 2.3 Refactor `ChatInput.tsx` to use `useKeyboardVisible()` instead of its internal keyboard listener (deduplicate existing code)
+  - [x] 2.4 Wire transition logic **in `App.tsx`** (not in the hook): on keyboard close, if `modules.size > 0` AND `agentStatus === 'idle'` → `setTimeout(() => setMode('dashboard'), 1000)` with cleanup on unmount or re-open. Cancel timer if keyboard reopens or agent starts streaming
 
-- [ ] Task 3: Refactor App.tsx layout to two-mode rendering (AC: #1, #6, #10)
-  - [ ] 3.1 Replace the current `ChatThread(flex:1) + ModuleList(flex:1)` simultaneous layout with a conditional render based on `screenModeStore.mode`
-  - [ ] 3.2 Chat Mode: render `<ChatThread style={{flex: 1}} />` only (full screen above input)
-  - [ ] 3.3 Dashboard Mode: render `<ModuleList style={{flex: 1}} />` only (full screen above input)
-  - [ ] 3.4 Keep `ChatInput` always rendered at the bottom in both modes (constant anchor)
-  - [ ] 3.5 Keep `Header` always rendered at the top in both modes
+- [x] Task 3: Refactor App.tsx layout to two-mode rendering (AC: #1, #6, #10)
+  - [x] 3.1 Replace the current `ChatThread(flex:1) + ModuleList(flex:1)` simultaneous layout with a conditional render based on `screenModeStore.mode`
+  - [x] 3.2 Chat Mode: render `<ChatThread style={{flex: 1}} />` only (full screen above input)
+  - [x] 3.3 Dashboard Mode: render `<ModuleList style={{flex: 1}} />` only (full screen above input)
+  - [x] 3.4 Keep `ChatInput` always rendered at the bottom in both modes (constant anchor)
+  - [x] 3.5 Keep `Header` always rendered at the top in both modes
 
-- [ ] Task 4: Add crossfade transition animation (AC: #2, #3)
-  - [ ] 4.1 Wrap mode content in `Animated.View` with opacity transition (250ms ease-in-out)
-  - [ ] 4.2 On mode change: fade out current content (opacity 1→0), swap content, fade in new content (opacity 0→1)
-  - [ ] 4.3 Respect `Reduce Motion` accessibility setting: if enabled, use instant swap instead of crossfade
+- [x] Task 4: Add crossfade transition animation (AC: #2, #3)
+  - [x] 4.1 Wrap mode content in `Animated.View` with opacity transition (250ms ease-in-out)
+  - [x] 4.2 On mode change: fade out current content (opacity 1→0), swap content, fade in new content (opacity 0→1)
+  - [x] 4.3 Respect `Reduce Motion` accessibility setting: if enabled, use instant swap instead of crossfade
 
-- [ ] Task 5: Render inline module cards in ChatThread (AC: #5, #9, #11)
-  - [ ] 5.1 Add new message type `module_card` to `chatStore.messages` array — message with `type: 'module_card'` and `moduleId: string`
-  - [ ] 5.2 In `moduleSync.ts`, when `module_created` is received: check `chatStore.agentStatus`. If `idle` → append `module_card` entry immediately. If streaming/thinking → subscribe to `agentStatus` changes via `chatStore.subscribe()` and append the `module_card` entry once `agentStatus` returns to `idle` (i.e., after `finalizeAgentMessage`). Use a one-shot subscription that cleans itself up
-  - [ ] 5.3 In `ChatThread.tsx`, add a render branch: if `message.type === 'module_card'`, render `<ModuleCard module={moduleStore.modules.get(moduleId)} />` inline in the scroll
-  - [ ] 5.4 Style inline ModuleCard with `marginHorizontal: tokens.spacing.md` to align with chat bubbles
+- [x] Task 5: Render inline module cards in ChatThread (AC: #5, #9, #11)
+  - [x] 5.1 Add new message type `module_card` to `chatStore.messages` array — message with `type: 'module_card'` and `moduleId: string`
+  - [x] 5.2 In `moduleSync.ts`, when `module_created` is received: check `chatStore.agentStatus`. If `idle` → append `module_card` entry immediately. If streaming/thinking → subscribe to `agentStatus` changes via `chatStore.subscribe()` and append the `module_card` entry once `agentStatus` returns to `idle` (i.e., after `finalizeAgentMessage`). Use a one-shot subscription that cleans itself up
+  - [x] 5.3 In `ChatThread.tsx`, add a render branch: if `message.type === 'module_card'`, render `<ModuleCard module={moduleStore.modules.get(moduleId)} />` inline in the scroll
+  - [x] 5.4 Style inline ModuleCard with `marginHorizontal: tokens.spacing.md` to align with chat bubbles
 
-- [ ] Task 6: Wire ChatInput focus to trigger Chat Mode (AC: #2)
-  - [ ] 6.1 Add an optional `onInputFocus?: () => void` prop to `ChatInput` (maintains shell layer purity — no store imports)
-  - [ ] 6.2 In `ChatInput.tsx`, call `onInputFocus?.()` from the TextInput's `onFocus` handler
-  - [ ] 6.3 In `App.tsx`, pass `onInputFocus={() => screenModeStore.setMode('chat')}` to `<ChatInput />` — this keeps the store call in the orchestration layer
+- [x] Task 6: Wire ChatInput focus to trigger Chat Mode (AC: #2)
+  - [x] 6.1 Add an optional `onInputFocus?: () => void` prop to `ChatInput` (maintains shell layer purity — no store imports)
+  - [x] 6.2 In `ChatInput.tsx`, call `onInputFocus?.()` from the TextInput's `onFocus` handler
+  - [x] 6.3 In `App.tsx`, pass `onInputFocus={() => screenModeStore.setMode('chat')}` to `<ChatInput />` — this keeps the store call in the orchestration layer
 
-- [ ] Task 7: Write tests (AC: all)
-  - [ ] 7.1 Unit test `screenModeStore`: initial mode based on module count, `setMode` transitions
-  - [ ] 7.2 Unit test `useKeyboardVisible` hook: mock keyboard events, verify state changes (pure — no store side effects)
-  - [ ] 7.3 Unit test ChatThread: renders `module_card` type messages as ModuleCard components, renders `chat` type as ChatBubble
-  - [ ] 7.4 Unit test App layout: in chat mode only ChatThread visible, in dashboard mode only ModuleList visible
-  - [ ] 7.5 Unit test transition delay: keyboard close with modules + agent idle triggers dashboard after 1s, cleanup on re-open cancels timer
-  - [ ] 7.6 Unit test streaming guard: keyboard close while agent streaming does NOT trigger dashboard transition; transition fires after agent becomes idle
-  - [ ] 7.7 Unit test AppState foreground: mock AppState change from background→active after >5s, verify mode re-evaluation
-  - [ ] 7.8 Unit test module_card timing in moduleSync: if agent is streaming when module_created arrives, module_card is appended only after streaming completes
+- [x] Task 7: Write tests (AC: all)
+  - [x] 7.1 Unit test `screenModeStore`: initial mode based on module count, `setMode` transitions
+  - [x] 7.2 Unit test `useKeyboardVisible` hook: mock keyboard events, verify state changes (pure — no store side effects)
+  - [x] 7.3 Unit test ChatThread: renders `module_card` type messages as ModuleCard components, renders `chat` type as ChatBubble
+  - [x] 7.4 Unit test App layout: in chat mode only ChatThread visible, in dashboard mode only ModuleList visible
+  - [x] 7.5 Unit test transition delay: keyboard close with modules + agent idle triggers dashboard after 1s, cleanup on re-open cancels timer
+  - [x] 7.6 Unit test streaming guard: keyboard close while agent streaming does NOT trigger dashboard transition; transition fires after agent becomes idle
+  - [x] 7.7 Unit test AppState foreground: mock AppState change from background→active after >5s, verify mode re-evaluation
+  - [x] 7.8 Unit test module_card timing in moduleSync: if agent is streaming when module_created arrives, module_card is appended only after streaming completes
 
-- [ ] Task 8: Update existing tests for new layout (AC: all)
-  - [ ] 8.1 Update App.tsx tests to account for conditional rendering (ChatThread OR ModuleList, not both)
-  - [ ] 8.2 Update ChatThread tests to handle `module_card` message type
-  - [ ] 8.3 Ensure all existing mobile tests pass — run `npm run test:mobile`
+- [x] Task 8: Update existing tests for new layout (AC: all)
+  - [x] 8.1 Update App.tsx tests to account for conditional rendering (ChatThread OR ModuleList, not both)
+  - [x] 8.2 Update ChatThread tests to handle `module_card` message type
+  - [x] 8.3 Ensure all existing mobile tests pass — run `npm run test:mobile`
 
 ## Dev Notes
 
@@ -242,22 +242,25 @@ apps/mobile/
 
 ### Agent Model Used
 
-(pending implementation)
+Claude Opus 4.6 (claude-opus-4-6)
 
 ### Debug Log References
 
-(pending implementation)
+No debug issues.
 
 ### Completion Notes List
 
-(pending implementation)
+Tasks 1-8 complete. 54 new tests. 0 regressions. 1133+784=1917 total.
 
 ### Change Log
 
 - 2026-02-24: Story 2.5 created — Screen Mode Architecture for Chat & Dashboard modes, based on Twilight UX deep dive analysis of keyboard/module/chat conflict
 - 2026-02-24: Post-audit review — fixed ChatMessage type (timestamp: string not number, added isError), corrected target file (moduleSync.ts not chatSync.ts), updated test counts (1079+784), added architecture reference
+- 2026-02-24: Impl complete (Opus 4.6) - 8 tasks, 54 new tests, 0 regressions
+- 2026-02-24: Code review (Opus 4.6) — Fixed MEDIUM: crossfade using absoluteFill instead of collapsed height:0 (proper overlay during transition). Removed no-op setTimeout placeholder. Added 30 edge-case tests (TEA phase). Final: 1163 mobile tests passing.
 - 2026-02-24: Party mode review (Winston, Sally, Amelia, Bob) — 8 fixes: (1) useKeyboardVisible now pure hook, transition logic in App.tsx; (2) added AppState listener task for foreground resume; (3) fixed crossfade pseudo-code (both views mounted during transition); (4) added AC #11 streaming guard + AC #3 agent-idle condition; (5) discriminated union with explicit type:'chat'; (6) module_card timing via one-shot chatStore subscription; (7) ChatInput uses onInputFocus prop instead of store import; (8) AC #8 clarified with 5s background threshold
 
 ### File List
 
-(populated after implementation)
+New: screenModeStore.ts, useKeyboardVisible.ts, 7 test files. Modified: App.tsx, chatStore.ts, moduleSync.ts, ChatThread.tsx, ChatInput.tsx
+

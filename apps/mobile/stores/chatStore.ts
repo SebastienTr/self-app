@@ -8,6 +8,10 @@
  *   - NEVER use isLoading: boolean — always use AgentState enum
  *
  * One store per domain: chatStore manages chat ONLY.
+ *
+ * ChatMessage is a discriminated union:
+ *   - type: 'chat' — regular user/agent messages
+ *   - type: 'module_card' — inline module card rendered in chat thread
  */
 
 import { create } from 'zustand';
@@ -26,13 +30,26 @@ function uuid(): string {
   });
 }
 
-export interface ChatMessage {
+/** Regular chat message (user or agent). */
+export interface ChatMessageChat {
   id: string;
+  type: 'chat';
   role: 'user' | 'agent';
   content: string;
   timestamp: string;
   isError?: boolean;
 }
+
+/** Inline module card entry in chat thread. */
+export interface ChatMessageModuleCard {
+  id: string;
+  type: 'module_card';
+  moduleId: string;
+  timestamp: string;
+}
+
+/** Discriminated union of all chat message types. */
+export type ChatMessage = ChatMessageChat | ChatMessageModuleCard;
 
 // AgentStatus = AgentState (same type, reused from ws.ts)
 export type AgentStatus = AgentState;
@@ -50,6 +67,7 @@ export interface ChatStore {
   finalizeAgentMessage: () => void;
   addErrorMessage: (message: string) => void;
   setAgentStatus: (status: AgentStatus) => void;
+  addModuleCard: (moduleId: string) => void;
   clearMessages: () => void;
 
   // Selectors (get + descriptive noun)
@@ -71,7 +89,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ...state.messages,
         {
           id: uuid(),
-          role: 'user',
+          type: 'chat' as const,
+          role: 'user' as const,
           content,
           timestamp: new Date().toISOString(),
         },
@@ -94,8 +113,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       if (state.streamingMessage === null) {
         return { agentStatus: 'idle' as AgentStatus };
       }
-      const finalMessage: ChatMessage = {
+      const finalMessage: ChatMessageChat = {
         id: uuid(),
+        type: 'chat',
         role: 'agent',
         content: state.streamingMessage,
         timestamp: new Date().toISOString(),
@@ -113,7 +133,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         ...state.messages,
         {
           id: uuid(),
-          role: 'agent',
+          type: 'chat' as const,
+          role: 'agent' as const,
           content: message,
           timestamp: new Date().toISOString(),
           isError: true,
@@ -124,6 +145,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     })),
 
   setAgentStatus: (status) => set({ agentStatus: status }),
+
+  addModuleCard: (moduleId) =>
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        {
+          id: uuid(),
+          type: 'module_card' as const,
+          moduleId,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    })),
 
   clearMessages: () =>
     set({

@@ -1,6 +1,6 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-24T19:30 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-24T21:00 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 > **Baseline note:** dashboard/wave totals track `58` epic stories currently in `sprint-status.yaml` (including post-PRD additions `1.7` and `2.5`) + `Prep.1` = `59` total stories.
 
@@ -8,11 +8,11 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 4 · Story 2.5 · READY-FOR-DEV                        ║
+║  WAVE 4 · Story 2.3 · BACKLOG                              ║
 ║  Next milestone: First Light Complete                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓▓░░░░░░░░░░░░░░░]  15/59 done (25%)
+TOTAL   [▓▓▓▓▓░░░░░░░░░░░░░░░]  16/59 done (27%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
@@ -20,7 +20,7 @@ W1  Bootstrap      ▓▓▓▓▓▓▓▓                   8/8   ✓ DONE    
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
 W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro ✓
 PP  Preparation    ▓                           1/1   ✓ DONE
-W4  Backfill       ▓-·····                     1/7   << ICI        🔄 E2+E4, First Light retro
+W4  Backfill       ▓▓·····                     2/7   << ICI        🔄 E2+E4, First Light retro
 W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
 W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
 W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
@@ -28,7 +28,7 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓▓   8/8  ✓
-E2  Conversation   ▓▓-··      2/5  <<    ┐
+E2  Conversation   ▓▓▓··      3/5  <<    ┐
 E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
 E4  Freshness      ···        0/3         ┘
 PP  Preparation    ▓          1/1  ✓   (critical path cleared)
@@ -168,7 +168,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 > Sortie attendue: First Light complet avec dépendances critiques levées pour accélérer les waves MVP suivantes.
 
 - `[x]` **2.2** — Agent Identity Persistence (SOUL.md) — *blocks Epic 5*
-- `[-]` **2.5** — Screen Mode Architecture (Chat & Dashboard) — *blocks 2.4*
+- `[x]` **2.5** — Screen Mode Architecture (Chat & Dashboard) — *blocks 2.4*
 - `[ ]` **2.3** — Persona Preset Selection — *blocks Epic 6*
 - `[ ]` **2.4** — Contextual Empty State — *depends on 2.5*
 - `[ ]` **4.1** — Cron-Based Background Refresh — *blocks 4.2, 10.1*

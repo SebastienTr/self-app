@@ -5,14 +5,13 @@
  * Design tokens: Twilight theme from constants/tokens.ts.
  *
  * Props:
- *   onSend   — called with trimmed message text when user sends
- *   disabled — disables input and send button (e.g., when agent is processing)
+ *   onSend        — called with trimmed message text when user sends
+ *   disabled      — disables input and send button (e.g., when agent is processing)
+ *   onInputFocus  — called when TextInput gains focus (used by App.tsx for mode switching)
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  Keyboard,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { tokens } from '@/constants/tokens';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
 /**
  * Keyboard avoidance is handled at the App.tsx level with a KeyboardAvoidingView
@@ -31,20 +31,13 @@ import { tokens } from '@/constants/tokens';
 export interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  onInputFocus?: () => void;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, onInputFocus }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const { keyboardVisible } = useKeyboardVisible();
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
 
   const canSend = value.trim().length > 0 && !disabled;
   // When keyboard is open, KAV already offsets for safe area — use minimal margin.
@@ -72,6 +65,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         multiline={false}
         returnKeyType="send"
         onSubmitEditing={handleSend}
+        onFocus={onInputFocus}
       />
       <TouchableOpacity
         style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
@@ -82,7 +76,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Text style={[styles.sendIcon, !canSend && styles.sendIconDisabled]}>
-          ▶
+          \u25B6
         </Text>
       </TouchableOpacity>
     </View>

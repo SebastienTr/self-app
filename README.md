@@ -43,19 +43,19 @@ Most apps decide what you can do before you open them. Self flips that:
 ## Project Status
 
 ```
-[▓▓▓▓▓░░░░░░░░░░░░░░░] 15/59 stories (25%)
+[▓▓▓▓▓░░░░░░░░░░░░░░░] 16/59 stories (27%)
 ```
 
 Baseline metrics = `58` epic stories currently tracked in `sprint-status.yaml` (includes post-PRD additions `1.7` and `2.5`) + `Prep.1` (`59` total).
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 20 | 14 | **In Progress** |
+| First Light | 20 | 15 | **In Progress** |
 | Preparation | 1 | 1 | **Done** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
-**Current focus:** Wave 4 — Backfill First Light (stories 2.5, 2.3–2.4, 4.1–4.3)
+**Current focus:** Wave 4 — Backfill First Light (stories 2.3–2.4, 4.1–4.3)
 **Next milestone:** First Light Complete
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
@@ -195,7 +195,7 @@ See the [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep
 | [Epic 3 Retrospective](_bmad-output/implementation-artifacts/epic-3-retro-2026-02-24.md) | Done |
 | [Story 2.2 — Agent Identity Persistence](_bmad-output/implementation-artifacts/2-2-agent-identity-persistence.md) | Done |
 | [Story 1.7 — Observability & Correlation IDs](_bmad-output/implementation-artifacts/1-7-observability-and-correlation-ids.md) | Done |
-| [Story 2.5 — Screen Mode Architecture](_bmad-output/implementation-artifacts/2-5-screen-mode-architecture.md) | Ready for Dev |
+| [Story 2.5 — Screen Mode Architecture](_bmad-output/implementation-artifacts/2-5-screen-mode-architecture.md) | Done |
 | [Story Prep.1 — Agent Dev Autonomy](_bmad-output/implementation-artifacts/prep-1-agent-dev-autonomy.md) | Done |
 
 </details>

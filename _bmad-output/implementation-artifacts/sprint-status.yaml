@@ -63,7 +63,7 @@ development_status:
   2-1-real-time-chat-interface-with-streaming: done
   2-2-agent-identity-persistence: done
   2-3-persona-preset-selection: backlog
-  2-5-screen-mode-architecture: ready-for-dev    # NEW — Chat/Dashboard two-mode layout (blocks 2-4)
+  2-5-screen-mode-architecture: done       # Chat/Dashboard two-mode layout (blocks 2-4)
   2-4-contextual-empty-state: backlog             # depends on 2-5 (empty state = Chat Mode with 0 modules)
   epic-2-retrospective: optional
 

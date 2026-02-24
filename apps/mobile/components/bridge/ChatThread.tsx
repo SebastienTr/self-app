@@ -7,6 +7,7 @@
  * Renders:
  *   - All finalized messages from chatStore.messages
  *   - A streaming ChatBubble if chatStore.streamingMessage !== null
+ *   - Inline ModuleCard for module_card messages (story 2-5)
  *
  * Auto-scrolls to bottom on new messages or streaming deltas.
  */
@@ -15,9 +16,33 @@ import { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { useChatStore } from '@/stores/chatStore';
+import { useModuleStore } from '@/stores/moduleStore';
 import type { ChatMessage } from '@/stores/chatStore';
 import { ChatBubble } from '@/components/shell/ChatBubble';
+import { ModuleCard } from '@/components/bridge/ModuleCard';
 import { tokens } from '@/constants/tokens';
+
+function renderMessage(msg: ChatMessage) {
+  if (msg.type === 'module_card') {
+    const module = useModuleStore.getState().modules.get(msg.moduleId);
+    if (!module) return null;
+    return (
+      <View key={msg.id} style={styles.inlineModuleCard}>
+        <ModuleCard module={module} />
+      </View>
+    );
+  }
+
+  // type === 'chat'
+  return (
+    <ChatBubble
+      key={msg.id}
+      role={msg.role}
+      content={msg.content}
+      isError={msg.isError}
+    />
+  );
+}
 
 export function ChatThread() {
   const messages = useChatStore((s) => s.messages);
@@ -41,14 +66,7 @@ export function ChatThread() {
       }}
     >
       <View>
-        {messages.map((msg: ChatMessage) => (
-          <ChatBubble
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            isError={msg.isError}
-          />
-        ))}
+        {messages.map((msg: ChatMessage) => renderMessage(msg))}
         {streamingMessage !== null && (
           <ChatBubble
             role="agent"
@@ -71,5 +89,9 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.spacing.md,
     flexGrow: 1,
     justifyContent: 'flex-end',
+  },
+  inlineModuleCard: {
+    marginHorizontal: 0,
+    marginVertical: tokens.spacing.xs,
   },
 });

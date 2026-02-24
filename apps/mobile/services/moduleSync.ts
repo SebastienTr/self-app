@@ -2,7 +2,7 @@
  * Module sync service — WS message handler registration for module-related messages.
  *
  * Registers handlers for:
- *   - module_created → adds module to store
+ *   - module_created → adds module to store + appends module_card to chatStore
  *   - module_updated → updates module in store
  *   - module_list   → replaces all modules (full sync response)
  *   - module_sync   → merges delta sync into store, updates lastSync
@@ -13,11 +13,56 @@
 import type { WSMessage, ModuleSpec } from '@/types/ws';
 import { onMessage } from '@/services/wsClient';
 import { useModuleStore } from '@/stores/moduleStore';
+import { useChatStore } from '@/stores/chatStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { logger } from './logger';
 
 /** Unsubscribe functions returned by onMessage registrations. */
 let unsubscribers: (() => void)[] = [];
+
+/** Pending module cards waiting for agent to finish streaming. */
+let pendingModuleCards: string[] = [];
+
+/** One-shot subscription cleanup for agent status watching. */
+let agentStatusUnsub: (() => void) | null = null;
+
+/**
+ * Append a module_card to chatStore immediately if agent is idle,
+ * or defer until agent finishes streaming.
+ */
+function scheduleModuleCard(moduleId: string): void {
+  const chatStore = useChatStore.getState();
+
+  if (chatStore.agentStatus === 'idle') {
+    // Agent is idle — append immediately
+    chatStore.addModuleCard(moduleId);
+    return;
+  }
+
+  // Agent is streaming/thinking — defer the card
+  pendingModuleCards.push(moduleId);
+
+  // Only set up one subscription at a time
+  if (agentStatusUnsub) return;
+
+  agentStatusUnsub = useChatStore.subscribe((state) => {
+    if (state.agentStatus === 'idle' && pendingModuleCards.length > 0) {
+      // Flush all pending cards
+      const cards = [...pendingModuleCards];
+      pendingModuleCards = [];
+
+      for (const id of cards) {
+        useChatStore.getState().addModuleCard(id);
+      }
+
+      // Clean up one-shot subscription
+      if (agentStatusUnsub) {
+        agentStatusUnsub();
+        agentStatusUnsub = null;
+      }
+    }
+  });
+}
 
 /**
  * Initialize module sync handlers.
@@ -30,6 +75,11 @@ export function initModuleSync(): void {
     unsub();
   }
   unsubscribers = [];
+  pendingModuleCards = [];
+  if (agentStatusUnsub) {
+    agentStatusUnsub();
+    agentStatusUnsub = null;
+  }
 
   // module_created — a new module was created by the agent
   unsubscribers.push(
@@ -39,6 +89,10 @@ export function initModuleSync(): void {
       const updatedAt = new Date().toISOString();
 
       useModuleStore.getState().addModule(spec, updatedAt);
+
+      // Schedule inline module card in chat thread
+      scheduleModuleCard(spec.moduleId);
+
       logger.info('moduleSync', 'module_created', {
         module_id: spec.moduleId,
       });
@@ -122,4 +176,9 @@ export function cleanupModuleSync(): void {
     unsub();
   }
   unsubscribers = [];
+  pendingModuleCards = [];
+  if (agentStatusUnsub) {
+    agentStatusUnsub();
+    agentStatusUnsub = null;
+  }
 }
