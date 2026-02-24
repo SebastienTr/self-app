@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as NavigationBar from 'expo-navigation-bar';
 
 import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -32,12 +34,20 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
   disconnected: 'Disconnected',
 };
 
-export default function App() {
+function AppContent() {
   const status = useConnectionStore((s) => s.status);
   const moduleCount = useModuleStore((s) => s.modules.size);
   const authStatus = useAuthStore((s) => s.authStatus);
   const agentStatus = useChatStore((s) => s.agentStatus);
   const [initialized, setInitialized] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    // Hide Android navigation bar (immersive mode — swipe up to reveal)
+    if (Platform.OS === 'android') {
+      NavigationBar.setVisibilityAsync('hidden');
+    }
+  }, []);
 
   useEffect(() => {
     async function startup() {
@@ -62,9 +72,15 @@ export default function App() {
       ]);
 
       const authStore = useAuthStore.getState();
-      if (token && backendUrl) {
+      // In dev, prefer env var URL over stored URL (handles tunnel mode)
+      const effectiveUrl =
+        __DEV__ && process.env.EXPO_PUBLIC_DEV_BACKEND_URL
+          ? process.env.EXPO_PUBLIC_DEV_BACKEND_URL
+          : backendUrl;
+
+      if (token && effectiveUrl) {
         authStore.setSessionToken(token);
-        authStore.setBackendUrl(backendUrl);
+        authStore.setBackendUrl(effectiveUrl);
         authStore.setAuthStatus('authenticating');
       }
 
@@ -87,8 +103,8 @@ export default function App() {
       });
 
       // 6. Connect to WebSocket if session is configured
-      if (token && backendUrl) {
-        connect(backendUrl);
+      if (token && effectiveUrl) {
+        connect(effectiveUrl);
       }
     }
 
@@ -116,27 +132,30 @@ export default function App() {
   const isInputDisabled = agentStatus !== 'idle' || status !== 'connected';
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { paddingTop: insets.top + tokens.spacing.sm }]}
+    >
       {initialized && showPairing ? (
         <PairingScreen />
       ) : (
         <>
-          <Text style={styles.title}>self</Text>
-          <View style={styles.statusRow}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: STATUS_COLORS[status] },
-              ]}
-            />
-            <Text style={styles.statusText}>
-              {STATUS_LABELS[status]}
-              {moduleCount > 0 ? ` \u00B7 ${moduleCount} module${moduleCount !== 1 ? 's' : ''}` : ''}
-            </Text>
+          {/* Compact header: Orb + title + status on one line */}
+          <View style={styles.header}>
+            <Orb size={32} />
+            <Text style={styles.title}>Self</Text>
+            <View style={styles.statusBadge}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: STATUS_COLORS[status] },
+                ]}
+              />
+              <Text style={styles.statusText}>
+                {STATUS_LABELS[status]}
+                {moduleCount > 0 ? ` \u00B7 ${moduleCount}` : ''}
+              </Text>
+            </View>
           </View>
-
-          {/* Orb: agent state indicator */}
-          <Orb />
 
           {/* ChatThread: scrollable message list */}
           {initialized && <ChatThread />}
@@ -159,29 +178,41 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: tokens.colors.background,
+  },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    gap: tokens.spacing.sm,
   },
   title: {
     ...tokens.typography.title,
-    fontSize: 32,
     color: tokens.colors.text,
-    marginBottom: tokens.spacing.md,
+    lineHeight: 32, // Match Orb size (32px) for perfect vertical centering
   },
-  statusRow: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.sm,
-    marginBottom: tokens.spacing.md,
+    gap: 6,
+    marginLeft: 'auto',
   },
   statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   statusText: {
     ...tokens.typography.caption,

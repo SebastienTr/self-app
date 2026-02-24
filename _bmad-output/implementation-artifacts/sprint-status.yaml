@@ -69,12 +69,19 @@ development_status:
   # Epic 3: Autonomous Module Creation & Native Rendering (⚡ First Light)
   # FRs: FR9, FR10, FR11, FR17, FR18, FR28
   # ═══════════════════════════════════════════════════════════════
-  epic-3: in-progress
+  epic-3: done
   3-1-sdui-primitive-registry-and-simple-primitives: done
   3-2-composite-primitives-card-list: done
   3-3-module-rendering-pipeline: done
-  3-4-module-creation-end-to-end: backlog
-  epic-3-retrospective: optional
+  3-4-module-creation-end-to-end: done
+  epic-3-retrospective: done
+
+  # ═══════════════════════════════════════════════════════════════
+  # Preparation: Dev Tooling & Agent Autonomy (Critical Path)
+  # Source: Epic 3 Retrospective Action Item #1
+  # Blocker: Must complete before Epic 4 starts
+  # ═══════════════════════════════════════════════════════════════
+  prep-1-agent-dev-autonomy: ready-for-dev
 
   # ═══════════════════════════════════════════════════════════════
   # Epic 4: Module Data Freshness & Management (⚡ First Light + 🚀 MVP)

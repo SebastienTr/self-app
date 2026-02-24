@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { tokens } from '@/constants/tokens';
 
@@ -27,6 +28,7 @@ export interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState('');
+  const insets = useSafeAreaInsets();
 
   const canSend = value.trim().length > 0 && !disabled;
 
@@ -37,7 +39,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { marginBottom: Math.max(insets.bottom, tokens.spacing.sm) }]}>
       <TextInput
         style={styles.input}
         value={value}
@@ -77,7 +79,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
     marginHorizontal: tokens.spacing.md,
-    marginBottom: tokens.spacing.md,
   },
   input: {
     flex: 1,
