@@ -19,10 +19,12 @@ Architecture mandates:
   - Per-request DB connections (never session-scoped — see fix(1-5))
 """
 
+import asyncio
 import json
 import re
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import WebSocket
 
@@ -30,6 +32,121 @@ from app.db import get_connection
 from app.llm.base import LLMProvider, LLMResult
 from app.logging import log
 from app.modules import create_module
+
+# ---------------------------------------------------------------------------
+# SOUL.md — Agent Identity Persistence
+# ---------------------------------------------------------------------------
+
+_DEFAULT_SOUL_CONTENT = """\
+# Self — Agent Identity
+
+## Name
+Self
+
+## Personality
+You are Self, a thoughtful and capable AI assistant. You are warm but concise, \
+helpful but not overbearing. You speak naturally, like a knowledgeable friend \
+who genuinely wants to help.
+
+## Communication Style
+- Be conversational and natural — avoid sounding robotic or formulaic
+- Match the user's language (if they write in French, respond in French)
+- Keep responses concise unless the user asks for detail
+- Use a friendly, approachable tone
+- Never start responses with "I" — vary your sentence openings
+- Acknowledge the user's intent before jumping to solutions
+
+## Knowledge & Capabilities
+You can create native mobile modules (widgets) by discovering APIs and composing \
+UI primitives. When a user describes a need that maps to a data module (weather, \
+stocks, news, tracking, etc.), you create it autonomously.
+
+For regular conversation, you are helpful, honest, and direct. You don't pretend \
+to know things you don't.
+
+## Values
+- Respect the user's time — be efficient
+- Be honest about limitations
+- Prioritize the user's actual need over showing off
+- Remember that every API call costs the user money (BYOK) — be mindful of \
+token usage
+"""
+
+
+def _soul_path(data_dir: str) -> Path:
+    """Return the path to the SOUL.md file.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+
+    Returns:
+        Path object pointing to SOUL.md inside data_dir.
+    """
+    return Path(data_dir) / "SOUL.md"
+
+
+async def _ensure_default_soul(data_dir: str) -> str:
+    """Write the default SOUL.md content to disk and return it.
+
+    Creates the data directory if it does not exist.
+    Note: This function does NOT log — callers (load_soul) handle logging
+    before invoking this to distinguish first-creation vs regeneration.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+
+    Returns:
+        The default SOUL content string.
+    """
+    soul_file = _soul_path(data_dir)
+    await asyncio.to_thread(soul_file.parent.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(soul_file.write_text, _DEFAULT_SOUL_CONTENT, encoding="utf-8")
+    return _DEFAULT_SOUL_CONTENT
+
+
+async def load_soul(data_dir: str) -> str:
+    """Load the agent's SOUL identity from disk.
+
+    Reads data_dir/SOUL.md. If the file is missing, empty, or corrupted,
+    regenerates the default SOUL.md and returns default content.
+
+    This function is called on every chat message (no caching) so that
+    live edits to the file take effect immediately.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+
+    Returns:
+        The SOUL.md content string.
+    """
+    soul_file = _soul_path(data_dir)
+    try:
+        content = await asyncio.to_thread(soul_file.read_text, encoding="utf-8")
+        if not content.strip():
+            log.warning(
+                "soul_empty",
+                agent_action="SOUL.md was empty, regenerating default identity",
+            )
+            return await _ensure_default_soul(data_dir)
+        return content
+    except FileNotFoundError:
+        log.info(
+            "soul_not_found",
+            agent_action="Creating default SOUL.md for first boot",
+        )
+        return await _ensure_default_soul(data_dir)
+    except (OSError, UnicodeDecodeError) as e:
+        log.warning(
+            "soul_read_failed",
+            error=str(e),
+            agent_action="SOUL.md corrupted, regenerating default identity",
+        )
+        return await _ensure_default_soul(data_dir)
+
+
+# ---------------------------------------------------------------------------
+# Module Spec Extraction & Prompt Assembly
+# ---------------------------------------------------------------------------
 
 # Required fields for a valid module spec from the LLM
 _REQUIRED_SPEC_FIELDS = {"name", "type", "template", "data_sources", "refresh_interval", "schema_version", "accessible_label"}
@@ -117,20 +234,27 @@ def _extract_chat_text(content: str) -> str:
     return text
 
 
-def _build_module_prompt(message: str) -> str:
+def _build_module_prompt(message: str, soul_content: str) -> str:
     """Build the prompt for the LLM that enables module creation.
 
-    Includes system instructions for module creation, schema requirements,
-    and examples. The LLM will respond with both conversational text and
-    a JSON module spec code block when appropriate.
+    Includes the agent's SOUL identity, system instructions for module creation,
+    schema requirements, and examples. The LLM will respond with both
+    conversational text and a JSON module spec code block when appropriate.
 
     Args:
-        message: The user's chat message.
+        message:      The user's chat message.
+        soul_content: The SOUL.md content for agent identity.
 
     Returns:
         The full prompt string for the LLM provider.
     """
-    return f"""You are Self, an AI agent that creates native mobile modules. When the user describes a need that can be fulfilled by a data module (data tracking, monitoring, dashboards, weather, stocks, news, etc.), respond with BOTH:
+    return f"""# Agent Identity
+
+{soul_content}
+
+# Instructions
+
+You are Self, an AI agent that creates native mobile modules. When the user describes a need that can be fulfilled by a data module (data tracking, monitoring, dashboards, weather, stocks, news, etc.), respond with BOTH:
 1. A conversational acknowledgment (friendly, brief)
 2. A valid module spec JSON block wrapped in ```json ... ```
 
@@ -369,8 +493,12 @@ async def handle_chat(
     await ws.send_json({"type": "status", "payload": {"state": "thinking"}})
 
     try:
-        # Build prompt with module creation instructions
-        prompt = _build_module_prompt(message)
+        # Load agent identity from SOUL.md (read on every request, no caching)
+        data_dir = str(Path(db_path).parent)
+        soul_content = await load_soul(data_dir)
+
+        # Build prompt with SOUL identity and module creation instructions
+        prompt = _build_module_prompt(message, soul_content)
 
         # Call provider with the enriched prompt
         result = await provider.execute(prompt=prompt)

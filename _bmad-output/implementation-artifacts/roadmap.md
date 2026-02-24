@@ -1,17 +1,17 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-24T14:00 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-24T18:00 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 4 · Story 2.2 · BACKLOG                              ║
+║  WAVE 4 · Story 2.3 · BACKLOG                              ║
 ║  Next milestone: First Light Complete                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓▓░░░░░░░░░░░░░░░]  13/57 done (23%)
+TOTAL   [▓▓▓▓▓░░░░░░░░░░░░░░░]  14/57 done (25%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
@@ -19,7 +19,7 @@ W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE      
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
 W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro ✓
 PP  Preparation    ▓                           1/1   ✓ DONE
-W4  Backfill       ······                      0/6   << ICI        🔄 E2+E4, First Light retro
+W4  Backfill       ▓·····                      1/6   << ICI        🔄 E2+E4, First Light retro
 W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
 W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
 W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
@@ -27,7 +27,7 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
-E2  Conversation   ▓···       1/4  <<    ┐
+E2  Conversation   ▓▓··       2/4  <<    ┐
 E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
 E4  Freshness      ···        0/3         ┘
 PP  Preparation    ▓          1/1  ✓   (critical path cleared)
@@ -163,7 +163,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 > Objectif: terminer le socle "First Light" laissé de côté pour débloquer proprement memory, onboarding, lifecycle et proactivité.
 > Sortie attendue: First Light complet avec dépendances critiques levées pour accélérer les waves MVP suivantes.
 
-- `[ ]` **2.2** — Agent Identity Persistence (SOUL.md) — *blocks Epic 5*
+- `[x]` **2.2** — Agent Identity Persistence (SOUL.md) — *blocks Epic 5*
 - `[ ]` **2.3** — Persona Preset Selection — *blocks Epic 6*
 - `[ ]` **2.4** — Contextual Empty State
 - `[ ]` **4.1** — Cron-Based Background Refresh — *blocks 4.2, 10.1*
