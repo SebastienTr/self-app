@@ -32,7 +32,7 @@ Most apps decide what you can do before you open them. Self flips that:
 | Layer | Technology |
 |-------|-----------|
 | Mobile | React Native (Expo SDK 54) |
-| Backend | Python 3.14 / FastAPI |
+| Backend | Python 3.12+ / FastAPI |
 | Database | SQLite (WAL) + sqlite-vec |
 | State | Zustand |
 | Schema | Zod → TypeScript types → Pydantic models |
@@ -79,7 +79,7 @@ self-app/
 
 - **Node.js** 22+
 - **pnpm** 10.30+ (`corepack enable`)
-- **Python** 3.14+ with [uv](https://docs.astral.sh/uv/)
+- **Python** 3.12+ with [uv](https://docs.astral.sh/uv/)
 - **Expo Go** on your mobile device (for development)
 
 ### Install & Run
