@@ -261,7 +261,7 @@ class TestClaudeCodeCLI:
 
     def test_build_command(self, claude_cli):
         cmd = claude_cli._build_command("hello world")
-        assert cmd == ["claude", "-p", "hello world", "--output-format", "json"]
+        assert cmd == ["claude", "-p", "hello world", "--output-format", "json", "--model", "claude-sonnet-4-6"]
 
     def test_parse_output(self, claude_cli):
         stdout = (
