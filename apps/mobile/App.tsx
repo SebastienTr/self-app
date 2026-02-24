@@ -62,9 +62,15 @@ export default function App() {
       ]);
 
       const authStore = useAuthStore.getState();
-      if (token && backendUrl) {
+      // In dev, prefer env var URL over stored URL (handles tunnel mode)
+      const effectiveUrl =
+        __DEV__ && process.env.EXPO_PUBLIC_DEV_BACKEND_URL
+          ? process.env.EXPO_PUBLIC_DEV_BACKEND_URL
+          : backendUrl;
+
+      if (token && effectiveUrl) {
         authStore.setSessionToken(token);
-        authStore.setBackendUrl(backendUrl);
+        authStore.setBackendUrl(effectiveUrl);
         authStore.setAuthStatus('authenticating');
       }
 
@@ -87,8 +93,8 @@ export default function App() {
       });
 
       // 6. Connect to WebSocket if session is configured
-      if (token && backendUrl) {
-        connect(backendUrl);
+      if (token && effectiveUrl) {
+        connect(effectiveUrl);
       }
     }
 

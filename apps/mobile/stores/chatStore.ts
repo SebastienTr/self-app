@@ -14,6 +14,18 @@ import { create } from 'zustand';
 
 import type { AgentState } from '@/types/ws';
 
+/** UUID v4 with crypto.randomUUID() fallback for older Hermes engines. */
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'agent';
@@ -58,7 +70,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       messages: [
         ...state.messages,
         {
-          id: crypto.randomUUID(),
+          id: uuid(),
           role: 'user',
           content,
           timestamp: new Date().toISOString(),
@@ -83,7 +95,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         return { agentStatus: 'idle' as AgentStatus };
       }
       const finalMessage: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         role: 'agent',
         content: state.streamingMessage,
         timestamp: new Date().toISOString(),
@@ -100,7 +112,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       messages: [
         ...state.messages,
         {
-          id: crypto.randomUUID(),
+          id: uuid(),
           role: 'agent',
           content: message,
           timestamp: new Date().toISOString(),

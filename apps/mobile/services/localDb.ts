@@ -15,9 +15,16 @@ import type { CachedModule } from '@/types/module';
 import type { ModuleSpec, WSMessage } from '@/types/ws';
 import { logger } from './logger';
 
-// --- Database instance (lazy-initialized) ---
+// --- Database instance (lazy-initialized on first use) ---
 
-const db = openDatabaseSync('self-cache.db');
+let _db: ReturnType<typeof openDatabaseSync> | null = null;
+
+function getDb() {
+  if (!_db) {
+    _db = openDatabaseSync('self-cache.db');
+  }
+  return _db;
+}
 
 // --- Schema initialization ---
 
@@ -27,7 +34,7 @@ const db = openDatabaseSync('self-cache.db');
  */
 export async function initLocalDb(): Promise<void> {
   try {
-    await db.execAsync(
+    await getDb().execAsync(
       `CREATE TABLE IF NOT EXISTS modules_cache (
         module_id TEXT PRIMARY KEY,
         spec TEXT NOT NULL,
@@ -37,7 +44,7 @@ export async function initLocalDb(): Promise<void> {
       )`,
     );
 
-    await db.execAsync(
+    await getDb().execAsync(
       `CREATE TABLE IF NOT EXISTS pending_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         message TEXT NOT NULL,
@@ -70,7 +77,7 @@ export async function cacheModule(
 ): Promise<void> {
   const cachedAt = new Date().toISOString();
   try {
-    await db.runAsync(
+    await getDb().runAsync(
       'INSERT OR REPLACE INTO modules_cache (module_id, spec, status, updated_at, cached_at) VALUES (?, ?, ?, ?, ?)',
       [moduleId, JSON.stringify(spec), status, updatedAt, cachedAt],
     );
@@ -89,7 +96,7 @@ export async function cacheModule(
  */
 export async function getCachedModules(): Promise<CachedModule[]> {
   try {
-    return await db.getAllAsync<CachedModule>(
+    return await getDb().getAllAsync<CachedModule>(
       'SELECT * FROM modules_cache ORDER BY updated_at DESC',
     );
   } catch (err) {
@@ -106,7 +113,7 @@ export async function getCachedModules(): Promise<CachedModule[]> {
  */
 export async function removeCachedModule(moduleId: string): Promise<void> {
   try {
-    await db.runAsync('DELETE FROM modules_cache WHERE module_id = ?', [moduleId]);
+    await getDb().runAsync('DELETE FROM modules_cache WHERE module_id = ?', [moduleId]);
   } catch (err) {
     logger.error('localDb', 'remove_cached_module_failed', {
       module_id: moduleId,
@@ -122,7 +129,7 @@ export async function removeCachedModule(moduleId: string): Promise<void> {
  */
 export async function clearModulesCache(): Promise<void> {
   try {
-    await db.runAsync('DELETE FROM modules_cache');
+    await getDb().runAsync('DELETE FROM modules_cache');
   } catch (err) {
     logger.error('localDb', 'clear_modules_cache_failed', {
       error: String(err),
@@ -140,7 +147,7 @@ export async function clearModulesCache(): Promise<void> {
 export async function enqueuePendingMessage(msg: WSMessage): Promise<void> {
   const createdAt = new Date().toISOString();
   try {
-    await db.runAsync('INSERT INTO pending_messages (message, created_at) VALUES (?, ?)', [
+    await getDb().runAsync('INSERT INTO pending_messages (message, created_at) VALUES (?, ?)', [
       JSON.stringify(msg),
       createdAt,
     ]);
@@ -166,7 +173,7 @@ export async function enqueuePendingMessage(msg: WSMessage): Promise<void> {
  */
 export async function dequeuePendingMessages(): Promise<WSMessage[]> {
   try {
-    const rows = await db.getAllAsync<{ id: number; message: string; created_at: string }>(
+    const rows = await getDb().getAllAsync<{ id: number; message: string; created_at: string }>(
       'SELECT * FROM pending_messages ORDER BY id ASC',
     );
 
@@ -175,7 +182,7 @@ export async function dequeuePendingMessages(): Promise<WSMessage[]> {
       // Delete only the rows we just read (by max id) to avoid deleting
       // messages enqueued concurrently between the SELECT and DELETE.
       const maxId = rows[rows.length - 1].id;
-      await db.runAsync('DELETE FROM pending_messages WHERE id <= ?', [maxId]);
+      await getDb().runAsync('DELETE FROM pending_messages WHERE id <= ?', [maxId]);
       logger.info('localDb', 'messages_dequeued', {
         count: rows.length,
       });
@@ -196,7 +203,7 @@ export async function dequeuePendingMessages(): Promise<WSMessage[]> {
  */
 export async function clearPendingMessages(): Promise<void> {
   try {
-    await db.runAsync('DELETE FROM pending_messages');
+    await getDb().runAsync('DELETE FROM pending_messages');
   } catch (err) {
     logger.error('localDb', 'clear_pending_messages_failed', {
       error: String(err),
@@ -210,7 +217,7 @@ export async function clearPendingMessages(): Promise<void> {
  */
 export async function getPendingMessageCount(): Promise<number> {
   try {
-    const result = await db.getFirstAsync<{ count: number }>(
+    const result = await getDb().getFirstAsync<{ count: number }>(
       'SELECT COUNT(*) as count FROM pending_messages',
     );
     return result?.count ?? 0;
