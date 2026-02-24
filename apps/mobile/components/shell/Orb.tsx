@@ -24,9 +24,13 @@ import { tokens } from '@/constants/tokens';
 import { useChatStore } from '@/stores/chatStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 
-const ORB_SIZE = 60;
+const DEFAULT_SIZE = 60;
 
-export function Orb() {
+export interface OrbProps {
+  size?: number;
+}
+
+export function Orb({ size = DEFAULT_SIZE }: OrbProps) {
   const agentStatus = useChatStore((s) => s.agentStatus);
   const connectionStatus = useConnectionStore((s) => s.status);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -100,10 +104,17 @@ export function Orb() {
         ? 'Agent status: idle'
         : `Agent status: ${agentStatus}`;
 
+  const orbStyle = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: tokens.colors.accent,
+  };
+
   if (reduceMotion) {
     return (
       <View
-        style={styles.orbStatic}
+        style={orbStyle}
         accessibilityLabel={accessibilityLabel}
       />
     );
@@ -111,25 +122,8 @@ export function Orb() {
 
   return (
     <Animated.View
-      style={[styles.orb, { transform: [{ scale: scaleAnim }] }]}
+      style={[orbStyle, { transform: [{ scale: scaleAnim }] }]}
       accessibilityLabel={accessibilityLabel}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  orb: {
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    borderRadius: ORB_SIZE / 2,
-    backgroundColor: tokens.colors.accent, // #E8A84C amber
-    alignSelf: 'center',
-  },
-  orbStatic: {
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    borderRadius: ORB_SIZE / 2,
-    backgroundColor: tokens.colors.accent,
-    alignSelf: 'center',
-  },
-});

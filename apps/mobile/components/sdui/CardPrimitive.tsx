@@ -12,7 +12,6 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { tokens } from '@/constants/tokens';
-import { getPrimitive } from './registry';
 
 /** Shape of a child primitive within a card spec. */
 export interface PrimitiveChild {
@@ -52,6 +51,8 @@ export function CardPrimitive({
       ) : null}
       {safeChildren.map((child, index) => {
         const childType = child?.type ?? '';
+        // Lazy require to break circular dependency: registry → CardPrimitive → registry
+        const { getPrimitive } = require('./registry') as typeof import('./registry');
         const Component = getPrimitive(childType);
         return <Component key={index} {...child} />;
       })}
