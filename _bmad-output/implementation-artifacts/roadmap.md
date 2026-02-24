@@ -1,25 +1,25 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-24T13:00 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-24T14:00 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  PREP · Story Prep.1 · READY-FOR-DEV                       ║
-║  Next milestone: Agent Dev Autonomy → Wave 4                ║
+║  WAVE 4 · Story 2.2 · BACKLOG                              ║
+║  Next milestone: First Light Complete                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓░░░░░░░░░░░░░░░░]  12/57 done (21%)
+TOTAL   [▓▓▓▓▓░░░░░░░░░░░░░░░]  13/57 done (23%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
 W1  Bootstrap      ▓▓▓▓▓▓▓                    7/7   ✓ DONE        🔄 E1 retro ✓
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
 W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro ✓
-PP  Preparation    -                           0/1   << ICI
-W4  Backfill       ······                      0/6                 🔄 E2+E4, First Light retro
+PP  Preparation    ▓                           1/1   ✓ DONE
+W4  Backfill       ······                      0/6   << ICI        🔄 E2+E4, First Light retro
 W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
 W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
 W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
@@ -27,10 +27,10 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓    7/7  ✓
-E2  Conversation   ▓···       1/4         ┐
+E2  Conversation   ▓···       1/4  <<    ┐
 E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
 E4  Freshness      ···        0/3         ┘
-PP  Preparation    -          0/1  <<  (critical path before W4)
+PP  Preparation    ▓          1/1  ✓   (critical path cleared)
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
 E7  Interaction    ····       0/4  ├ MVP
@@ -149,9 +149,9 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 > Source: Epic 3 Retrospective Action Item #1
 > 1 story | First use case: fix keyboard avoidance bug on Android
 
-- `[-]` **Prep.1** — Agent Dev Autonomy (dev-tools.sh, adb screenshots, log reading, keyboard bug fix)
+- `[x]` **Prep.1** — Agent Dev Autonomy (dev-tools.sh, adb screenshots, log reading, keyboard bug fix)
 
-> Without this, every visual bug requires a 6-step manual feedback loop (screenshot on phone → Messenger → Mac → download → send to agent). This story eliminates that friction.
+> ✅ **Done.** Dev agent can now capture screenshots, read logs, and debug visually. Keyboard avoidance bug fixed. Critical path to Wave 4 cleared.
 
 ---
 

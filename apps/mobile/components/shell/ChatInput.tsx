@@ -11,6 +11,8 @@
 
 import { useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +22,19 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { tokens } from '@/constants/tokens';
+
+/**
+ * Keyboard avoidance strategy:
+ *
+ * With Android edge-to-edge enabled (Expo SDK 54), adjustResize no longer
+ * automatically pushes content above the keyboard. We wrap the ChatInput
+ * container in a KeyboardAvoidingView:
+ *   - iOS: behavior="padding" — adds padding equal to keyboard height
+ *   - Android: behavior="height" — shrinks the view height
+ *
+ * This is a zero-dependency solution using built-in React Native components.
+ * If more robust behavior is needed later, migrate to react-native-keyboard-controller.
+ */
 
 export interface ChatInputProps {
   onSend: (message: string) => void;
@@ -39,32 +54,36 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   }
 
   return (
-    <View style={[styles.container, { marginBottom: Math.max(insets.bottom, tokens.spacing.sm) }]}>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={setValue}
-        placeholder="Message..."
-        placeholderTextColor={tokens.colors.textSecondary}
-        editable={!disabled}
-        accessibilityLabel="Message input"
-        multiline={false}
-        returnKeyType="send"
-        onSubmitEditing={handleSend}
-      />
-      <TouchableOpacity
-        style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-        onPress={handleSend}
-        disabled={!canSend}
-        accessibilityLabel="Send message"
-        accessibilityState={{ disabled: !canSend }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Text style={[styles.sendIcon, !canSend && styles.sendIconDisabled]}>
-          ▶
-        </Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={[styles.container, { marginBottom: Math.max(insets.bottom, tokens.spacing.sm) }]}>
+        <TextInput
+          style={styles.input}
+          value={value}
+          onChangeText={setValue}
+          placeholder="Message..."
+          placeholderTextColor={tokens.colors.textSecondary}
+          editable={!disabled}
+          accessibilityLabel="Message input"
+          multiline={false}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
+        />
+        <TouchableOpacity
+          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+          onPress={handleSend}
+          disabled={!canSend}
+          accessibilityLabel="Send message"
+          accessibilityState={{ disabled: !canSend }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.sendIcon, !canSend && styles.sendIconDisabled]}>
+            ▶
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
