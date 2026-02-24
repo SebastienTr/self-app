@@ -166,7 +166,9 @@ class TestAuthWithValidToken:
         with auth_client.websocket_connect("/ws") as ws:
             # Authenticate
             ws.send_json({"type": "auth", "payload": {"token": "valid-token"}})
-            # No error response means success — send a real message
+            ack = ws.receive_json()  # status:idle after auth
+            assert ack == {"type": "status", "payload": {"state": "idle"}}
+            # Send a real message
             ws.send_json({"type": "chat", "payload": {"message": "hello"}})
             response = ws.receive_json()
             # Story 2.1: first response is now status:thinking (not chat_stream)
@@ -180,6 +182,7 @@ class TestAuthWithValidToken:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "seen-token"}})
+            ws.receive_json()  # status:idle after auth
             # Send a message to ensure auth was processed
             ws.send_json({"type": "sync", "payload": {}})
             ws.receive_json()
@@ -223,7 +226,8 @@ class TestAuthWithPairingToken:
                 "type": "auth",
                 "payload": {"token": session_token, "pairing_token": pairing_token},
             })
-            # No error = success. Verify by sending a real message.
+            ws.receive_json()  # status:idle after auth
+            # Verify by sending a real message.
             ws.send_json({"type": "chat", "payload": {"message": "paired!"}})
             response = ws.receive_json()
             # Story 2.1: first response is status:thinking (not chat_stream)
@@ -244,6 +248,7 @@ class TestAuthWithPairingToken:
                 "type": "auth",
                 "payload": {"token": str(uuid.uuid4()), "pairing_token": pairing_token},
             })
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "sync", "payload": {}})
             ws.receive_json()
 
@@ -273,6 +278,7 @@ class TestAuthReset:
         with auth_client.websocket_connect("/ws") as ws:
             # Authenticate first
             ws.send_json({"type": "auth", "payload": {"token": "reset-me"}})
+            ws.receive_json()  # status:idle after auth
             # Now reset
             ws.send_json({"type": "auth_reset", "payload": {}})
             response = ws.receive_json()
@@ -285,8 +291,9 @@ class TestAuthReset:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "old-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "auth_reset", "payload": {}})
-            ws.receive_json()  # status response
+            ws.receive_json()  # status response from reset
 
         # Old token should be gone
         old = _get_session(test_settings.db_path, "old-token")
@@ -311,8 +318,8 @@ class TestReconnection:
         # First connection
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "persist-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "chat", "payload": {"message": "first"}})
-            # Story 2.1: first response is status:thinking (agent.handle_chat)
             r = ws.receive_json()
             assert r["type"] == "status"
             assert r["payload"]["state"] == "thinking"
@@ -320,6 +327,7 @@ class TestReconnection:
         # Second connection (simulates reconnect)
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "persist-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "chat", "payload": {"message": "second"}})
             r = ws.receive_json()
             assert r["type"] == "status"
@@ -331,6 +339,7 @@ class TestReconnection:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "reconnect-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "sync", "payload": {}})
             ws.receive_json()
 

@@ -11,6 +11,12 @@ set -euo pipefail
 #   status             Check backend health, Metro, adb device
 #   device-info        Show connected device details
 #   clear-logs         Clear logcat buffer
+#   tap X Y            Simulate tap at screen coordinates
+#   input-text TEXT     Type text into focused field
+#   key KEYCODE         Send key event (BACK, HOME, ENTER, etc.)
+#   swipe X1 Y1 X2 Y2  Swipe gesture (scroll, dismiss)
+#   ui-tree             Dump UI accessibility tree (element hierarchy)
+#   reload              Trigger React Native hot reload
 #   emulator-start     Boot Android emulator (headless, no window)
 #   emulator-stop      Kill the Android emulator
 #   app-launch         All-in-one: emulator + backend + app on emulator
@@ -228,6 +234,89 @@ cmd_clear_logs() {
   log_ok "Logcat buffer cleared"
 }
 
+# ── Interaction commands ──────────────────────────────────────────
+
+cmd_tap() {
+  require_device
+  if [[ $# -lt 2 ]]; then
+    log_err "Usage: ./dev-tools.sh tap <x> <y>"
+    exit 1
+  fi
+  local x="$1" y="$2"
+  adb shell input tap "$x" "$y"
+  log_ok "Tapped at ($x, $y)"
+}
+
+cmd_input_text() {
+  require_device
+  if [[ $# -lt 1 ]]; then
+    log_err "Usage: ./dev-tools.sh input-text <text>"
+    exit 1
+  fi
+  local text="$1"
+  # Replace spaces with %s for adb input (spaces are not supported directly)
+  adb shell input text "${text// /%s}"
+  log_ok "Typed: $text"
+}
+
+cmd_key() {
+  require_device
+  if [[ $# -lt 1 ]]; then
+    log_err "Usage: ./dev-tools.sh key <KEYCODE>"
+    log "Common keycodes: BACK, HOME, ENTER, DEL, TAB, DPAD_UP, DPAD_DOWN"
+    exit 1
+  fi
+  local key="$1"
+  # Allow short names without KEYCODE_ prefix
+  if [[ "$key" != KEYCODE_* ]]; then
+    key="KEYCODE_$key"
+  fi
+  adb shell input keyevent "$key"
+  log_ok "Sent key: $key"
+}
+
+cmd_swipe() {
+  require_device
+  if [[ $# -lt 4 ]]; then
+    log_err "Usage: ./dev-tools.sh swipe <x1> <y1> <x2> <y2> [duration_ms]"
+    log "Example: ./dev-tools.sh swipe 540 1500 540 500  (scroll up)"
+    exit 1
+  fi
+  local x1="$1" y1="$2" x2="$3" y2="$4" dur="${5:-300}"
+  adb shell input swipe "$x1" "$y1" "$x2" "$y2" "$dur"
+  log_ok "Swiped ($x1,$y1) → ($x2,$y2) [${dur}ms]"
+}
+
+cmd_ui_tree() {
+  require_device
+  local dump_file="/sdcard/ui-dump.xml"
+  local local_file="$RUN_DIR/ui-tree.xml"
+
+  log "Dumping UI hierarchy..."
+  adb shell uiautomator dump "$dump_file" 2>/dev/null
+  adb pull "$dump_file" "$local_file" 2>/dev/null
+  adb shell rm "$dump_file" 2>/dev/null
+
+  if [[ -f "$local_file" ]] && [[ -s "$local_file" ]]; then
+    log_ok "UI tree saved: .run/ui-tree.xml"
+    # Print a summary: extract text and content-desc attributes for quick scan
+    log "Element summary (text / content-desc):"
+    grep -oE '(text|content-desc)="[^"]*"' "$local_file" | grep -v '=""' | head -40 || true
+    echo ".run/ui-tree.xml"
+  else
+    log_err "UI tree dump failed"
+    exit 1
+  fi
+}
+
+cmd_reload() {
+  require_device
+  log "Triggering React Native reload..."
+  # Double-tap 'R' via adb to trigger fast refresh in dev mode
+  adb shell input keyevent 46 && adb shell input keyevent 46
+  log_ok "Reload triggered (double-R)"
+}
+
 # ── Emulator commands ─────────────────────────────────────────────
 
 cmd_emulator_start() {
@@ -347,7 +436,7 @@ cmd_app_launch() {
   # 6. Launch metro + install Expo Go + open on emulator
   log "Launching app on emulator (first run installs Expo Go automatically)..."
   cd "$ROOT_DIR/apps/mobile"
-  npx expo start --android --no-dev --no-minify 2>&1 | sed -u "s/^/${GREEN}[expo]${NC} /" &
+  npx expo start --android 2>&1 | sed -u "s/^/${GREEN}[expo]${NC} /" &
   local expo_pid=$!
   echo "$expo_pid" > "$RUN_DIR/expo-agent.pid"
   cd "$ROOT_DIR"
@@ -415,6 +504,14 @@ show_help() {
   echo "  device-info        Show connected device details"
   echo "  clear-logs         Clear logcat buffer"
   echo ""
+  echo "Interaction commands:"
+  echo "  tap X Y            Simulate tap at screen coordinates"
+  echo "  input-text TEXT    Type text into the focused field"
+  echo "  key KEYCODE        Send key event (BACK, HOME, ENTER, DEL, TAB)"
+  echo "  swipe X1 Y1 X2 Y2 Swipe gesture (scroll, drag)"
+  echo "  ui-tree            Dump UI accessibility tree to .run/ui-tree.xml"
+  echo "  reload             Trigger React Native hot reload"
+  echo ""
   echo "Emulator commands:"
   echo "  emulator-start     Boot Android emulator (headless, no window)"
   echo "  emulator-stop      Kill the Android emulator"
@@ -427,8 +524,14 @@ show_help() {
   echo "Agent workflow:"
   echo "  ./dev-tools.sh app-launch          # Boot emulator + start everything"
   echo "  ./dev-tools.sh screenshot          # Capture & analyze screen"
+  echo "  ./dev-tools.sh ui-tree             # Inspect element hierarchy"
+  echo "  ./dev-tools.sh tap 540 960         # Tap on a UI element"
+  echo "  ./dev-tools.sh input-text 'hello'  # Type into focused field"
+  echo "  ./dev-tools.sh key BACK            # Navigate back / dismiss keyboard"
   echo "  ./dev-tools.sh logs                # Read JS logs"
-  echo "  # ... fix code, wait for hot reload ..."
+  echo "  ./dev-tools.sh logs --errors       # Check for errors only"
+  echo "  # ... fix code ..."
+  echo "  ./dev-tools.sh reload              # Hot reload after changes"
   echo "  ./dev-tools.sh screenshot          # Verify fix"
   echo "  ./dev-tools.sh app-stop            # Clean up"
 }
@@ -445,6 +548,12 @@ case "$1" in
   status)          cmd_status ;;
   device-info)     cmd_device_info ;;
   clear-logs)      cmd_clear_logs ;;
+  tap)             shift; cmd_tap "$@" ;;
+  input-text)      shift; cmd_input_text "$@" ;;
+  key)             shift; cmd_key "$@" ;;
+  swipe)           shift; cmd_swipe "$@" ;;
+  ui-tree)         cmd_ui_tree ;;
+  reload)          cmd_reload ;;
   emulator-start)  cmd_emulator_start ;;
   emulator-stop)   cmd_emulator_stop ;;
   app-launch)      cmd_app_launch ;;

@@ -1,20 +1,27 @@
 /**
- * Keyboard avoidance tests for ChatInput shell component — TEA prep-1 expansion.
+ * Keyboard-aware margin tests for ChatInput shell component.
  *
- * Covers KeyboardAvoidingView integration paths NOT exercised by existing tests:
- *   - [P0] Platform-specific behavior prop (iOS='padding', Android='height')
- *   - [P1] KAV wraps the input container (structural relationship)
- *   - [P1] Safe area insets margin calculation with non-zero bottom inset
- *   - [P2] KAV does not break accessibility labels
- *   - [P2] KAV is present even when component is disabled
- *   - [P2] Safe area insets edge: zero bottom inset uses spacing.sm fallback
- *   - [P2] Safe area insets edge: large bottom inset used over spacing.sm
+ * ChatInput adjusts its bottom margin based on keyboard visibility:
+ *   - Keyboard hidden: marginBottom = Math.max(insets.bottom, spacing.sm)
+ *   - Keyboard visible: marginBottom = spacing.xs (4)
+ *
+ * KAV (KeyboardAvoidingView) lives at App.tsx level, not in ChatInput.
+ * These tests verify the margin adaptation only.
  */
 
 import React from 'react';
-import { Platform } from 'react-native';
-import { render, within } from '@testing-library/react-native';
+import { Keyboard, Platform } from 'react-native';
+import { render, act } from '@testing-library/react-native';
 import { ChatInput } from './ChatInput';
+
+// Capture keyboard event listeners so tests can trigger them
+type ListenerCallback = () => void;
+const keyboardListeners: Record<string, ListenerCallback> = {};
+
+jest.spyOn(Keyboard, 'addListener').mockImplementation((event: string, callback: any) => {
+  keyboardListeners[event] = callback;
+  return { remove: jest.fn() } as any;
+});
 
 // Default insets mock — can be overridden per test
 const mockUseSafeAreaInsets = jest.fn(() => ({
@@ -28,170 +35,134 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockUseSafeAreaInsets(),
 }));
 
-describe('ChatInput — keyboard avoidance', () => {
+/** Helper: extract the flattened marginBottom from the container View. */
+function getContainerMarginBottom(getByLabelText: any): number | undefined {
+  const containerView = getByLabelText('Message input').parent?.parent;
+  expect(containerView).toBeTruthy();
+  const flatStyle = containerView?.props?.style;
+  const styles = Array.isArray(flatStyle) ? Object.assign({}, ...flatStyle) : flatStyle;
+  return styles?.marginBottom;
+}
+
+describe('ChatInput — keyboard-aware margin', () => {
+  const originalOS = Platform.OS;
+
   beforeEach(() => {
-    mockUseSafeAreaInsets.mockReturnValue({
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-    });
+    mockUseSafeAreaInsets.mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+    // Clear captured listeners
+    Object.keys(keyboardListeners).forEach((k) => delete keyboardListeners[k]);
   });
 
-  describe('[P0] platform-specific behavior prop', () => {
-    const originalOS = Platform.OS;
-
-    afterEach(() => {
-      // Restore original Platform.OS after each test
-      Object.defineProperty(Platform, 'OS', { value: originalOS });
-    });
-
-    it('uses behavior="padding" on iOS', () => {
-      // Given: platform is iOS
-      Object.defineProperty(Platform, 'OS', { value: 'ios' });
-
-      // When: ChatInput renders
-      const { UNSAFE_getByType } = render(<ChatInput onSend={jest.fn()} />);
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-
-      // Then: behavior is 'padding' for iOS keyboard handling
-      expect(kav.props.behavior).toBe('padding');
-    });
-
-    it('uses behavior="height" on Android', () => {
-      // Given: platform is Android
-      Object.defineProperty(Platform, 'OS', { value: 'android' });
-
-      // When: ChatInput renders
-      const { UNSAFE_getByType } = render(<ChatInput onSend={jest.fn()} />);
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-
-      // Then: behavior is 'height' for Android edge-to-edge keyboard handling
-      expect(kav.props.behavior).toBe('height');
-    });
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: originalOS });
   });
 
-  describe('[P1] KAV wraps the input container', () => {
-    it('KeyboardAvoidingView is the outermost rendered element', () => {
-      // Given: ChatInput renders
-      const { UNSAFE_getByType } = render(<ChatInput onSend={jest.fn()} />);
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-
-      // Then: the KAV contains the message input (structural verification)
-      const inputInKav = within(kav).getByLabelText('Message input');
-      expect(inputInKav).toBeTruthy();
-    });
-
-    it('KeyboardAvoidingView wraps the send button', () => {
-      // Given: ChatInput renders
-      const { UNSAFE_getByType } = render(<ChatInput onSend={jest.fn()} />);
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-
-      // Then: the KAV contains the send button
-      const sendButtonInKav = within(kav).getByLabelText('Send message');
-      expect(sendButtonInKav).toBeTruthy();
-    });
-  });
-
-  describe('[P1] safe area insets margin calculation', () => {
-    it('uses bottom inset when larger than spacing.sm (8)', () => {
-      // Given: device has a large bottom safe area (e.g., iPhone notch = 34)
-      mockUseSafeAreaInsets.mockReturnValue({
-        top: 47,
-        bottom: 34,
-        left: 0,
-        right: 0,
-      });
-
-      // When: ChatInput renders
-      const { UNSAFE_getByType } = render(<ChatInput onSend={jest.fn()} />);
-      const { View } = require('react-native');
-
-      // Then: the container View uses the larger inset as marginBottom
+  describe('[P0] margin when keyboard is hidden (default)', () => {
+    it('uses insets.bottom when larger than spacing.sm (8)', () => {
+      mockUseSafeAreaInsets.mockReturnValue({ top: 47, bottom: 34, left: 0, right: 0 });
+      const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
       // Math.max(34, 8) = 34
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-      const containerView = within(kav).getByLabelText('Message input').parent?.parent;
-
-      // Find the View with marginBottom style — traverse up from input
-      expect(containerView).toBeTruthy();
-      const flatStyle = containerView?.props?.style;
-      // Style may be an array; flatten to find marginBottom
-      const styles = Array.isArray(flatStyle) ? Object.assign({}, ...flatStyle) : flatStyle;
-      expect(styles?.marginBottom).toBe(34);
+      expect(getContainerMarginBottom(getByLabelText)).toBe(34);
     });
 
-    it('uses spacing.sm (8) when bottom inset is zero', () => {
-      // Given: device has no bottom safe area (e.g., standard Android phone)
-      mockUseSafeAreaInsets.mockReturnValue({
-        top: 24,
-        bottom: 0,
-        left: 0,
-        right: 0,
-      });
-
-      // When: ChatInput renders
-      const { UNSAFE_getByType } = render(<ChatInput onSend={jest.fn()} />);
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-      const containerView = within(kav).getByLabelText('Message input').parent?.parent;
-
-      // Then: Math.max(0, 8) = 8
-      expect(containerView).toBeTruthy();
-      const flatStyle = containerView?.props?.style;
-      const styles = Array.isArray(flatStyle) ? Object.assign({}, ...flatStyle) : flatStyle;
-      expect(styles?.marginBottom).toBe(8);
+    it('falls back to spacing.sm (8) when insets.bottom is zero', () => {
+      mockUseSafeAreaInsets.mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
+      const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
+      // Math.max(0, 8) = 8
+      expect(getContainerMarginBottom(getByLabelText)).toBe(8);
     });
   });
 
-  describe('[P2] accessibility through KAV wrapper', () => {
-    it('Message input label is accessible through KAV', () => {
-      // Given: ChatInput wrapped in KAV
-      // When: rendered
+  describe('[P0] margin when keyboard is visible', () => {
+    it('uses spacing.xs (4) when keyboard shows on Android', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      mockUseSafeAreaInsets.mockReturnValue({ top: 0, bottom: 48, left: 0, right: 0 });
       const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
 
-      // Then: accessibility labels are reachable (KAV does not break a11y tree)
-      expect(getByLabelText('Message input')).toBeTruthy();
+      // Simulate keyboard show
+      act(() => { keyboardListeners['keyboardDidShow']?.(); });
+
+      expect(getContainerMarginBottom(getByLabelText)).toBe(4);
     });
 
-    it('Send message label is accessible through KAV', () => {
-      // Given: ChatInput wrapped in KAV
-      // When: rendered
+    it('uses spacing.xs (4) when keyboard shows on iOS', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'ios' });
+      mockUseSafeAreaInsets.mockReturnValue({ top: 47, bottom: 34, left: 0, right: 0 });
       const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
 
-      // Then: send button label is reachable through KAV wrapper
-      expect(getByLabelText('Send message')).toBeTruthy();
+      // iOS uses keyboardWillShow for smoother animation
+      act(() => { keyboardListeners['keyboardWillShow']?.(); });
+
+      expect(getContainerMarginBottom(getByLabelText)).toBe(4);
     });
   });
 
-  describe('[P2] KAV presence in disabled state', () => {
-    it('KeyboardAvoidingView is present when disabled=true', () => {
-      // Given: ChatInput is disabled
-      // When: rendered
-      const { UNSAFE_getByType } = render(
-        <ChatInput onSend={jest.fn()} disabled />
-      );
-      const { KeyboardAvoidingView } = require('react-native');
+  describe('[P1] margin reverts when keyboard hides', () => {
+    it('restores insets.bottom margin after keyboard dismiss on Android', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      mockUseSafeAreaInsets.mockReturnValue({ top: 0, bottom: 48, left: 0, right: 0 });
+      const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
 
-      // Then: KAV is still in the tree (keyboard avoidance should work regardless of disabled state)
-      expect(UNSAFE_getByType(KeyboardAvoidingView)).toBeTruthy();
+      // Open keyboard
+      act(() => { keyboardListeners['keyboardDidShow']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(4);
+
+      // Close keyboard
+      act(() => { keyboardListeners['keyboardDidHide']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(48);
     });
 
-    it('KAV behavior prop is unchanged when disabled', () => {
-      // Given: ChatInput is disabled
-      // When: rendered
-      const { UNSAFE_getByType } = render(
-        <ChatInput onSend={jest.fn()} disabled />
-      );
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
+    it('restores insets.bottom margin after keyboard dismiss on iOS', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'ios' });
+      mockUseSafeAreaInsets.mockReturnValue({ top: 47, bottom: 34, left: 0, right: 0 });
+      const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
 
-      // Then: behavior prop is still set correctly
-      expect(['padding', 'height']).toContain(kav.props.behavior);
+      // Open keyboard
+      act(() => { keyboardListeners['keyboardWillShow']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(4);
+
+      // Close keyboard
+      act(() => { keyboardListeners['keyboardWillHide']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(34);
+    });
+  });
+
+  describe('[P1] open → close → reopen cycle', () => {
+    it('margin is correct through full open/close/reopen cycle', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      mockUseSafeAreaInsets.mockReturnValue({ top: 0, bottom: 48, left: 0, right: 0 });
+      const { getByLabelText } = render(<ChatInput onSend={jest.fn()} />);
+
+      // Initial: keyboard hidden
+      expect(getContainerMarginBottom(getByLabelText)).toBe(48);
+
+      // Open
+      act(() => { keyboardListeners['keyboardDidShow']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(4);
+
+      // Close
+      act(() => { keyboardListeners['keyboardDidHide']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(48);
+
+      // Reopen
+      act(() => { keyboardListeners['keyboardDidShow']?.(); });
+      expect(getContainerMarginBottom(getByLabelText)).toBe(4);
+    });
+  });
+
+  describe('[P2] platform-specific keyboard events', () => {
+    it('subscribes to keyboardWillShow/keyboardWillHide on iOS', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'ios' });
+      render(<ChatInput onSend={jest.fn()} />);
+      expect(keyboardListeners).toHaveProperty('keyboardWillShow');
+      expect(keyboardListeners).toHaveProperty('keyboardWillHide');
+    });
+
+    it('subscribes to keyboardDidShow/keyboardDidHide on Android', () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      render(<ChatInput onSend={jest.fn()} />);
+      expect(keyboardListeners).toHaveProperty('keyboardDidShow');
+      expect(keyboardListeners).toHaveProperty('keyboardDidHide');
     });
   });
 });

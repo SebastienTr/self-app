@@ -169,8 +169,8 @@ class TestAuthMalformedPayloads:
                     "another": 42,
                 },
             })
-            # No error means success — verify by sending a real message
-            # Story 2.1: first response is status:thinking (agent.handle_chat)
+            ws.receive_json()  # status:idle after auth
+            # Verify by sending a real message
             ws.send_json({"type": "chat", "payload": {"message": "hi"}})
             response = ws.receive_json()
             assert response["type"] == "status"
@@ -187,9 +187,11 @@ class TestReAuth:
         with auth_client.websocket_connect("/ws") as ws:
             # First auth
             ws.send_json({"type": "auth", "payload": {"token": "same-token"}})
+            ws.receive_json()  # status:idle after first auth
             # Second auth (same token)
             ws.send_json({"type": "auth", "payload": {"token": "same-token"}})
-            # Should still work — story 2.1: first response is status:thinking
+            ws.receive_json()  # status:idle after second auth
+            # Should still work
             ws.send_json({"type": "chat", "payload": {"message": "still working"}})
             response = ws.receive_json()
             assert response["type"] == "status"
@@ -203,9 +205,11 @@ class TestReAuth:
         with auth_client.websocket_connect("/ws") as ws:
             # Auth with token-a
             ws.send_json({"type": "auth", "payload": {"token": "token-a"}})
+            ws.receive_json()  # status:idle after first auth
             # Re-auth with token-b
             ws.send_json({"type": "auth", "payload": {"token": "token-b"}})
-            # Should work with new session — story 2.1: first response is status:thinking
+            ws.receive_json()  # status:idle after second auth
+            # Should work with new session
             ws.send_json({"type": "chat", "payload": {"message": "switched"}})
             response = ws.receive_json()
             assert response["type"] == "status"
@@ -219,6 +223,7 @@ class TestReAuth:
         with auth_client.websocket_connect("/ws") as ws:
             # First auth succeeds
             ws.send_json({"type": "auth", "payload": {"token": "original-token"}})
+            ws.receive_json()  # status:idle after auth
             # Second auth fails
             ws.send_json({"type": "auth", "payload": {"token": "bad-token"}})
             response = ws.receive_json()
@@ -290,6 +295,7 @@ class TestAuthResetRoundTrip:
         with auth_client.websocket_connect("/ws") as ws:
             # Authenticate
             ws.send_json({"type": "auth", "payload": {"token": "reset-flow-token"}})
+            ws.receive_json()  # status:idle after auth
             # Reset
             ws.send_json({"type": "auth_reset", "payload": {}})
             response = ws.receive_json()
@@ -297,7 +303,6 @@ class TestAuthResetRoundTrip:
             assert response["payload"]["state"] == "idle"
 
             # Connection should still be usable (authenticated within this connection)
-            # Story 2.1: first response is status:thinking (agent.handle_chat)
             ws.send_json({"type": "chat", "payload": {"message": "after reset"}})
             chat_response = ws.receive_json()
             assert chat_response["type"] == "status"
@@ -310,8 +315,9 @@ class TestAuthResetRoundTrip:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "invalidated-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "auth_reset", "payload": {}})
-            ws.receive_json()  # status response
+            ws.receive_json()  # status response from reset
 
         # New connection with old token should fail
         with auth_client.websocket_connect("/ws") as ws:
@@ -330,6 +336,7 @@ class TestUnknownMessageTypes:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "unk-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "nonexistent_type", "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "error"
@@ -350,6 +357,7 @@ class TestUnknownMessageTypes:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "none-type-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": None, "payload": {}})
             response = ws.receive_json()
             assert response["type"] == "error"
@@ -417,6 +425,7 @@ class TestPairingTokenSecurity:
                     "pairing_token": pairing_token,
                 },
             })
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "sync", "payload": {}})
             ws.receive_json()  # consume the module_list response
 
@@ -450,7 +459,8 @@ class TestMultipleAuthAttempts:
 
             # Second: valid
             ws.send_json({"type": "auth", "payload": {"token": "valid-retry-token"}})
-            # Should be authenticated now — story 2.1: first response is status:thinking
+            ws.receive_json()  # status:idle after auth
+            # Should be authenticated now
             ws.send_json({"type": "chat", "payload": {"message": "recovered"}})
             response = ws.receive_json()
             assert response["type"] == "status"
@@ -522,6 +532,7 @@ class TestErrorResponseFormat:
 
         with auth_client.websocket_connect("/ws") as ws:
             ws.send_json({"type": "auth", "payload": {"token": "format-token"}})
+            ws.receive_json()  # status:idle after auth
             ws.send_json({"type": "unknown_xyz", "payload": {}})
             response = ws.receive_json()
             payload = response["payload"]

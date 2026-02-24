@@ -136,26 +136,6 @@ describe('ChatInput', () => {
     });
   });
 
-  describe('keyboard avoidance', () => {
-    it('wraps content in KeyboardAvoidingView', () => {
-      const { UNSAFE_getByType } = render(
-        <ChatInput onSend={jest.fn()} />
-      );
-      const { KeyboardAvoidingView } = require('react-native');
-      expect(UNSAFE_getByType(KeyboardAvoidingView)).toBeTruthy();
-    });
-
-    it('KeyboardAvoidingView has a behavior prop set', () => {
-      const { UNSAFE_getByType } = render(
-        <ChatInput onSend={jest.fn()} />
-      );
-      const { KeyboardAvoidingView } = require('react-native');
-      const kav = UNSAFE_getByType(KeyboardAvoidingView);
-      // behavior should be 'padding' (iOS) or 'height' (Android) — never undefined
-      expect(['padding', 'height']).toContain(kav.props.behavior);
-    });
-  });
-
   describe('pure component behavior', () => {
     it('renders without crashing', () => {
       expect(() =>

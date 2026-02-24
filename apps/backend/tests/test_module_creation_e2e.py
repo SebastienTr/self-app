@@ -141,6 +141,9 @@ def _receive_n(ws, n: int) -> list[dict]:
 def _auth(ws) -> None:
     """Authenticate a WebSocket connection."""
     ws.send_json({"type": "auth", "payload": {"token": _TEST_TOKEN}})
+    # Server sends status:idle after successful auth — consume it
+    ack = ws.receive_json()
+    assert ack == {"type": "status", "payload": {"state": "idle"}}
 
 
 # --- Fixtures ---

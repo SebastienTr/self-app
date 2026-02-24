@@ -379,6 +379,11 @@ async def websocket_endpoint(ws: WebSocket):
                 if auth_result:
                     authenticated = True
                     session_id = sid
+                    # Send status so client can infer auth success
+                    await ws.send_json({
+                        "type": "status",
+                        "payload": {"state": "idle"},
+                    })
                 continue
 
             # --- Auth gate: reject all non-auth messages if not authenticated ---

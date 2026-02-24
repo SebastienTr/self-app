@@ -9,9 +9,9 @@
  *   disabled — disables input and send button (e.g., when agent is processing)
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Text,
@@ -24,16 +24,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens } from '@/constants/tokens';
 
 /**
- * Keyboard avoidance strategy:
- *
- * With Android edge-to-edge enabled (Expo SDK 54), adjustResize no longer
- * automatically pushes content above the keyboard. We wrap the ChatInput
- * container in a KeyboardAvoidingView:
- *   - iOS: behavior="padding" — adds padding equal to keyboard height
- *   - Android: behavior="height" — shrinks the view height
- *
- * This is a zero-dependency solution using built-in React Native components.
- * If more robust behavior is needed later, migrate to react-native-keyboard-controller.
+ * Keyboard avoidance is handled at the App.tsx level with a KeyboardAvoidingView
+ * wrapping the entire screen. ChatInput is a pure presentational component.
  */
 
 export interface ChatInputProps {
@@ -43,9 +35,23 @@ export interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   const canSend = value.trim().length > 0 && !disabled;
+  // When keyboard is open, KAV already offsets for safe area — use minimal margin.
+  // When closed, use insets.bottom so input sits above home indicator / nav bar.
+  const bottomMargin = keyboardVisible
+    ? tokens.spacing.xs
+    : Math.max(insets.bottom, tokens.spacing.sm);
 
   function handleSend() {
     if (!canSend) return;
@@ -54,36 +60,32 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={[styles.container, { marginBottom: Math.max(insets.bottom, tokens.spacing.sm) }]}>
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={setValue}
-          placeholder="Message..."
-          placeholderTextColor={tokens.colors.textSecondary}
-          editable={!disabled}
-          accessibilityLabel="Message input"
-          multiline={false}
-          returnKeyType="send"
-          onSubmitEditing={handleSend}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!canSend}
-          accessibilityLabel="Send message"
-          accessibilityState={{ disabled: !canSend }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={[styles.sendIcon, !canSend && styles.sendIconDisabled]}>
-            ▶
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+    <View style={[styles.container, { marginBottom: bottomMargin }]}>
+      <TextInput
+        style={styles.input}
+        value={value}
+        onChangeText={setValue}
+        placeholder="Message..."
+        placeholderTextColor={tokens.colors.textSecondary}
+        editable={!disabled}
+        accessibilityLabel="Message input"
+        multiline={false}
+        returnKeyType="send"
+        onSubmitEditing={handleSend}
+      />
+      <TouchableOpacity
+        style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+        onPress={handleSend}
+        disabled={!canSend}
+        accessibilityLabel="Send message"
+        accessibilityState={{ disabled: !canSend }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={[styles.sendIcon, !canSend && styles.sendIconDisabled]}>
+          ▶
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
