@@ -50,6 +50,7 @@ function makeTabBarProps(overrides: {
       stale: false as const,
       type: 'tab' as const,
       history: [],
+      preloadedRouteKeys: [],
     },
     descriptors: Object.fromEntries(
       routes.map((r) => [
@@ -58,7 +59,7 @@ function makeTabBarProps(overrides: {
           options: {},
           route: r,
           navigation: {} as any,
-          render: () => null,
+          render: (() => null) as any,
         },
       ]),
     ),
