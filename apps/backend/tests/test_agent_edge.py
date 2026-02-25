@@ -20,7 +20,7 @@ import aiosqlite
 import pytest
 
 from app.agent import handle_chat, _log_llm_usage
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 
 
 class MockWebSocket:
@@ -51,11 +51,24 @@ def _make_result(content: str = "Response content") -> LLMResult:
     )
 
 
+def _make_stream_fn(content: str = "Response content", provider_name: str = "test-provider"):
+    """Create an async generator that yields chunks for the given content."""
+    async def stream(prompt: str = "", **kwargs):
+        yield LLMStreamChunk(delta=content, accumulated=content, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=content, done=True,
+            tokens_in=5, tokens_out=10, model="test-model",
+            provider=provider_name, latency_ms=42,
+        )
+    return stream
+
+
 def _make_provider(content: str = "Response content") -> MagicMock:
-    """Helper to create a mock provider returning given content."""
+    """Helper to create a mock provider returning given content via streaming."""
     provider = MagicMock()
     provider.name = "test-provider"
     provider.execute = AsyncMock(return_value=_make_result(content))
+    provider.stream = _make_stream_fn(content)
     return provider
 
 
@@ -95,22 +108,31 @@ class TestHandleChatEdgeCases:
 
     @pytest.mark.asyncio
     async def test_empty_message_still_calls_provider(self, ws, tmp_path):
-        """handle_chat with empty message still calls provider.execute with enriched prompt."""
+        """handle_chat with empty message still calls provider.stream with enriched prompt."""
         db_path = str(tmp_path / "test.db")
         await _create_db_with_usage_table(db_path)
 
-        provider = _make_provider("Response to empty message")
+        captured_prompt = None
+
+        async def tracking_stream(prompt: str = "", **kwargs):
+            nonlocal captured_prompt
+            captured_prompt = prompt
+            yield LLMStreamChunk(delta="Response", accumulated="Response", done=False)
+            yield LLMStreamChunk(delta="", accumulated="Response", done=True,
+                                 tokens_in=5, tokens_out=10, model="m", provider="p", latency_ms=42)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        provider.stream = tracking_stream
+
         await handle_chat(ws, "", provider, db_path)
 
-        provider.execute.assert_called_once()
-        # The prompt is enriched with module creation system instructions
-        call_kwargs = provider.execute.call_args
-        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
-        assert "User message:" in prompt
+        assert captured_prompt is not None
+        assert "User message:" in captured_prompt
 
     @pytest.mark.asyncio
     async def test_empty_message_completes_full_protocol(self, ws, tmp_path):
-        """handle_chat with empty message still completes the full 4-message protocol."""
+        """handle_chat with empty message still completes the full streaming protocol."""
         db_path = str(tmp_path / "test.db")
         await _create_db_with_usage_table(db_path)
 
@@ -118,7 +140,8 @@ class TestHandleChatEdgeCases:
         await handle_chat(ws, "", provider, db_path)
 
         types = [m["type"] for m in ws.sent]
-        assert types == ["status", "chat_stream", "chat_stream", "status"]
+        # New order: thinking, streaming, chat_stream, chat_stream(done), idle
+        assert types == ["status", "status", "chat_stream", "chat_stream", "status"]
 
     @pytest.mark.asyncio
     async def test_empty_content_from_provider_sends_empty_delta(self, ws, tmp_path):
@@ -158,7 +181,11 @@ class TestHandleChatEdgeCases:
 
         provider = MagicMock()
         provider.name = "failing-provider"
-        provider.execute = AsyncMock(side_effect=ValueError("Unexpected shape"))
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise ValueError("Unexpected shape")
+            yield  # noqa: E701
+        provider.stream = failing_stream
 
         await handle_chat(ws, "Hello", provider, db_path)
 
@@ -174,7 +201,11 @@ class TestHandleChatEdgeCases:
 
         provider = MagicMock()
         provider.name = "my-special-provider"
-        provider.execute = AsyncMock(side_effect=RuntimeError("CLI failed"))
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise RuntimeError("CLI failed")
+            yield  # noqa: E701
+        provider.stream = failing_stream
 
         await handle_chat(ws, "Hello", provider, db_path)
 
@@ -182,50 +213,64 @@ class TestHandleChatEdgeCases:
         assert "my-special-provider" in error_msgs[0]["payload"]["agent_action"]
 
     @pytest.mark.asyncio
-    async def test_thinking_status_sent_before_provider_execute(self, ws, tmp_path):
-        """status:thinking must be sent before provider.execute() is called."""
+    async def test_thinking_status_sent_before_provider_stream(self, ws, tmp_path):
+        """status:thinking must be sent before provider.stream() yields."""
         db_path = str(tmp_path / "test.db")
         await _create_db_with_usage_table(db_path)
 
         call_order = []
 
         async def tracking_send_json(data):
-            call_order.append(("ws_send", data.get("type")))
+            call_order.append(("ws_send", data.get("type"), data.get("payload", {}).get("state")))
             ws.sent.append(data)
-
-        async def tracking_execute(prompt):
-            call_order.append(("provider_execute", prompt))
-            return _make_result("Response")
 
         ws.send_json = tracking_send_json
 
+        async def tracking_stream(prompt: str = "", **kwargs):
+            call_order.append(("provider_stream", None, None))
+            yield LLMStreamChunk(delta="Response", accumulated="Response", done=False)
+            yield LLMStreamChunk(delta="", accumulated="Response", done=True,
+                                 tokens_in=5, tokens_out=10, model="m", provider="p", latency_ms=42)
+
         provider = MagicMock()
         provider.name = "track-provider"
-        provider.execute = tracking_execute
+        provider.stream = tracking_stream
 
         await handle_chat(ws, "Test", provider, db_path)
 
-        # Verify thinking was sent before execute was called
+        # Verify thinking was sent before stream yielded
         thinking_idx = next(
             i for i, item in enumerate(call_order)
-            if item == ("ws_send", "status")
+            if item[0] == "ws_send" and item[2] == "thinking"
         )
-        execute_idx = next(
+        stream_idx = next(
             i for i, item in enumerate(call_order)
-            if item[0] == "provider_execute"
+            if item[0] == "provider_stream"
         )
-        assert thinking_idx < execute_idx
+        assert thinking_idx < stream_idx
 
     @pytest.mark.asyncio
-    async def test_provider_called_exactly_once(self, ws, tmp_path):
-        """provider.execute() is called exactly once per handle_chat invocation."""
+    async def test_stream_called_exactly_once(self, ws, tmp_path):
+        """provider.stream() is iterated exactly once per handle_chat invocation."""
         db_path = str(tmp_path / "test.db")
         await _create_db_with_usage_table(db_path)
 
-        provider = _make_provider("Once")
+        call_count = 0
+
+        async def counting_stream(prompt: str = "", **kwargs):
+            nonlocal call_count
+            call_count += 1
+            yield LLMStreamChunk(delta="Once", accumulated="Once", done=False)
+            yield LLMStreamChunk(delta="", accumulated="Once", done=True,
+                                 tokens_in=5, tokens_out=10, model="m", provider="p", latency_ms=42)
+
+        provider = MagicMock()
+        provider.name = "test-provider"
+        provider.stream = counting_stream
+
         await handle_chat(ws, "Call once", provider, db_path)
 
-        provider.execute.assert_called_once()
+        assert call_count == 1
 
     @pytest.mark.asyncio
     async def test_idle_sent_even_when_log_llm_usage_fails(self, ws, tmp_path):
@@ -248,15 +293,15 @@ class TestHandleChatEdgeCases:
         assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
-    async def test_total_messages_on_success_is_four(self, ws, tmp_path):
-        """Exactly 4 messages are sent on happy path: thinking, stream, done, idle."""
+    async def test_total_messages_on_success_is_five(self, ws, tmp_path):
+        """Exactly 5 messages are sent on happy path: thinking, streaming, chat_stream, done, idle."""
         db_path = str(tmp_path / "test.db")
         await _create_db_with_usage_table(db_path)
 
-        provider = _make_provider("Exactly four messages")
+        provider = _make_provider("Exactly five messages")
         await handle_chat(ws, "Test", provider, db_path)
 
-        assert len(ws.sent) == 4
+        assert len(ws.sent) == 5
 
     @pytest.mark.asyncio
     async def test_total_messages_on_error_is_three(self, ws, tmp_path):
@@ -266,7 +311,11 @@ class TestHandleChatEdgeCases:
 
         provider = MagicMock()
         provider.name = "error-provider"
-        provider.execute = AsyncMock(side_effect=Exception("Boom"))
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise Exception("Boom")
+            yield  # noqa: E701
+        provider.stream = failing_stream
 
         await handle_chat(ws, "Test", provider, db_path)
 
@@ -282,7 +331,11 @@ class TestHandleChatEdgeCases:
 
         provider = MagicMock()
         provider.name = "test"
-        provider.execute = AsyncMock(side_effect=Exception("INTERNAL: null pointer"))
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise Exception("INTERNAL: null pointer")
+            yield  # noqa: E701
+        provider.stream = failing_stream
 
         await handle_chat(ws, "Hello", provider, db_path)
 

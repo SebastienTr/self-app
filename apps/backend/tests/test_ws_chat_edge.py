@@ -20,7 +20,7 @@ import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 from app.sessions import create_session
 
 
@@ -87,12 +87,17 @@ def _make_mock_provider(
     fail: bool = False,
     failure_exc: Exception | None = None,
 ) -> MagicMock:
-    """Create a mock LLM provider."""
+    """Create a mock LLM provider with streaming support."""
     provider = MagicMock()
     provider.name = "mock-provider"
     if fail:
         exc = failure_exc or Exception("LLM provider failure")
         provider.execute = AsyncMock(side_effect=exc)
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise exc
+            yield  # noqa: E701
+        provider.stream = failing_stream
     else:
         result = LLMResult(
             content=response_text,
@@ -104,6 +109,15 @@ def _make_mock_provider(
             cost_estimate=0.0001,
         )
         provider.execute = AsyncMock(return_value=result)
+
+        async def mock_stream(prompt: str = "", **kwargs):
+            yield LLMStreamChunk(delta=response_text, accumulated=response_text, done=False)
+            yield LLMStreamChunk(
+                delta="", accumulated=response_text, done=True,
+                tokens_in=5, tokens_out=10, model="mock-model",
+                provider="mock-provider", latency_ms=50,
+            )
+        provider.stream = mock_stream
     return provider
 
 
@@ -281,8 +295,8 @@ class TestChatHappyPathEdgeCases:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
 
-            # Collect all 4 messages
-            responses = [ws.receive_json() for _ in range(4)]
+            # Collect all 5 messages (thinking, streaming, chat_stream, done, idle)
+            responses = [ws.receive_json() for _ in range(5)]
 
         # None of the responses should be WS_UNKNOWN_TYPE
         for resp in responses:
@@ -294,17 +308,17 @@ class TestChatHappyPathEdgeCases:
         with chat_client.websocket_connect("/ws") as ws:
             _auth(ws)
 
-            # First chat message — consume all 4 responses
+            # First chat message — consume all 5 responses
             ws.send_json({"type": "chat", "payload": {"message": "First"}})
-            for _ in range(4):
+            for _ in range(5):
                 ws.receive_json()
 
-            # Second chat message — should also produce 4 responses
+            # Second chat message — should also produce 5 responses
             ws.send_json({"type": "chat", "payload": {"message": "Second"}})
-            second_responses = [ws.receive_json() for _ in range(4)]
+            second_responses = [ws.receive_json() for _ in range(5)]
 
         types = [m["type"] for m in second_responses]
-        assert types == ["status", "chat_stream", "chat_stream", "status"]
+        assert types == ["status", "status", "chat_stream", "chat_stream", "status"]
 
     def test_chat_stream_done_false_has_provider_response_content(self, chat_client):
         """The chat_stream(done=False) delta contains the mock provider's response."""
@@ -313,6 +327,7 @@ class TestChatHappyPathEdgeCases:
             ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
 
             ws.receive_json()  # status:thinking
+            ws.receive_json()  # status:streaming
             stream_msg = ws.receive_json()  # chat_stream(done=False)
 
             assert stream_msg["type"] == "chat_stream"

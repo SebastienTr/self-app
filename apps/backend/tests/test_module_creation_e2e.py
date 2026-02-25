@@ -21,7 +21,7 @@ import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 from app.sessions import create_session
 
 
@@ -137,6 +137,15 @@ def _make_provider(response_text: str) -> MagicMock:
         cost_estimate=0.01,
     )
     provider.execute = AsyncMock(return_value=result)
+
+    async def mock_stream(prompt: str = "", **kwargs):
+        yield LLMStreamChunk(delta=response_text, accumulated=response_text, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=response_text, done=True,
+            tokens_in=50, tokens_out=200, model="mock-model",
+            provider="mock-e2e-provider", latency_ms=500,
+        )
+    provider.stream = mock_stream
     return provider
 
 
@@ -200,44 +209,50 @@ class TestModuleCreationE2E:
     def test_full_module_creation_flow(self, module_creation_client):
         """Full flow: chat -> LLM -> parse -> validate -> save -> module_created.
 
-        Expected message sequence (7 messages):
+        Expected message sequence (11 messages, Story 4.0 streaming):
         1. status:thinking
-        2. chat_stream (conversational text, done=False)
-        3. chat_stream (done=True)
-        4. status:discovering
-        5. status:composing
-        6. module_created
-        7. status:idle
+        2. status:streaming
+        3. chat_stream (raw LLM response with JSON, done=False)
+        4. chat_stream (extracted chat text, done=False)
+        5. chat_stream (done=True)
+        6. status:discovering
+        7. status:composing
+        8. status:saving
+        9. module_created
+        10. status:idle
         """
         with module_creation_client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Show me the weather in Paris"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             types = [m["type"] for m in messages]
 
             # Verify message sequence
             assert types == [
                 "status",       # thinking
-                "chat_stream",  # conversational text
+                "status",       # streaming
+                "chat_stream",  # raw streaming delta
+                "chat_stream",  # extracted chat text
                 "chat_stream",  # done signal
                 "status",       # discovering
                 "status",       # composing
+                "status",       # saving
                 "module_created",
                 "status",       # idle
             ]
 
     def test_status_message_sequence(self, module_creation_client):
-        """Status messages follow: thinking -> discovering -> composing -> idle."""
+        """Status messages follow: thinking -> streaming -> discovering -> composing -> saving -> idle."""
         with module_creation_client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Track the weather"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             status_msgs = [m for m in messages if m["type"] == "status"]
             states = [m["payload"]["state"] for m in status_msgs]
 
-            assert states == ["thinking", "discovering", "composing", "idle"]
+            assert states == ["thinking", "streaming", "discovering", "composing", "saving", "idle"]
 
     def test_module_created_payload_structure(self, module_creation_client):
         """module_created payload has all required fields in snake_case."""
@@ -245,7 +260,7 @@ class TestModuleCreationE2E:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Weather module please"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             module_msgs = [m for m in messages if m["type"] == "module_created"]
             assert len(module_msgs) == 1
 
@@ -266,7 +281,7 @@ class TestModuleCreationE2E:
         with module_creation_client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Create weather"}})
-            _receive_n(ws, 7)
+            _receive_n(ws, 10)
 
         # Verify in DB
         async def _check_db():
@@ -294,14 +309,15 @@ class TestModuleCreationE2E:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Weather please"}})
 
-            messages = _receive_n(ws, 7)
-            stream_msgs = [m for m in messages if m["type"] == "chat_stream"]
+            messages = _receive_n(ws, 10)
+            stream_msgs = [m for m in messages if m["type"] == "chat_stream" and not m["payload"].get("done")]
 
-            # First stream message should have conversational text
-            delta = stream_msgs[0]["payload"]["delta"]
-            assert "weather module" in delta.lower() or "data sources" in delta.lower()
-            # Should NOT contain the JSON code fence
-            assert "```json" not in delta
+            # Second stream message (extracted text) should have conversational text without JSON
+            # First stream message is the raw LLM output (may contain JSON)
+            # The extracted chat text message should NOT contain the JSON code fence
+            extracted = stream_msgs[1]["payload"]["delta"]
+            assert "weather module" in extracted.lower() or "data sources" in extracted.lower()
+            assert "```json" not in extracted
 
 
 class TestModuleCreationErrorPath:
@@ -389,7 +405,7 @@ class TestModuleAppearsInSync:
 
             # Create module
             ws.send_json({"type": "chat", "payload": {"message": "Weather module"}})
-            _receive_n(ws, 7)
+            _receive_n(ws, 10)
 
             # Full sync
             ws.send_json({"type": "sync", "payload": {}})
@@ -408,7 +424,7 @@ class TestModuleAppearsInSync:
 
             # Create module
             ws.send_json({"type": "chat", "payload": {"message": "Weather module"}})
-            _receive_n(ws, 7)
+            _receive_n(ws, 10)
 
             # Delta sync with old timestamp
             ws.send_json({
@@ -432,10 +448,10 @@ class TestRegularChatStillWorks:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
 
-            messages = _receive_n(ws, 4)  # thinking + stream(delta) + stream(done) + idle
+            messages = _receive_n(ws, 5)  # thinking + streaming + stream(delta) + stream(done) + idle
             types = [m["type"] for m in messages]
 
-            assert types == ["status", "chat_stream", "chat_stream", "status"]
+            assert types == ["status", "status", "chat_stream", "chat_stream", "status"]
             assert "module_created" not in types
 
     def test_regular_chat_no_modules_saved(self, regular_chat_client, test_settings):
@@ -443,7 +459,7 @@ class TestRegularChatStillWorks:
         with regular_chat_client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hi there"}})
-            _receive_n(ws, 4)
+            _receive_n(ws, 5)
 
         async def _check_db():
             db = await aiosqlite.connect(test_settings.db_path)

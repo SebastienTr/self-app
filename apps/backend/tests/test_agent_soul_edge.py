@@ -22,7 +22,7 @@ from app.agent import (
     _build_module_prompt,
     handle_chat,
 )
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 
 # Shared test SOUL content
 _TEST_SOUL = "# Test SOUL\n\nYou are a test agent."
@@ -57,19 +57,27 @@ def _make_result(content: str = "Response content") -> LLMResult:
 
 
 def _make_provider(content: str = "Response content") -> MagicMock:
-    """Helper to create a mock provider returning given content."""
+    """Helper to create a mock provider returning given content with streaming."""
     provider = MagicMock()
     provider.name = "test-provider"
     provider.execute = AsyncMock(return_value=_make_result(content))
+    provider._captured_prompt = None
+
+    async def mock_stream(prompt: str = "", **kwargs):
+        provider._captured_prompt = prompt
+        yield LLMStreamChunk(delta=content, accumulated=content, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=content, done=True,
+            tokens_in=5, tokens_out=10, model="test-model",
+            provider="test-provider", latency_ms=42,
+        )
+    provider.stream = mock_stream
     return provider
 
 
 def _get_prompt(provider: MagicMock) -> str:
-    """Extract the prompt string from a mock provider's call_args."""
-    ca = provider.execute.call_args
-    return ca.kwargs.get(
-        "prompt", ca.args[0] if ca.args else ""
-    )
+    """Extract the prompt string captured during streaming."""
+    return provider._captured_prompt or ""
 
 
 async def _setup_db(db_path: str) -> None:
@@ -292,7 +300,7 @@ class TestHandleChatSoulEdgeCases:
 
         # Should complete normally
         types = [m["type"] for m in ws.sent]
-        assert types == ["status", "chat_stream", "chat_stream", "status"]
+        assert types == ["status", "status", "chat_stream", "chat_stream", "status"]
 
         # Prompt should contain default SOUL
         prompt = _get_prompt(provider)
@@ -309,6 +317,11 @@ class TestHandleChatSoulEdgeCases:
         provider.execute = AsyncMock(
             side_effect=Exception("should not reach")
         )
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise Exception("should not reach")
+            yield  # noqa: E701
+        provider.stream = failing_stream
 
         # Patch load_soul to raise an unexpected exception
         with patch(
@@ -346,7 +359,7 @@ class TestHandleChatSoulEdgeCases:
 
         # Should complete normally
         types = [m["type"] for m in ws.sent]
-        assert types == ["status", "chat_stream", "chat_stream", "status"]
+        assert types == ["status", "status", "chat_stream", "chat_stream", "status"]
 
         # Prompt should contain the special chars
         prompt = _get_prompt(provider)

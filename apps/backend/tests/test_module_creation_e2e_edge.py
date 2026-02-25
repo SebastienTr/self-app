@@ -20,7 +20,7 @@ import aiosqlite
 import pytest
 from starlette.testclient import TestClient
 
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 from app.sessions import create_session
 
 
@@ -155,6 +155,15 @@ def _make_provider(response_text: str) -> MagicMock:
         cost_estimate=0.01,
     )
     provider.execute = AsyncMock(return_value=result)
+
+    async def mock_stream(prompt: str = "", **kwargs):
+        yield LLMStreamChunk(delta=response_text, accumulated=response_text, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=response_text, done=True,
+            tokens_in=50, tokens_out=200, model="mock-model",
+            provider="mock-e2e-edge-provider", latency_ms=500,
+        )
+    provider.stream = mock_stream
     return provider
 
 
@@ -175,6 +184,19 @@ def _make_sequential_provider(responses: list[str]) -> MagicMock:
         for text in responses
     ]
     provider.execute = AsyncMock(side_effect=results)
+
+    call_count = 0
+    async def sequential_stream(prompt: str = "", **kwargs):
+        nonlocal call_count
+        text = responses[call_count]
+        call_count += 1
+        yield LLMStreamChunk(delta=text, accumulated=text, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=text, done=True,
+            tokens_in=50, tokens_out=200, model="mock-model",
+            provider="mock-sequential-provider", latency_ms=500,
+        )
+    provider.stream = sequential_stream
     return provider
 
 
@@ -383,7 +405,7 @@ class TestOnlyJsonResponse:
 
             status_msgs = [m for m in messages if m["type"] == "status"]
             states = [m["payload"]["state"] for m in status_msgs]
-            assert states == ["thinking", "discovering", "composing", "idle"]
+            assert states == ["thinking", "streaming", "discovering", "composing", "saving", "idle"]
 
 
 class TestExtraSpecFields:

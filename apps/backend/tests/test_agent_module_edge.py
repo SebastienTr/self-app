@@ -28,7 +28,7 @@ from app.agent import (
     _try_extract_module_spec,
     handle_chat,
 )
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 
 # Shared SOUL content for tests that call _build_module_prompt directly
 _TEST_SOUL = "# Test SOUL\n\nYou are a test agent."
@@ -68,6 +68,15 @@ def _make_provider(content: str) -> MagicMock:
     provider = MagicMock()
     provider.name = "test-provider"
     provider.execute = AsyncMock(return_value=_make_result(content))
+
+    async def mock_stream(prompt: str = "", **kwargs):
+        yield LLMStreamChunk(delta=content, accumulated=content, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=content, done=True,
+            tokens_in=50, tokens_out=200, model="test-model",
+            provider="test-provider", latency_ms=500,
+        )
+    provider.stream = mock_stream
     return provider
 
 
@@ -574,7 +583,7 @@ class TestHandleChatModuleCreationEdgeCases:
 
     @pytest.mark.asyncio
     async def test_module_creation_total_message_count(self, ws, tmp_path):
-        """Module creation sends exactly 7 messages."""
+        """Module creation sends exactly 10 messages (Story 4.0 streaming)."""
         db_path = str(tmp_path / "test.db")
         await _setup_full_db(db_path)
 
@@ -583,15 +592,19 @@ class TestHandleChatModuleCreationEdgeCases:
 
         await handle_chat(ws, "Create module", provider, db_path)
 
-        # Expected: thinking, chat_stream(text), chat_stream(done), discovering, composing, module_created, idle
-        assert len(ws.sent) == 7
+        # Expected: thinking, streaming, chat_stream(raw), chat_stream(text), chat_stream(done),
+        #           discovering, composing, saving, module_created, idle
+        assert len(ws.sent) == 10
         types = [m["type"] for m in ws.sent]
         assert types == [
             "status",           # thinking
-            "chat_stream",      # conversational text
+            "status",           # streaming
+            "chat_stream",      # raw streaming delta
+            "chat_stream",      # extracted conversational text
             "chat_stream",      # done=True
             "status",           # discovering
             "status",           # composing
+            "status",           # saving
             "module_created",   # the module
             "status",           # idle
         ]

@@ -21,7 +21,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 from app.sessions import create_session
 
 
@@ -85,7 +85,7 @@ async def _setup_ws_db(db_path: str, session_token: str = "test-ws-token") -> No
 
 
 def _make_mock_provider(response_text: str = "Mock response") -> MagicMock:
-    """Create a mock LLM provider that returns a fixed response."""
+    """Create a mock LLM provider that returns a fixed response via streaming."""
     provider = MagicMock()
     provider.name = "mock-provider"
     result = LLMResult(
@@ -98,6 +98,15 @@ def _make_mock_provider(response_text: str = "Mock response") -> MagicMock:
         cost_estimate=0.0001,
     )
     provider.execute = AsyncMock(return_value=result)
+
+    async def mock_stream(prompt: str = "", **kwargs):
+        yield LLMStreamChunk(delta=response_text, accumulated=response_text, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=response_text, done=True,
+            tokens_in=5, tokens_out=10, model="mock-model",
+            provider="mock-provider", latency_ms=50,
+        )
+    provider.stream = mock_stream
     return provider
 
 
@@ -181,7 +190,8 @@ class TestChatMessage:
     """Test chat message type handling.
 
     Story 2.1: echo stub replaced by agent.handle_chat().
-    Message sequence: status:thinking → chat_stream(done=False) → chat_stream(done=True) → status:idle
+    Story 4.0: streaming added — sequence is now:
+    status:thinking → status:streaming → chat_stream(done=False) → chat_stream(done=True) → status:idle
     """
 
     def test_chat_message_receives_status_thinking_first(self, client):
@@ -204,11 +214,16 @@ class TestChatMessage:
             r1 = ws.receive_json()
             assert r1["type"] == "status"
 
-            # Second response: chat_stream with content
+            # Consume status:streaming
             r2 = ws.receive_json()
-            assert r2["type"] == "chat_stream"
-            assert r2["payload"]["done"] is False
-            assert r2["payload"]["delta"] == "Test response"
+            assert r2["type"] == "status"
+            assert r2["payload"]["state"] == "streaming"
+
+            # Third response: chat_stream with content
+            r3 = ws.receive_json()
+            assert r3["type"] == "chat_stream"
+            assert r3["payload"]["done"] is False
+            assert r3["payload"]["delta"] == "Test response"
 
     def test_chat_message_receives_done_signal(self, client):
         """Chat must receive chat_stream with done:True after content."""
@@ -216,14 +231,15 @@ class TestChatMessage:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
 
-            # Consume status:thinking and chat_stream(done=False)
+            # Consume status:thinking, status:streaming, chat_stream(done=False)
             ws.receive_json()  # status:thinking
+            ws.receive_json()  # status:streaming
             ws.receive_json()  # chat_stream(done=False)
 
-            # Third response: chat_stream with done=True
-            r3 = ws.receive_json()
-            assert r3["type"] == "chat_stream"
-            assert r3["payload"]["done"] is True
+            # Fourth response: chat_stream with done=True
+            r4 = ws.receive_json()
+            assert r4["type"] == "chat_stream"
+            assert r4["payload"]["done"] is True
 
     def test_chat_message_ends_with_status_idle(self, client):
         """Last response to chat must be status:idle."""
@@ -231,14 +247,15 @@ class TestChatMessage:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Hello"}})
 
-            # Consume all 4 messages
+            # Consume all 5 messages
             ws.receive_json()  # status:thinking
+            ws.receive_json()  # status:streaming
             ws.receive_json()  # chat_stream(done=False)
             ws.receive_json()  # chat_stream(done=True)
-            r4 = ws.receive_json()  # status:idle
+            r5 = ws.receive_json()  # status:idle
 
-            assert r4["type"] == "status"
-            assert r4["payload"]["state"] == "idle"
+            assert r5["type"] == "status"
+            assert r5["payload"]["state"] == "idle"
 
     def test_chat_message_follows_type_payload_format(self, client):
         """Test that all chat responses follow { type, payload } format."""
@@ -431,11 +448,12 @@ class TestMultipleMessages:
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
 
-            # Chat — now sends status:thinking first, then 3 more messages
+            # Chat — sends 5 messages: thinking, streaming, stream(F), stream(T), idle
             ws.send_json({"type": "chat", "payload": {"message": "Hi"}})
             resp1 = ws.receive_json()
             assert resp1["type"] == "status"  # status:thinking (story 2.1)
             # Consume remaining chat messages
+            ws.receive_json()  # status:streaming
             ws.receive_json()  # chat_stream(done=False)
             ws.receive_json()  # chat_stream(done=True)
             ws.receive_json()  # status:idle
@@ -692,7 +710,7 @@ class TestEdgeCases:
     def test_rapid_messages_all_processed(self, client):
         """Test that many messages sent rapidly are all processed.
 
-        Story 2.1: chat now sends 4 messages (thinking, stream, done, idle) per chat.
+        Story 4.0: chat now sends 5 messages (thinking, streaming, stream, done, idle) per chat.
         We send 3 chats and verify the first response for each is status:thinking.
         """
         with client.websocket_connect("/ws") as ws:
@@ -703,10 +721,11 @@ class TestEdgeCases:
                 ws.send_json({"type": "chat", "payload": {"message": f"msg_{i}"}})
 
             # Verify first response per chat is status:thinking
-            # (4 messages per chat: thinking, stream, done, idle)
+            # (5 messages per chat: thinking, streaming, stream, done, idle)
             for i in range(count):
                 r = ws.receive_json()
                 assert r["type"] == "status"  # thinking
+                ws.receive_json()  # status:streaming
                 ws.receive_json()  # chat_stream(done=False)
                 ws.receive_json()  # chat_stream(done=True)
                 ws.receive_json()  # status:idle
@@ -716,11 +735,12 @@ class TestEdgeCases:
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
 
-            # chat — now sends 4 messages
+            # chat — now sends 5 messages (thinking, streaming, stream, done, idle)
             ws.send_json({"type": "chat", "payload": {"message": "hello"}})
             r1 = ws.receive_json()
             # First response is status:thinking (story 2.1)
             assert r1["type"] == "status"
+            ws.receive_json()  # status:streaming
             ws.receive_json()  # chat_stream(done=False)
             ws.receive_json()  # chat_stream(done=True)
             ws.receive_json()  # status:idle
@@ -1149,6 +1169,15 @@ def _make_module_creation_provider() -> MagicMock:
         cost_estimate=0.01,
     )
     provider.execute = AsyncMock(return_value=result)
+
+    async def mock_stream(prompt: str = "", **kwargs):
+        yield LLMStreamChunk(delta=_MODULE_CREATION_LLM_RESPONSE, accumulated=_MODULE_CREATION_LLM_RESPONSE, done=False)
+        yield LLMStreamChunk(
+            delta="", accumulated=_MODULE_CREATION_LLM_RESPONSE, done=True,
+            tokens_in=50, tokens_out=200, model="mock-model",
+            provider="mock-provider", latency_ms=500,
+        )
+    provider.stream = mock_stream
     return provider
 
 
@@ -1178,14 +1207,17 @@ class TestModuleCreationViaChat:
     Agent detects module creation intent from LLM response (JSON code fence)
     Backend sends module_created message with the full module spec.
 
-    Expected message sequence (7 messages):
+    Expected message sequence (10 messages, Story 4.0 streaming):
       1. status:thinking
-      2. chat_stream (delta with conversational text, done=False)
-      3. chat_stream (done=True)
-      4. status:discovering
-      5. status:composing
-      6. module_created
-      7. status:idle
+      2. status:streaming
+      3. chat_stream (raw streaming delta, done=False)
+      4. chat_stream (extracted chat text, done=False)
+      5. chat_stream (done=True)
+      6. status:discovering
+      7. status:composing
+      8. status:saving
+      9. module_created
+      10. status:idle
     """
 
     def test_chat_triggers_module_created_message(self, module_client):
@@ -1194,7 +1226,7 @@ class TestModuleCreationViaChat:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Show me the weather"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             types = [m["type"] for m in messages]
             assert "module_created" in types
 
@@ -1204,7 +1236,7 @@ class TestModuleCreationViaChat:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Show me weather"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             module_msgs = [m for m in messages if m["type"] == "module_created"]
             assert len(module_msgs) == 1
             payload = module_msgs[0]["payload"]
@@ -1214,15 +1246,15 @@ class TestModuleCreationViaChat:
             assert payload["template"] == "metric-dashboard"
 
     def test_module_creation_sends_status_sequence(self, module_client):
-        """Status messages should be: thinking -> discovering -> composing -> idle."""
+        """Status messages should be: thinking -> streaming -> discovering -> composing -> saving -> idle."""
         with module_client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Create weather module"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             status_msgs = [m for m in messages if m["type"] == "status"]
             states = [m["payload"]["state"] for m in status_msgs]
-            assert states == ["thinking", "discovering", "composing", "idle"]
+            assert states == ["thinking", "streaming", "discovering", "composing", "saving", "idle"]
 
     def test_created_module_appears_in_sync(self, module_client, test_settings):
         """After module creation, sync should return the new module."""
@@ -1231,8 +1263,8 @@ class TestModuleCreationViaChat:
 
             # Step 1: Create a module via chat
             ws.send_json({"type": "chat", "payload": {"message": "Create weather"}})
-            # Consume all 7 module creation messages
-            _receive_n(ws, 7)
+            # Consume all 10 module creation messages
+            _receive_n(ws, 10)
 
             # Step 2: Sync to get all modules
             ws.send_json({"type": "sync", "payload": {}})
@@ -1251,7 +1283,7 @@ class TestModuleCreationViaChat:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "Weather please"}})
 
-            messages = _receive_n(ws, 7)
+            messages = _receive_n(ws, 10)
             types = [m["type"] for m in messages]
 
             # chat_stream should appear before module_created

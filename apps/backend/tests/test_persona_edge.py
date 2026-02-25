@@ -29,7 +29,7 @@ from app.agent import (
     load_persona,
     set_persona_type,
 )
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 
 
 _TEST_SOUL = "# Test SOUL\n\nYou are a test agent."
@@ -506,16 +506,20 @@ class TestHandleChatPersonaEdge:
 
         provider = MagicMock()
         provider.name = "test-provider"
-        result = LLMResult(
-            content="Hello!",
-            provider="test-provider",
-            model="test-model",
-            tokens_in=10,
-            tokens_out=20,
-            latency_ms=100,
-            cost_estimate=0.001,
-        )
-        provider.execute = AsyncMock(return_value=result)
+        content = "Hello!"
+        provider.execute = AsyncMock(return_value=LLMResult(
+            content=content, provider="test-provider", model="test-model",
+            tokens_in=10, tokens_out=20, latency_ms=100, cost_estimate=0.001,
+        ))
+
+        async def mock_stream(prompt: str = "", **kwargs):
+            yield LLMStreamChunk(delta=content, accumulated=content, done=False)
+            yield LLMStreamChunk(
+                delta="", accumulated=content, done=True,
+                tokens_in=10, tokens_out=20, model="test-model",
+                provider="test-provider", latency_ms=100,
+            )
+        provider.stream = mock_stream
 
         ws = MockWebSocket()
         await handle_chat(ws, "Hello", provider, db_path)
@@ -545,16 +549,18 @@ class TestHandleChatPersonaEdge:
 
         provider = MagicMock()
         provider.name = "test-provider"
-        result = LLMResult(
-            content="Hello!",
-            provider="test-provider",
-            model="test-model",
-            tokens_in=10,
-            tokens_out=20,
-            latency_ms=100,
-            cost_estimate=0.001,
-        )
-        provider.execute = AsyncMock(return_value=result)
+        content = "Hello!"
+        provider._captured_prompt = None
+
+        async def mock_stream(prompt: str = "", **kwargs):
+            provider._captured_prompt = prompt
+            yield LLMStreamChunk(delta=content, accumulated=content, done=False)
+            yield LLMStreamChunk(
+                delta="", accumulated=content, done=True,
+                tokens_in=10, tokens_out=20, model="test-model",
+                provider="test-provider", latency_ms=100,
+            )
+        provider.stream = mock_stream
 
         ws = MockWebSocket()
         await handle_chat(ws, "Hello", provider, db_path)
@@ -563,8 +569,7 @@ class TestHandleChatPersonaEdge:
         assert ws.sent[-1]["payload"]["state"] == "idle"
 
         # Prompt should NOT contain persona section (empty file returns None)
-        ck = provider.execute.call_args
-        prompt = ck.kwargs.get("prompt", ck.args[0] if ck.args else "")
+        prompt = provider._captured_prompt or ""
         assert "\n# Persona\n" not in prompt
 
     @pytest.mark.asyncio
@@ -576,22 +581,23 @@ class TestHandleChatPersonaEdge:
 
         provider = MagicMock()
         provider.name = "test-provider"
-        result = LLMResult(
-            content="Hello!",
-            provider="test-provider",
-            model="test-model",
-            tokens_in=10,
-            tokens_out=20,
-            latency_ms=100,
-            cost_estimate=0.001,
-        )
-        provider.execute = AsyncMock(return_value=result)
+        content = "Hello!"
+        captured_prompts = []
+
+        async def mock_stream(prompt: str = "", **kwargs):
+            captured_prompts.append(prompt)
+            yield LLMStreamChunk(delta=content, accumulated=content, done=False)
+            yield LLMStreamChunk(
+                delta="", accumulated=content, done=True,
+                tokens_in=10, tokens_out=20, model="test-model",
+                provider="test-provider", latency_ms=100,
+            )
+        provider.stream = mock_stream
 
         # First chat — no persona
         ws1 = MockWebSocket()
         await handle_chat(ws1, "Hello", provider, db_path)
-        call_kwargs1 = provider.execute.call_args
-        prompt1 = call_kwargs1.kwargs.get("prompt", call_kwargs1.args[0] if call_kwargs1.args else "")
+        prompt1 = captured_prompts[0]
         assert "\n# Persona\n" not in prompt1
 
         # Set persona
@@ -599,10 +605,8 @@ class TestHandleChatPersonaEdge:
 
         # Second chat — should have tree persona
         ws2 = MockWebSocket()
-        provider.execute.reset_mock()
         await handle_chat(ws2, "Hello again", provider, db_path)
-        call_kwargs2 = provider.execute.call_args
-        prompt2 = call_kwargs2.kwargs.get("prompt", call_kwargs2.args[0] if call_kwargs2.args else "")
+        prompt2 = captured_prompts[1]
         assert "# Persona" in prompt2
         assert "Tree" in prompt2
 
@@ -617,6 +621,11 @@ class TestHandleChatPersonaEdge:
         provider = MagicMock()
         provider.name = "test-provider"
         provider.execute = AsyncMock(side_effect=Exception("LLM failure"))
+
+        async def failing_stream(prompt: str = "", **kwargs):
+            raise Exception("LLM failure")
+            yield  # noqa: E701
+        provider.stream = failing_stream
 
         ws = MockWebSocket()
         await handle_chat(ws, "Hello", provider, db_path)

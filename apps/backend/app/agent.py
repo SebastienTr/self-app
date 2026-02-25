@@ -26,12 +26,18 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from collections.abc import AsyncIterator, Callable, Coroutine
+from typing import Any
+
 from fastapi import WebSocket
 
 from app.db import get_connection
-from app.llm.base import LLMProvider, LLMResult
+from app.llm.base import LLMProvider, LLMResult, LLMStreamChunk
 from app.logging import log
 from app.modules import create_module
+
+# Type for the send callback: async (payload: dict) -> None
+SendFn = Callable[[dict], Coroutine[Any, Any, None]]
 
 # ---------------------------------------------------------------------------
 # SOUL.md — Agent Identity Persistence
@@ -638,8 +644,8 @@ async def _log_llm_usage(result: LLMResult, db_path: str) -> None:
 
 
 async def _handle_module_creation(
-    ws: WebSocket,
-    result: LLMResult,
+    send: SendFn,
+    accumulated_text: str,
     module_spec: dict,
     db_path: str,
     persona_type: str | None = None,
@@ -649,33 +655,36 @@ async def _handle_module_creation(
     Sends status updates, saves to DB, sends module_created message.
     Called from handle_chat when _extract_module_spec finds a valid spec.
 
-    Status sequence: discovering -> composing -> module_created
+    Status sequence: discovering -> composing -> saving -> module_created
     (thinking is sent before this, idle is sent after in handle_chat's finally)
 
     Args:
-        ws:           WebSocket connection.
-        result:       LLM result (for text extraction).
-        module_spec:  Validated module spec dict from LLM.
-        db_path:      Path to SQLite database.
-        persona_type: Current persona type for status messages.
+        send:             Async callback to send messages (via task manager).
+        accumulated_text: The full accumulated LLM response text.
+        module_spec:      Validated module spec dict from LLM.
+        db_path:          Path to SQLite database.
+        persona_type:     Current persona type for status messages.
     """
     # Send conversational text as chat_stream (before module_created)
-    chat_text = _extract_chat_text(result.content)
+    chat_text = _extract_chat_text(accumulated_text)
     if chat_text:
-        await ws.send_json({
+        await send({
             "type": "chat_stream",
             "payload": {"delta": chat_text, "done": False},
         })
-    await ws.send_json({
+    await send({
         "type": "chat_stream",
         "payload": {"delta": "", "done": True},
     })
 
     # Status: discovering (after parsing LLM response)
-    await ws.send_json({"type": "status", "payload": {"state": "discovering", "persona": persona_type}})
+    await send({"type": "status", "payload": {"state": "discovering", "persona": persona_type}})
 
     # Status: composing (during DB save)
-    await ws.send_json({"type": "status", "payload": {"state": "composing", "persona": persona_type}})
+    await send({"type": "status", "payload": {"state": "composing", "persona": persona_type}})
+
+    # Status: saving (before DB write)
+    await send({"type": "status", "payload": {"state": "saving", "persona": persona_type}})
 
     # Save module to database
     module_name = module_spec.get("name", "Unnamed Module")
@@ -688,18 +697,18 @@ async def _handle_module_creation(
     wire_spec = {**module_spec, "module_id": saved["id"]}
 
     # Send module_created message — module is already persisted at this point,
-    # so WS send failure should not be reported as MODULE_CREATION_FAILED
+    # so send failure should not be reported as MODULE_CREATION_FAILED
     try:
-        await ws.send_json({
+        await send({
             "type": "module_created",
             "payload": wire_spec,
         })
-    except Exception as ws_err:
+    except Exception as send_err:
         log.warning(
             "module_created_ws_send_failed",
             module_id=saved["id"],
             module_name=module_name,
-            error=str(ws_err),
+            error=str(send_err),
             agent_action="Module was saved to DB but the WS notification failed. "
             "The module will appear on next sync.",
         )
@@ -713,36 +722,42 @@ async def _handle_module_creation(
 
 
 async def handle_chat(
-    ws: WebSocket,
+    ws: WebSocket | SendFn,
     message: str,
     provider: LLMProvider,
     db_path: str,
 ) -> None:
-    """Handle a chat message: call LLM provider and stream response back.
+    """Handle a chat message: stream LLM response back token by token.
 
-    Detects module creation intent from LLM response (JSON code fence).
+    Detects module creation intent from accumulated LLM response (JSON code fence).
     If module spec found: validates, saves to DB, sends module_created.
-    If no spec found: sends response as regular chat_stream.
+    If no spec found: streams response as real-time chat_stream deltas.
 
     Status sequence:
-      - Regular chat: thinking -> chat_stream -> idle
-      - Module creation: thinking -> discovering -> composing -> module_created -> idle
+      - Regular chat: thinking -> streaming (tokens) -> idle
+      - Module creation: thinking -> streaming -> discovering -> composing -> saving -> idle
       - Error: thinking -> error -> idle
 
     Sends status:idle in finally block (always, even on error).
 
     Args:
-        ws:       WebSocket — the sole communication channel (from main.py)
+        ws:       WebSocket or async send callback (from main.py via task manager)
         message:  The user's chat message text
         provider: LLM provider instance (obtained via get_provider() in main.py)
         db_path:  Path to SQLite database for llm_usage logging
     """
+    # Support both WebSocket (legacy/test) and SendFn (task manager) patterns
+    if callable(ws) and not isinstance(ws, WebSocket):
+        send: SendFn = ws
+    else:
+        send = ws.send_json  # type: ignore[union-attr]
+
     # Load persona type once at the start — used for both prompt and status messages
     data_dir = str(Path(db_path).parent)
     persona_type = await get_persona_type(db_path)
 
     # Always notify thinking state before calling provider
-    await ws.send_json({"type": "status", "payload": {"state": "thinking", "persona": persona_type}})
+    await send({"type": "status", "payload": {"state": "thinking", "persona": persona_type}})
 
     try:
         # Load agent identity from SOUL.md (read on every request, no caching)
@@ -754,16 +769,53 @@ async def handle_chat(
         # Build prompt with SOUL identity, persona instructions, and module creation instructions
         prompt = _build_module_prompt(message, soul_content, persona_content)
 
-        # Call provider with the enriched prompt
-        result = await provider.execute(prompt=prompt)
+        # Stream tokens from the provider
+        accumulated = ""
+        first_token = True
+        tokens_in = None
+        tokens_out = None
+        model_name = None
+        latency_ms = 0
 
-        # Check if response contains a module spec
-        spec_result = _try_extract_module_spec(result.content)
+        async for chunk in provider.stream(prompt=prompt):
+            if chunk.done:
+                # Final metadata chunk — capture metrics
+                accumulated = chunk.accumulated
+                tokens_in = chunk.tokens_in
+                tokens_out = chunk.tokens_out
+                model_name = chunk.model
+                latency_ms = chunk.latency_ms or 0
+            else:
+                # Content chunk — send streaming status on first token
+                if first_token:
+                    await send({"type": "status", "payload": {"state": "streaming", "persona": persona_type}})
+                    first_token = False
+
+                # Stream delta to client
+                await send({
+                    "type": "chat_stream",
+                    "payload": {"delta": chunk.delta, "done": False},
+                })
+                accumulated = chunk.accumulated
+
+        # Build an LLMResult for usage logging
+        result = LLMResult(
+            content=accumulated,
+            provider=provider.name,
+            model=model_name or "unknown",
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            latency_ms=latency_ms,
+            cost_estimate=None,
+        )
+
+        # Check if response contains a module spec (on full accumulated text)
+        spec_result = _try_extract_module_spec(accumulated)
 
         if spec_result.spec is not None:
             # Module creation pipeline — valid spec found
             try:
-                await _handle_module_creation(ws, result, spec_result.spec, db_path, persona_type)
+                await _handle_module_creation(send, accumulated, spec_result.spec, db_path, persona_type)
             except Exception as e:
                 log.error(
                     "module_creation_failed",
@@ -772,7 +824,7 @@ async def handle_chat(
                     agent_action="Check LLM output format. Expected valid JSON with fields: "
                     "name, type, template, data_sources, refresh_interval, schema_version, accessible_label",
                 )
-                await ws.send_json({
+                await send({
                     "type": "error",
                     "payload": {
                         "code": "MODULE_CREATION_FAILED",
@@ -789,18 +841,12 @@ async def handle_chat(
                 agent_action="Check LLM output format. Expected valid JSON with fields: "
                 "name, type, template, data_sources, refresh_interval, schema_version, accessible_label",
             )
-            # Still send the conversational text portion
-            chat_text = _extract_chat_text(result.content)
-            if chat_text:
-                await ws.send_json({
-                    "type": "chat_stream",
-                    "payload": {"delta": chat_text, "done": False},
-                })
-                await ws.send_json({
-                    "type": "chat_stream",
-                    "payload": {"delta": "", "done": True},
-                })
-            await ws.send_json({
+            # Stream done signal (conversational text was already streamed token by token)
+            await send({
+                "type": "chat_stream",
+                "payload": {"delta": "", "done": True},
+            })
+            await send({
                 "type": "error",
                 "payload": {
                     "code": "MODULE_CREATION_FAILED",
@@ -810,12 +856,8 @@ async def handle_chat(
                 },
             })
         else:
-            # Regular chat — no JSON code fence, send full response as stream
-            await ws.send_json({
-                "type": "chat_stream",
-                "payload": {"delta": result.content, "done": False},
-            })
-            await ws.send_json({
+            # Regular chat — stream done signal (tokens were already sent during streaming)
+            await send({
                 "type": "chat_stream",
                 "payload": {"delta": "", "done": True},
             })
@@ -837,7 +879,7 @@ async def handle_chat(
             provider=provider.name,
             agent_action=f"Check provider logs: {provider.name}",
         )
-        await ws.send_json({
+        await send({
             "type": "error",
             "payload": {
                 "code": "LLM_CHAT_FAILED",
@@ -848,4 +890,4 @@ async def handle_chat(
 
     finally:
         # Always reset to idle, even on error
-        await ws.send_json({"type": "status", "payload": {"state": "idle", "persona": persona_type}})
+        await send({"type": "status", "payload": {"state": "idle", "persona": persona_type}})
