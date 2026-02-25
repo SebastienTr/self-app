@@ -1,6 +1,6 @@
 # Story 2.5b: Tab Navigation Architecture
 
-Status: review
+Status: done
 
 ## Story
 
@@ -371,6 +371,22 @@ None — clean implementation, no debug cycles needed.
 - Added clearStoredBackendUrl to auth.ts service for Settings disconnect flow.
 - Added @/navigation/* and @/screens/* path aliases to tsconfig.json.
 
+### Post-Dev Bug Fixes
+
+- **White/light background on Home/Chat tabs**: NavigationContainer used default light theme. Fix: Created `TwilightTheme` override with dark colors, added explicit `backgroundColor` to HomeScreen and ChatScreen.
+- **ChatInput keyboard positioning on Samsung Galaxy S23 Ultra**: `edgeToEdgeEnabled: true` in app.json breaks Android `adjustResize` and `KeyboardAvoidingView`. Fix: Enhanced `useKeyboardVisible` to return `keyboardHeight`, replaced KAV on Android with manual `paddingBottom: keyboardHeight - insets.bottom`. iOS keeps KAV with `behavior="padding"`.
+- **CI typecheck failure**: TabBar test fixtures missing `preloadedRouteKeys` (required by React Navigation v7 types) and `render: () => null` incompatible with `Element` return type. Fix: Added `preloadedRouteKeys: []` and cast `render` to `any`.
+
+### Final Test Count
+
+66 suites, 1226 tests — all passing. CI green.
+
+### Commits
+
+1. `b78c8f2` feat(2-5b): tab navigation architecture — Home/Chat/Settings bottom tabs
+2. `9629ae1` fix(2-5b): resolve CI typecheck — add preloadedRouteKeys + cast render in TabBar tests
+3. `c487923` chore(2-5b): mark story done in sprint status
+
 ### File List
 
 **NEW:**
@@ -392,6 +408,21 @@ None — clean implementation, no debug cycles needed.
 - `components/shell/ChatInput.tsx` — Removed onInputFocus prop
 - `components/bridge/ChatThread.moduleCard.test.tsx` — Updated for ModuleLink rendering
 - `tsconfig.json` — Added @/navigation/*, @/screens/* paths
+
+**NEW (tests):**
+- `navigation/TabNavigator.test.tsx` — 7 tests
+- `navigation/TabBar.test.tsx` — 15 tests
+- `navigation/TabBar.edge.test.tsx` — 10 tests
+- `screens/HomeScreen.test.tsx` — 11 tests
+- `screens/HomeScreen.edge.test.tsx` — 5 tests
+- `screens/ChatScreen.test.tsx` — 10 tests
+- `screens/SettingsScreen.test.tsx` — 15 tests
+- `screens/SettingsScreen.edge.test.tsx` — 6 tests
+- `components/bridge/ModuleLink.test.tsx` — 9 tests
+- `components/bridge/ModuleLink.edge.test.tsx` — 10 tests
+- `stores/moduleStore.badge.test.ts` — 11 tests
+- `components/shell/ChatInput.keyboard.test.tsx` — rewritten for fixed margin behavior
+- `hooks/useKeyboardVisible.test.ts` — updated for keyboardHeight
 
 **DELETED:**
 - `stores/screenModeStore.ts`
