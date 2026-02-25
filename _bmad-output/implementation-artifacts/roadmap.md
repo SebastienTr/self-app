@@ -3,7 +3,7 @@
 > **Last updated:** 2026-02-25T12:00 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 > **Baseline note:** dashboard/wave totals track `59` epic stories currently in `sprint-status.yaml` (including post-PRD additions `1.7`, `2.5`, and `2.5b`) + `Prep.1` = `60` total stories.
-> **Latest change:** Story 2.3 (Persona Preset Selection) completed — three agent persona presets (Flame/Tree/Star) with backend prompt injection and mobile Settings UI.
+> **Latest change:** Story 2.3 (Persona Preset Selection) completed — three agent persona presets (Flame/Tree/Star) with backend prompt injection, mobile Settings UI, and kawaii SVG spirit illustrations.
 
 ## Dashboard
 

@@ -144,7 +144,7 @@ pnpm typecheck        # TypeScript type checking
 - **Orb** — The amber pulsing circle that embodies the agent's presence and state.
 - **Metamorphosis** — The interface morph from chat-dominant (0 modules) to dashboard-dominant (9+ modules).
 - **Genome** — A portable config capturing an entire app setup — modules, preferences, persona — shareable between users.
-- **Persona** — Three agent archetypes (Flame / Tree / Star) that change behavior, autonomy level, and communication style — not just cosmetics.
+- **Persona** — Three agent archetypes (Flame / Tree / Star) that change behavior, autonomy level, and communication style — each with its own kawaii spirit illustration.
 
 ## Design — Twilight Theme
 

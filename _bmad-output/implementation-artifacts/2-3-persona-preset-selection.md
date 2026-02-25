@@ -514,7 +514,13 @@ Claude Opus 4.6
 - `apps/mobile/components/shell/index.ts` -- PersonaSelector export
 
 **Mobile Created:**
-- `apps/mobile/components/shell/PersonaSelector.tsx` -- three tappable persona cards
+- `apps/mobile/components/shell/PersonaSelector.tsx` -- three tappable persona cards with inline SVG illustrations
+- `apps/mobile/assets/personas/flame.svg` -- Flame spirit kawaii illustration
+- `apps/mobile/assets/personas/tree.svg` -- Tree spirit kawaii illustration
+- `apps/mobile/assets/personas/star.svg` -- Star spirit kawaii illustration
+
+**Mobile Dependencies Added:**
+- `react-native-svg` -- SVG rendering for persona illustrations (SvgXml)
 
 **Mobile Tests Created:**
 - `apps/mobile/components/shell/PersonaSelector.test.tsx` -- 14 tests
@@ -533,7 +539,9 @@ Claude Opus 4.6
 | ws.ts | Added SetPersonaMessage type to WSMessage union |
 | connectionStore.ts | Added persona state and setPersona action |
 | wsClient.ts | Added persona extraction from status, sendSetPersona helper |
-| PersonaSelector.tsx | NEW: three tappable persona cards component |
+| PersonaSelector.tsx | NEW: three tappable persona cards with SVG spirit illustrations |
+| assets/personas/*.svg | NEW: kawaii spirit characters (Flame/Tree/Star) for persona cards |
+| package.json | Added react-native-svg dependency |
 | SettingsScreen.tsx | Added Persona section between Connection and Data |
 | shell/index.ts | Added PersonaSelector export |
 | test_persona.py | NEW: 25 persona management tests |
