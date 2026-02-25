@@ -346,4 +346,166 @@ describe('HomeScreen edge cases', () => {
       expect(queryByText('No modules yet')).toBeNull();
     });
   });
+
+  describe('contextual empty state — additional edge cases (TEA expansion)', () => {
+    it('AmbientBackground is not present when modules exist', () => {
+      const modules = new Map();
+      modules.set('mod-1', {
+        spec: { moduleId: 'mod-1' },
+        status: 'active',
+        dataStatus: 'ok',
+        updatedAt: new Date().toISOString(),
+        cachedAt: new Date().toISOString(),
+      });
+      useModuleStore.setState({ modules });
+
+      const { props } = makeHomeProps();
+      const { queryByTestId } = render(<HomeScreen {...props} />);
+      expect(queryByTestId('ambient-background')).toBeNull();
+    });
+
+    it('nudge timer does not start when modules already exist', () => {
+      const modules = new Map();
+      modules.set('mod-1', {
+        spec: { moduleId: 'mod-1' },
+        status: 'active',
+        dataStatus: 'ok',
+        updatedAt: new Date().toISOString(),
+        cachedAt: new Date().toISOString(),
+      });
+      useModuleStore.setState({ modules });
+
+      const { props } = makeHomeProps();
+      const { queryByTestId } = render(<HomeScreen {...props} />);
+
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+
+      // Nudge should not appear when there are modules
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+    });
+
+    it('nudge timer does not start when messages already exist', () => {
+      useChatStore.setState({
+        messages: [{ id: '1', type: 'chat', role: 'user', content: 'hi', timestamp: new Date().toISOString() }],
+      });
+
+      const { props } = makeHomeProps();
+      const { queryByTestId } = render(<HomeScreen {...props} />);
+
+      act(() => {
+        jest.advanceTimersByTime(20_000);
+      });
+
+      // Nudge should not appear when messages already exist
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+    });
+
+    it('tree persona chip press sends correct message and navigates', () => {
+      useConnectionStore.setState({ persona: 'tree' });
+      const navigate = jest.fn();
+      const { props } = makeHomeProps({ navigate });
+      const { getByText } = render(<HomeScreen {...props} />);
+
+      fireEvent.press(getByText("Let's chat first"));
+
+      expect(useChatStore.getState().messages[0]).toEqual(
+        expect.objectContaining({ content: "Let's chat first", role: 'user' }),
+      );
+      expect(send).toHaveBeenCalledWith({ type: 'chat', payload: { message: "Let's chat first" } });
+      expect(navigate).toHaveBeenCalledWith('Chat');
+    });
+
+    it('star persona chip press sends correct message and navigates', () => {
+      useConnectionStore.setState({ persona: 'star' });
+      const navigate = jest.fn();
+      const { props } = makeHomeProps({ navigate });
+      const { getByText } = render(<HomeScreen {...props} />);
+
+      fireEvent.press(getByText('Surprise me'));
+
+      expect(useChatStore.getState().messages[0]).toEqual(
+        expect.objectContaining({ content: 'Surprise me', role: 'user' }),
+      );
+      expect(send).toHaveBeenCalledWith({ type: 'chat', payload: { message: 'Surprise me' } });
+      expect(navigate).toHaveBeenCalledWith('Chat');
+    });
+
+    it('multiple blur/focus cycles properly manage nudge timer', () => {
+      const { props, triggerBlur, triggerFocus } = makeHomeProps();
+      const { queryByTestId } = render(<HomeScreen {...props} />);
+
+      // Cycle 1: advance 5s, blur, focus
+      act(() => { jest.advanceTimersByTime(5_000); });
+      act(() => { triggerBlur(); });
+      act(() => { triggerFocus(); });
+
+      // Cycle 2: advance 5s, blur, focus
+      act(() => { jest.advanceTimersByTime(5_000); });
+      act(() => { triggerBlur(); });
+      act(() => { triggerFocus(); });
+
+      // Cycle 3: advance 5s, blur, focus
+      act(() => { jest.advanceTimersByTime(5_000); });
+      act(() => { triggerBlur(); });
+      act(() => { triggerFocus(); });
+
+      // After all cycles, only 0s elapsed on current timer — nudge not shown
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+
+      // Now wait full 15s without interruption
+      act(() => { jest.advanceTimersByTime(15_000); });
+      expect(queryByTestId('nudge-prompt')).toBeTruthy();
+    });
+
+    it('nudge is hidden after blur even if it was showing', () => {
+      const { props, triggerBlur } = makeHomeProps();
+      const { queryByTestId } = render(<HomeScreen {...props} />);
+
+      // Wait for nudge to appear
+      act(() => { jest.advanceTimersByTime(15_000); });
+      expect(queryByTestId('nudge-prompt')).toBeTruthy();
+
+      // Blur should hide the nudge
+      act(() => { triggerBlur(); });
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+    });
+
+    it('goToChat CTA link still works in contextual empty state', () => {
+      const navigate = jest.fn();
+      const { props } = makeHomeProps({ navigate });
+      const { getByText } = render(<HomeScreen {...props} />);
+
+      // The "Ask Self to create one" link should still be functional
+      fireEvent.press(getByText(/Ask Self to create one/));
+      expect(navigate).toHaveBeenCalledWith('Chat');
+    });
+
+    it('PromptChips and NudgePrompt are not rendered when modules exist', () => {
+      const modules = new Map();
+      modules.set('mod-1', {
+        spec: { moduleId: 'mod-1' },
+        status: 'active',
+        dataStatus: 'ok',
+        updatedAt: new Date().toISOString(),
+        cachedAt: new Date().toISOString(),
+      });
+      useModuleStore.setState({ modules });
+
+      const { props } = makeHomeProps();
+      const { queryByTestId, queryByText } = render(<HomeScreen {...props} />);
+
+      expect(queryByTestId('prompt-chips')).toBeNull();
+      expect(queryByTestId('prompt-chips-hidden')).toBeNull();
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+      expect(queryByText('No modules yet')).toBeNull();
+    });
+
+    it('Orb is present in the contextual empty state', () => {
+      const { props } = makeHomeProps();
+      const { getByTestId } = render(<HomeScreen {...props} />);
+      expect(getByTestId('orb')).toBeTruthy();
+    });
+  });
 });

@@ -1,6 +1,6 @@
 # Story 2.4: Contextual Empty State
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -110,9 +110,15 @@ so that I know what to do on first use. (FR8)
   - [x] 9.8 Edge: fade-out animation completes before component unmounts
 
 - [x] Task 10: Run all tests and verify no regressions (AC: all)
-  - [x] 10.1 Run mobile tests — all 1303 tests pass across 73 suites (was 1272)
-  - [x] 10.2 New test count: 31 new tests across 6 new/modified test files
+  - [x] 10.1 Run mobile tests — all 1340 tests pass across 75 suites (was 1272)
+  - [x] 10.2 New test count: 68 new tests across 8 new/modified test files
   - [x] 10.3 Run backend tests — all 866 backend tests pass (no backend changes)
+
+### Review Follow-ups
+
+- [ ] [AI-Review][LOW] `chipPressedRef` guard on `chipsVisible` (HomeScreen.tsx:114) is redundant — `messageCount === 0` already hides chips after a message is sent. The ref guard on `handleChipPress` is sufficient for rapid-tap protection. Consider removing `!chipPressedRef.current` from line 114.
+- [ ] [AI-Review][LOW] `AmbientBackground.tsx` uses `as any` casts for percentage-based layout values (`bottom: '50%'`, `width: '60%'`, `height: '40%'`). These work at runtime but bypass TypeScript's type checking. Consider using numeric values or `StyleSheet.create` with explicit `DimensionValue` types if available in a future RN version.
+- [ ] [AI-Review][LOW] `NudgePrompt.test.tsx` test "text content matches expected nudge message" (line 31) is a duplicate of "renders nudge text when visible is true" (line 21) — both assert the same thing. Consider removing the duplicate.
 
 ## Dev Notes
 
@@ -329,7 +335,7 @@ No debug issues encountered. All tests passed on first implementation attempt af
 - 15s nudge timer with blur/focus reset and proper cleanup on unmount
 - Chip visibility derived from chatStore messages.length === 0 (no new store needed)
 - All 3 new shell components exported from components/shell/index.ts
-- 31 new tests across 6 test files, all passing. Zero regressions (1303 mobile, 866 backend)
+- 68 new tests across 8 test files, all passing. Zero regressions (1340 mobile, 866 backend)
 
 ### File List
 
@@ -338,9 +344,50 @@ No debug issues encountered. All tests passed on first implementation attempt af
 - apps/mobile/components/shell/PromptChips.edge.test.tsx (NEW)
 - apps/mobile/components/shell/AmbientBackground.tsx (NEW)
 - apps/mobile/components/shell/AmbientBackground.test.tsx (NEW)
+- apps/mobile/components/shell/AmbientBackground.edge.test.tsx (NEW)
 - apps/mobile/components/shell/NudgePrompt.tsx (NEW)
 - apps/mobile/components/shell/NudgePrompt.test.tsx (NEW)
+- apps/mobile/components/shell/NudgePrompt.edge.test.tsx (NEW)
 - apps/mobile/components/shell/index.ts (MODIFIED - added 3 exports)
 - apps/mobile/screens/HomeScreen.tsx (MODIFIED - enhanced empty state)
 - apps/mobile/screens/HomeScreen.test.tsx (MODIFIED - added contextual empty state tests)
 - apps/mobile/screens/HomeScreen.edge.test.tsx (MODIFIED - added contextual empty state edge tests)
+
+## Code Review Record
+
+### Reviewer
+
+Claude Opus 4.6 (adversarial code review workflow) on 2026-02-25
+
+### Review Summary
+
+**Issues Found:** 0 High, 2 Medium (fixed), 3 Low (documented)
+**All ACs verified:** Yes (8/8 implemented and tested)
+**All tasks verified:** Yes (10/10 complete with evidence)
+
+### Issues Fixed During Review
+
+1. **[MEDIUM] AmbientBackground initial opacity mismatch** -- `opacityAnim` was initialized at 0.42 (the reduce-motion midpoint) instead of 0.3 (the animation cycle start). This caused a visual discontinuity on the first breathing cycle when reduce motion was disabled. Fixed: changed initial value from 0.42 to 0.3 in `AmbientBackground.tsx`.
+
+2. **[MEDIUM] NudgePrompt used unnecessary Animated.Text** -- The text element was wrapped in `Animated.Text` but the parent `Animated.View` already handled the opacity animation. Changed to plain `Text` import from react-native. No functional change but cleaner semantics.
+
+3. **[MEDIUM] Story File List incomplete** -- Missing `AmbientBackground.edge.test.tsx` and `NudgePrompt.edge.test.tsx` from File List. Test count was stale (claimed 31 tests/6 files, actual 68 tests/8 files). Updated File List and test counts.
+
+### Low Issues (documented in Review Follow-ups)
+
+1. Redundant `chipPressedRef` check in `chipsVisible` calculation
+2. `as any` type casts for percentage layout values in AmbientBackground styles
+3. Duplicate test assertion in NudgePrompt.test.tsx
+
+### AC Verification
+
+| AC | Status | Evidence |
+|----|--------|----------|
+| AC1 - Empty state with orb + breathing animation | PASS | HomeScreen.tsx:118-135, AmbientBackground.tsx breathing loop |
+| AC2 - 3-4 contextual chips with proper styling | PASS | PromptChips.tsx:17-27, styles at lines 75-98 |
+| AC3 - Reduce Motion support | PASS | AmbientBackground.tsx:26-29, 70-77 (static 0.42 opacity) |
+| AC4 - 15s nudge timer | PASS | HomeScreen.tsx:60-95, NudgePrompt.tsx |
+| AC5 - Chip press sends message + navigates + fades | PASS | HomeScreen.tsx:101-111, PromptChips.tsx:38-43 |
+| AC6 - Chips disappear after first message | PASS | HomeScreen.tsx:114 `messageCount === 0` |
+| AC7 - Persona-specific 4th chip with dashed border | PASS | PromptChips.tsx:23-27, 61-69, styles.personaChip |
+| AC8 - Only 3 chips when no persona | PASS | PromptChips.tsx:46, 61 conditional render |

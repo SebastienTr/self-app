@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, StyleSheet, Text } from 'react-native';
 
 import { tokens } from '@/constants/tokens';
 
@@ -34,9 +34,9 @@ export function NudgePrompt({ visible }: NudgePromptProps) {
 
   return (
     <Animated.View style={[styles.container, { opacity: opacityAnim }]}>
-      <Animated.Text style={styles.text}>
+      <Text style={styles.text}>
         Try tapping a suggestion or type anything
-      </Animated.Text>
+      </Text>
     </Animated.View>
   );
 }

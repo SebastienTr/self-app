@@ -19,7 +19,7 @@ import { tokens } from '@/constants/tokens';
 
 export function AmbientBackground() {
   const [reduceMotion, setReduceMotion] = useState(false);
-  const opacityAnim = useRef(new Animated.Value(0.42)).current;
+  const opacityAnim = useRef(new Animated.Value(0.3)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Check for reduced motion preference on mount

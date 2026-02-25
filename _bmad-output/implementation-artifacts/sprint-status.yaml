@@ -59,13 +59,13 @@ development_status:
   # Epic 2: Conversational Shell & Agent Identity (⚡ First Light)
   # FRs: FR1, FR2, FR5, FR8, FR29
   # ═══════════════════════════════════════════════════════════════
-  epic-2: in-progress
+  epic-2: done
   2-1-real-time-chat-interface-with-streaming: done
   2-2-agent-identity-persistence: done
   2-3-persona-preset-selection: done
   2-5-screen-mode-architecture: done       # Chat/Dashboard two-mode layout (blocks 2-4)
   2-5b-tab-navigation-architecture: done          # Tab bar (Home/Chat/Settings) replacing crossfade transitions (blocks 2-4)
-  2-4-contextual-empty-state: review        # depends on 2-5b (empty state = Home tab with 0 modules)
+  2-4-contextual-empty-state: done           # depends on 2-5b (empty state = Home tab with 0 modules)
   epic-2-retrospective: optional
 
   # ═══════════════════════════════════════════════════════════════
