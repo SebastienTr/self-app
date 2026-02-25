@@ -88,9 +88,10 @@ development_status:
 
   # ═══════════════════════════════════════════════════════════════
   # Epic 4: Module Data Freshness & Management (⚡ First Light + 🚀 MVP)
-  # FRs: FR23, FR26, FR40
+  # FRs: FR5, FR23, FR26, FR40, FR56, FR57
   # ═══════════════════════════════════════════════════════════════
-  epic-4: backlog
+  epic-4: in-progress
+  4-0-robust-chat-streaming-and-session-recovery: ready-for-dev   # NEW — Epic 2 Retro Action Item #1 (priority)
   4-1-cron-based-background-refresh: backlog
   4-2-module-vitality-scoring: backlog
   4-3-module-delete-archive-and-restore: backlog
