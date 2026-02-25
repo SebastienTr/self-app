@@ -20,6 +20,7 @@ import { cacheModule, removeCachedModule } from '@/services/localDb';
 interface ModuleStore {
   // State (nouns)
   modules: Map<string, ModuleState>;
+  newModulesSinceLastHomeVisit: number;
 
   // Actions (imperative verbs)
   addModule: (spec: ModuleSpec, updatedAt: string) => void;
@@ -28,6 +29,8 @@ interface ModuleStore {
   setModuleStatus: (id: string, status: ModuleStatus) => void;
   setModuleDataStatus: (id: string, dataStatus: DataStatus) => void;
   loadFromCache: (modules: CachedModule[]) => void;
+  incrementNewModuleCount: () => void;
+  resetNewModuleCount: () => void;
 
   // Selectors (get + descriptive noun)
   getModule: (id: string) => ModuleState | undefined;
@@ -39,6 +42,7 @@ interface ModuleStore {
 export const useModuleStore = create<ModuleStore>((set, get) => ({
   // Initial state
   modules: new Map<string, ModuleState>(),
+  newModulesSinceLastHomeVisit: 0,
 
   // Actions
   addModule: (spec, updatedAt) => {
@@ -139,6 +143,14 @@ export const useModuleStore = create<ModuleStore>((set, get) => ({
       }
     }
     set({ modules: newModules });
+  },
+
+  incrementNewModuleCount: () => {
+    set((state) => ({ newModulesSinceLastHomeVisit: state.newModulesSinceLastHomeVisit + 1 }));
+  },
+
+  resetNewModuleCount: () => {
+    set({ newModulesSinceLastHomeVisit: 0 });
   },
 
   // Selectors

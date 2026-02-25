@@ -7,7 +7,6 @@
  * Props:
  *   onSend        — called with trimmed message text when user sends
  *   disabled      — disables input and send button (e.g., when agent is processing)
- *   onInputFocus  — called when TextInput gains focus (used by App.tsx for mode switching)
  */
 
 import { useState } from 'react';
@@ -31,20 +30,16 @@ import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 export interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
-  onInputFocus?: () => void;
 }
 
-export function ChatInput({ onSend, disabled, onInputFocus }: ChatInputProps) {
+export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState('');
   const { keyboardVisible } = useKeyboardVisible();
   const insets = useSafeAreaInsets();
 
   const canSend = value.trim().length > 0 && !disabled;
-  // When keyboard is open, KAV already offsets for safe area — use minimal margin.
-  // When closed, use insets.bottom so input sits above home indicator / nav bar.
-  const bottomMargin = keyboardVisible
-    ? tokens.spacing.xs
-    : Math.max(insets.bottom, tokens.spacing.sm);
+  // Tab bar handles safe area bottom — use small fixed margin.
+  const bottomMargin = tokens.spacing.sm;
 
   function handleSend() {
     if (!canSend) return;
@@ -65,7 +60,6 @@ export function ChatInput({ onSend, disabled, onInputFocus }: ChatInputProps) {
         multiline={false}
         returnKeyType="send"
         onSubmitEditing={handleSend}
-        onFocus={onInputFocus}
       />
       <TouchableOpacity
         style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
@@ -76,7 +70,7 @@ export function ChatInput({ onSend, disabled, onInputFocus }: ChatInputProps) {
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Text style={[styles.sendIcon, !canSend && styles.sendIconDisabled]}>
-          \u25B6
+          {'\u25B6'}
         </Text>
       </TouchableOpacity>
     </View>

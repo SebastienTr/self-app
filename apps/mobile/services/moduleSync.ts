@@ -89,6 +89,7 @@ export function initModuleSync(): void {
       const updatedAt = new Date().toISOString();
 
       useModuleStore.getState().addModule(spec, updatedAt);
+      useModuleStore.getState().incrementNewModuleCount();
 
       // Schedule inline module card in chat thread
       scheduleModuleCard(spec.moduleId);

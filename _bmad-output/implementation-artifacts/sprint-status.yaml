@@ -64,7 +64,8 @@ development_status:
   2-2-agent-identity-persistence: done
   2-3-persona-preset-selection: backlog
   2-5-screen-mode-architecture: done       # Chat/Dashboard two-mode layout (blocks 2-4)
-  2-4-contextual-empty-state: backlog             # depends on 2-5 (empty state = Chat Mode with 0 modules)
+  2-5b-tab-navigation-architecture: review        # Tab bar (Home/Chat/Settings) replacing crossfade transitions (blocks 2-4)
+  2-4-contextual-empty-state: backlog             # depends on 2-5b (empty state = Home tab with 0 modules)
   epic-2-retrospective: optional
 
   # ═══════════════════════════════════════════════════════════════

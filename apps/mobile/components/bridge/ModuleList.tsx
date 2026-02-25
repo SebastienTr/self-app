@@ -16,7 +16,11 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { tokens } from '@/constants/tokens';
 import { ModuleCard } from './ModuleCard';
 
-export function ModuleList() {
+interface ModuleListProps {
+  highlightModuleId?: string;
+}
+
+export function ModuleList({ highlightModuleId }: ModuleListProps = {}) {
   const modules = useModuleStore((s) => s.modules);
   const allModules = useMemo(() => Array.from(modules.values()), [modules]);
   const status = useConnectionStore((s) => s.status);

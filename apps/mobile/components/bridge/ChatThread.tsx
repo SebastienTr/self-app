@@ -19,16 +19,25 @@ import { useChatStore } from '@/stores/chatStore';
 import { useModuleStore } from '@/stores/moduleStore';
 import type { ChatMessage } from '@/stores/chatStore';
 import { ChatBubble } from '@/components/shell/ChatBubble';
-import { ModuleCard } from '@/components/bridge/ModuleCard';
+import { ModuleLink } from '@/components/bridge/ModuleLink';
 import { tokens } from '@/constants/tokens';
 
-function renderMessage(msg: ChatMessage) {
+interface ChatThreadProps {
+  onModuleLinkPress?: (moduleId: string) => void;
+}
+
+function renderMessage(msg: ChatMessage, onModuleLinkPress?: (moduleId: string) => void) {
   if (msg.type === 'module_card') {
     const module = useModuleStore.getState().modules.get(msg.moduleId);
     if (!module) return null;
     return (
       <View key={msg.id} style={styles.inlineModuleCard}>
-        <ModuleCard module={module} />
+        <ModuleLink
+          moduleId={msg.moduleId}
+          title={(module.spec.title as string) ?? module.spec.moduleId}
+          emoji={module.spec.emoji as string | undefined}
+          onPress={onModuleLinkPress}
+        />
       </View>
     );
   }
@@ -44,7 +53,7 @@ function renderMessage(msg: ChatMessage) {
   );
 }
 
-export function ChatThread() {
+export function ChatThread({ onModuleLinkPress }: ChatThreadProps = {}) {
   const messages = useChatStore((s) => s.messages);
   const streamingMessage = useChatStore((s) => s.streamingMessage);
 
@@ -66,7 +75,7 @@ export function ChatThread() {
       }}
     >
       <View>
-        {messages.map((msg: ChatMessage) => renderMessage(msg))}
+        {messages.map((msg: ChatMessage) => renderMessage(msg, onModuleLinkPress))}
         {streamingMessage !== null && (
           <ChatBubble
             role="agent"

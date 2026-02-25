@@ -14,7 +14,7 @@ import { renderHook, act } from '@testing-library/react-native';
 
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
-type KeyboardHandler = () => void;
+type KeyboardHandler = (e?: any) => void;
 const listeners = new Map<string, KeyboardHandler[]>();
 
 const mockRemove = jest.fn();
@@ -33,30 +33,36 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+const MOCK_KEYBOARD_HEIGHT = 300;
 function fireKeyboardEvent(event: string) {
   const handlers = listeners.get(event) || [];
-  for (const handler of handlers) handler();
+  const isShowEvent = event.includes('Show');
+  const arg = isShowEvent ? { endCoordinates: { height: MOCK_KEYBOARD_HEIGHT } } : undefined;
+  for (const handler of handlers) handler(arg);
 }
 
 describe('useKeyboardVisible', () => {
-  it('returns keyboardVisible false initially', () => {
+  it('returns keyboardVisible false and keyboardHeight 0 initially', () => {
     const { result } = renderHook(() => useKeyboardVisible());
     expect(result.current.keyboardVisible).toBe(false);
+    expect(result.current.keyboardHeight).toBe(0);
   });
 
   describe('iOS (default test platform)', () => {
-    it('sets keyboardVisible to true on keyboardWillShow', () => {
+    it('sets keyboardVisible to true and keyboardHeight on keyboardWillShow', () => {
       const { result } = renderHook(() => useKeyboardVisible());
       act(() => { fireKeyboardEvent('keyboardWillShow'); });
       expect(result.current.keyboardVisible).toBe(true);
+      expect(result.current.keyboardHeight).toBe(MOCK_KEYBOARD_HEIGHT);
     });
 
-    it('sets keyboardVisible to false on keyboardWillHide', () => {
+    it('resets keyboardVisible and keyboardHeight on keyboardWillHide', () => {
       const { result } = renderHook(() => useKeyboardVisible());
       act(() => { fireKeyboardEvent('keyboardWillShow'); });
       expect(result.current.keyboardVisible).toBe(true);
       act(() => { fireKeyboardEvent('keyboardWillHide'); });
       expect(result.current.keyboardVisible).toBe(false);
+      expect(result.current.keyboardHeight).toBe(0);
     });
 
     it('registers keyboardWillShow and keyboardWillHide listeners', () => {
@@ -77,18 +83,20 @@ describe('useKeyboardVisible', () => {
       (Platform as any).OS = originalPlatform;
     });
 
-    it('sets keyboardVisible to true on keyboardDidShow', () => {
+    it('sets keyboardVisible to true and keyboardHeight on keyboardDidShow', () => {
       const { result } = renderHook(() => useKeyboardVisible());
       act(() => { fireKeyboardEvent('keyboardDidShow'); });
       expect(result.current.keyboardVisible).toBe(true);
+      expect(result.current.keyboardHeight).toBe(MOCK_KEYBOARD_HEIGHT);
     });
 
-    it('sets keyboardVisible to false on keyboardDidHide', () => {
+    it('resets keyboardVisible and keyboardHeight on keyboardDidHide', () => {
       const { result } = renderHook(() => useKeyboardVisible());
       act(() => { fireKeyboardEvent('keyboardDidShow'); });
       expect(result.current.keyboardVisible).toBe(true);
       act(() => { fireKeyboardEvent('keyboardDidHide'); });
       expect(result.current.keyboardVisible).toBe(false);
+      expect(result.current.keyboardHeight).toBe(0);
     });
 
     it('registers keyboardDidShow and keyboardDidHide listeners', () => {

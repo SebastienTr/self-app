@@ -1,8 +1,8 @@
 /**
- * Tests for ChatThread inline module_card rendering (story 2-5).
+ * Tests for ChatThread inline module_card rendering (story 2-5b).
  *
  * Verifies:
- *   - module_card messages render ModuleCard component
+ *   - module_card messages render ModuleLink component
  *   - chat messages still render ChatBubble
  *   - module_card with missing module renders nothing
  *   - Mixed chat + module_card messages render in correct order
@@ -38,13 +38,13 @@ describe('ChatThread module_card rendering', () => {
       streamingMessage: null,
       agentStatus: 'idle',
     });
-    useModuleStore.setState({ modules: new Map() });
+    useModuleStore.setState({ modules: new Map(), newModulesSinceLastHomeVisit: 0 });
   });
 
-  it('renders ModuleCard for module_card message type', () => {
+  it('renders ModuleLink for module_card message type', () => {
     const modules = new Map();
     modules.set('mod-1', {
-      spec: { moduleId: 'mod-1', name: 'Weather', type: 'text', text: 'Sunny' },
+      spec: { moduleId: 'mod-1', title: 'Weather', type: 'text', text: 'Sunny' },
       status: 'active',
       dataStatus: 'ok',
       updatedAt: new Date().toISOString(),
@@ -64,7 +64,7 @@ describe('ChatThread module_card rendering', () => {
     });
 
     render(<ChatThread />);
-    // ModuleCard renders the module name as title
+    // ModuleLink renders the module title + "voir" action
     expect(screen.getByText('Weather')).toBeTruthy();
   });
 
@@ -105,7 +105,7 @@ describe('ChatThread module_card rendering', () => {
   it('renders mixed chat and module_card in order', () => {
     const modules = new Map();
     modules.set('mod-1', {
-      spec: { moduleId: 'mod-1', name: 'Weather', type: 'text', text: 'Sunny' },
+      spec: { moduleId: 'mod-1', title: 'Weather', type: 'text', text: 'Sunny' },
       status: 'active',
       dataStatus: 'ok',
       updatedAt: new Date().toISOString(),

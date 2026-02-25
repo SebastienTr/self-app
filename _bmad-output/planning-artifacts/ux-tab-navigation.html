@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self — Tab Navigation UX Spec</title>
+<style>
+  @keyframes breathe { 0%,100% { opacity: 0.3; } 50% { opacity: 0.55; } }
+  @keyframes pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes fadeSlideUp { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: translateY(0); } }
+  @keyframes orbPulse { 0%,100% { transform: scale(1); box-shadow: 0 0 20px rgba(232,168,76,0.3); } 50% { transform: scale(1.08); box-shadow: 0 0 32px rgba(232,168,76,0.5); } }
+  @keyframes highlightPulse { 0% { box-shadow: 0 0 0 0 rgba(232,168,76,0.4); } 70% { box-shadow: 0 0 0 8px rgba(232,168,76,0); } 100% { box-shadow: 0 0 0 0 rgba(232,168,76,0); } }
+
+  .self-orb {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #F0C060, #E8A84C, #D4943C);
+    display: inline-block; vertical-align: middle;
+    animation: orbPulse 4s ease-in-out infinite;
+  }
+  .self-orb-sm {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #F0C060, #E8A84C, #D4943C);
+    display: inline-block; vertical-align: middle;
+    animation: orbPulse 4s ease-in-out infinite;
+  }
+  .self-orb-creating {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #F0C060, #E8A84C, #D4943C);
+    display: inline-block;
+    animation: orbPulse 1.5s ease-in-out infinite;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #060E18; color: #E4ECF4; line-height: 1.5;
+  }
+
+  .header {
+    text-align: center; padding: 60px 24px 40px;
+    background: linear-gradient(180deg, #0C1420 0%, #060E18 100%);
+    border-bottom: 1px solid #1E2E44;
+  }
+  .header h1 { font-size: 36px; font-weight: 300; color: #E8A84C; margin-bottom: 6px; letter-spacing: 1px; }
+  .header .subtitle { font-size: 15px; color: #7899BB; max-width: 600px; margin: 0 auto; }
+
+  .section { max-width: 1200px; margin: 0 auto; padding: 48px 24px; }
+  .section-title { font-size: 22px; font-weight: 400; margin-bottom: 6px; color: #E4ECF4; }
+  .section-desc { font-size: 13px; color: #7899BB; margin-bottom: 28px; max-width: 700px; }
+  .divider { border: none; border-top: 1px solid #1E2E44; margin: 0; }
+
+  .design-note {
+    background: #101C2C; border-left: 3px solid #E8A84C;
+    padding: 14px 18px; border-radius: 0 8px 8px 0;
+    margin: 20px 0; font-size: 13px; color: #B8CCE0;
+  }
+  .design-note strong { color: #E8A84C; }
+
+  /* Phone mockup */
+  .phones-row { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; padding: 16px 0; }
+  .phone-wrapper { text-align: center; }
+  .phone-label { font-size: 13px; font-weight: 600; color: #E8A84C; margin-bottom: 8px; }
+  .phone-sublabel { font-size: 11px; color: #7899BB; margin-bottom: 12px; }
+  .phone {
+    width: 300px; height: 620px;
+    border-radius: 32px; border: 3px solid #1E2E44;
+    overflow: hidden; position: relative;
+    margin: 0 auto; background: #0C1420;
+  }
+  .phone-notch {
+    width: 110px; height: 26px;
+    border-radius: 0 0 16px 16px; margin: 0 auto;
+    background: #060E18; position: relative; z-index: 10;
+  }
+  .phone-content {
+    height: calc(100% - 26px); overflow-y: auto; position: relative;
+    background: #0C1420; display: flex; flex-direction: column;
+  }
+  .phone-content::-webkit-scrollbar { display: none; }
+
+  .ambient {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    animation: breathe 6s ease-in-out infinite;
+  }
+
+  /* Shared app header */
+  .app-header {
+    display: flex; align-items: center; padding: 10px 14px;
+    gap: 8px; position: relative; z-index: 1;
+  }
+  .app-title { font-size: 18px; font-weight: 600; color: #E4ECF4; }
+  .app-status {
+    margin-left: auto; display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: #7899BB;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #5CB8A0; }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 8px 0 12px;
+    background: #0C1420; border-top: 1px solid #1E2E44;
+    position: relative; z-index: 2;
+  }
+  .tab-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 10px; color: #5A7A9A; cursor: pointer; position: relative;
+    padding: 4px 16px;
+  }
+  .tab-item.active { color: #E8A84C; }
+  .tab-icon { font-size: 18px; }
+  .tab-indicator {
+    position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 2px; border-radius: 1px; background: #E8A84C;
+  }
+  .tab-badge {
+    position: absolute; top: -2px; right: 4px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #E8A84C; color: #0C1420;
+    font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Module cards */
+  .mod-card {
+    margin: 6px 14px; border-radius: 12px;
+    overflow: hidden;
+    background: #101C2C; border: 1px solid #1E2E44;
+  }
+  .mod-card.highlight {
+    border-color: #E8A84C;
+    animation: highlightPulse 1.5s ease 2;
+  }
+  .mod-header {
+    padding: 12px 14px 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .mod-title { font-size: 14px; font-weight: 600; color: #E4ECF4; }
+  .mod-badge { font-size: 9px; padding: 2px 8px; border-radius: 6px; }
+  .mod-body { padding: 0 14px 14px; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .metric-item {
+    padding: 12px; border-radius: 8px; text-align: center;
+    background: #162436;
+  }
+  .metric-val { font-size: 22px; font-weight: 700; color: #E4ECF4; }
+  .metric-lbl { font-size: 10px; color: #7899BB; margin-top: 2px; }
+
+  /* Chat messages */
+  .agent-msg {
+    margin: 8px 14px; padding: 12px 16px;
+    border-radius: 16px 16px 16px 4px;
+    font-size: 14px; max-width: 85%; text-align: left;
+    background: #162436; color: #E4ECF4;
+    animation: fadeSlideUp 0.4s ease;
+  }
+  .user-msg {
+    margin: 8px 14px 8px auto; padding: 12px 16px;
+    border-radius: 16px 16px 4px 16px;
+    font-size: 14px; max-width: 80%; text-align: right;
+    background: #1A3050; color: #E4ECF4;
+    border: 1px solid #2A4060;
+  }
+
+  /* Module link in chat */
+  .module-link {
+    margin: 6px 14px; padding: 10px 14px;
+    border-radius: 10px;
+    background: #101C2C; border: 1px solid #1E2E44;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; transition: border-color 0.2s;
+  }
+  .module-link:hover { border-color: #E8A84C; }
+  .module-link-title { font-size: 13px; font-weight: 600; color: #E4ECF4; }
+  .module-link-action { font-size: 12px; color: #E8A84C; font-weight: 500; }
+
+  /* Chat input */
+  .chat-input-bar {
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+    background: #0C1420;
+  }
+  .chat-field {
+    flex: 1; border: none; border-radius: 20px;
+    padding: 10px 16px; font-size: 14px;
+    background: #162436; color: #E4ECF4;
+    border: 1px solid #1E2E44;
+  }
+  .send-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    background: #E8A84C; color: #0C1420; font-weight: 700;
+  }
+
+  /* Chips */
+  .chip-row { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 14px; }
+  .chip {
+    padding: 7px 14px; border-radius: 16px;
+    font-size: 12px; white-space: nowrap;
+    background: #12203A; color: #E8A84C;
+    border: 1px solid #E8A84C; cursor: pointer; transition: all 0.2s;
+  }
+  .chip:hover { background: #1A3050; }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px; text-align: center;
+    position: relative; z-index: 1;
+  }
+  .empty-title { font-size: 16px; color: #7899BB; margin-top: 16px; }
+  .empty-action { font-size: 13px; color: #E8A84C; margin-top: 8px; cursor: pointer; }
+
+  /* Creation ceremony */
+  .creation-ceremony {
+    margin: 8px 14px; padding: 20px 16px;
+    border-radius: 12px; text-align: center;
+    background: linear-gradient(135deg, #12203A 0%, #1A2844 50%, #12203A 100%);
+    border: 1px solid #2A4060;
+    position: relative; overflow: hidden;
+  }
+  .creation-glow {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 50% 50%, rgba(232,168,76,0.15) 0%, transparent 70%);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .creation-text { position: relative; z-index: 1; }
+  .creation-status { font-size: 12px; color: #E8A84C; font-weight: 500; }
+  .creation-detail { font-size: 11px; color: #7899BB; margin-top: 4px; }
+  .shimmer-bar {
+    height: 3px; border-radius: 2px; margin-top: 12px;
+    background: linear-gradient(90deg, #162436, #E8A84C, #162436);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Settings */
+  .settings-group {
+    margin: 14px; padding: 14px;
+    background: #101C2C; border-radius: 12px; border: 1px solid #1E2E44;
+  }
+  .settings-label { font-size: 11px; color: #7899BB; margin-bottom: 6px; }
+  .settings-value { font-size: 13px; color: #E4ECF4; word-break: break-all; }
+  .settings-field {
+    width: 100%; padding: 8px 12px; border-radius: 8px;
+    background: #162436; border: 1px solid #1E2E44;
+    color: #E4ECF4; font-size: 13px; margin-top: 4px;
+  }
+  .settings-btn {
+    width: 100%; padding: 10px; border-radius: 8px; margin-top: 14px;
+    background: #E8A84C; color: #0C1420; font-weight: 600; font-size: 13px;
+    border: none; cursor: pointer;
+  }
+  .settings-section-title { font-size: 14px; font-weight: 600; color: #E4ECF4; margin: 14px 14px 0; }
+
+  /* Spec tables */
+  .spec-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  .spec-table th { text-align: left; padding: 8px 12px; font-size: 11px; color: #7899BB; border-bottom: 1px solid #1E2E44; }
+  .spec-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #10192A; color: #E4ECF4; }
+  .spec-table .token { font-family: 'SF Mono', monospace; color: #E8A84C; font-size: 12px; }
+
+  /* Comparison columns */
+  .compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 20px 0; }
+  .compare-col { background: #101C2C; border-radius: 12px; padding: 20px; border: 1px solid #1E2E44; }
+  .compare-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .compare-bad { border-color: #CC5F5F; }
+  .compare-bad .compare-title { color: #CC5F5F; }
+  .compare-good { border-color: #5CB8A0; }
+  .compare-good .compare-title { color: #5CB8A0; }
+  .compare-item { font-size: 13px; color: #B8CCE0; padding: 4px 0; }
+
+  .scroll-area { flex: 1; overflow-y: auto; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<div class="header">
+  <h1>Tab Navigation</h1>
+  <div class="subtitle">Replacing auto-transitions with explicit user-controlled navigation.<br>Dashboard-first. Chat as a tool. Settings for later.</div>
+</div>
+
+<!-- ========== 1. THE PROBLEM ========== -->
+<div class="section">
+  <div class="section-title">Why We're Changing</div>
+  <div class="section-desc">The current two-mode architecture uses automatic crossfade transitions triggered by keyboard state, timers, and agent status. This is overengineered and unpredictable.</div>
+
+  <div class="compare-row">
+    <div class="compare-col compare-bad">
+      <div class="compare-title">Before: Auto-Transitions</div>
+      <div class="compare-item">7 triggers (keyboard, timer, agent status...)</div>
+      <div class="compare-item">~100 lines of transition logic</div>
+      <div class="compare-item">App decides which screen you see</div>
+      <div class="compare-item">"Where did my conversation go?"</div>
+      <div class="compare-item">Chat input always visible (even on dashboard)</div>
+      <div class="compare-item">No settings screen — PairingScreen is conditional</div>
+    </div>
+    <div class="compare-col compare-good">
+      <div class="compare-title">After: Tab Navigation</div>
+      <div class="compare-item">1 trigger: user taps a tab</div>
+      <div class="compare-item">Standard tab navigator</div>
+      <div class="compare-item">User decides which screen they see</div>
+      <div class="compare-item">Each tab preserves its scroll position</div>
+      <div class="compare-item">Chat input lives in Chat tab only</div>
+      <div class="compare-item">Settings is a real tab with room to grow</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 2. INFORMATION ARCHITECTURE ========== -->
+<div class="section">
+  <div class="section-title">Information Architecture</div>
+  <div class="section-desc">Three tabs. Dashboard is home. Chat is the tool. Settings configures the app.</div>
+
+  <table class="spec-table">
+    <tr>
+      <th>Tab</th>
+      <th>Icon</th>
+      <th>Label</th>
+      <th>Role</th>
+      <th>Default?</th>
+    </tr>
+    <tr>
+      <td>Home</td>
+      <td>📦</td>
+      <td class="token">Home</td>
+      <td>Module dashboard — scrollable list of SDUI module cards. This is where users spend most time.</td>
+      <td style="color:#5CB8A0; font-weight:600;">Yes</td>
+    </tr>
+    <tr>
+      <td>Chat</td>
+      <td>💬</td>
+      <td class="token">Chat</td>
+      <td>Conversation with the agent. Messages, inline module links, creation ceremony. Input bar at bottom.</td>
+      <td style="color:#7899BB;">No</td>
+    </tr>
+    <tr>
+      <td>Settings</td>
+      <td>⚙️</td>
+      <td class="token">Settings</td>
+      <td>Backend pairing, app preferences. Replaces the conditional PairingScreen.</td>
+      <td style="color:#7899BB;">No</td>
+    </tr>
+  </table>
+
+  <div class="design-note">
+    <strong>Design principle:</strong> The tab bar is the only navigation mechanism. No auto-transitions, no timers, no keyboard-driven mode switches. The user is always in control.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 3. PHONE MOCKUPS ========== -->
+<div class="section">
+  <div class="section-title">Screen Mockups</div>
+  <div class="section-desc">Each tab is a full screen with its own scroll state. The tab bar is constant at the bottom.</div>
+
+  <div class="phones-row">
+
+    <!-- ===== HOME TAB: Dashboard with modules ===== -->
+    <div class="phone-wrapper">
+      <div class="phone-label">📦 Home — Dashboard</div>
+      <div class="phone-sublabel">Default screen. Where you live.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient" style="background:radial-gradient(ellipse at 50% 25%, #1A2844 0%, transparent 55%), radial-gradient(ellipse at 60% 80%, rgba(232,168,76,0.08) 0%, transparent 40%);"></div>
+
+          <div class="app-header">
+            <div class="self-orb" style="width:28px; height:28px;"></div>
+            <span class="app-title">Self</span>
+            <div class="app-status">
+              <div class="status-dot"></div>
+              Connected
+            </div>
+          </div>
+
+          <div class="scroll-area">
+            <!-- Module cards -->
+            <div class="mod-card">
+              <div class="mod-header">
+                <span class="mod-title">🌊 Marine Brest</span>
+                <span class="mod-badge" style="background:rgba(92,184,160,0.15); color:#5CB8A0;">Fresh</span>
+              </div>
+              <div class="mod-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-val" style="font-size:18px;">14 kn</div>
+                    <div class="metric-lbl">Wind</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-val" style="font-size:18px;">1.2 m</div>
+                    <div class="metric-lbl">Waves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mod-card">
+              <div class="mod-header">
+                <span class="mod-title">📊 MRR Tracker</span>
+                <span class="mod-badge" style="background:rgba(92,184,160,0.15); color:#5CB8A0;">Fresh</span>
+              </div>
+              <div class="mod-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-val" style="font-size:18px;">€4.2k</div>
+                    <div class="metric-lbl">MRR</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-val" style="font-size:18px; color:#5CB8A0;">+12%</div>
+                    <div class="metric-lbl">Growth</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mod-card">
+              <div class="mod-header">
+                <span class="mod-title">🏃 Running Log</span>
+                <span class="mod-badge" style="background:rgba(232,168,76,0.15); color:#E8A84C;">2h ago</span>
+              </div>
+              <div class="mod-body">
+                <div class="metric-grid">
+                  <div class="metric-item">
+                    <div class="metric-val" style="font-size:18px;">42 km</div>
+                    <div class="metric-lbl">This week</div>
+                  </div>
+                  <div class="metric-item">
+                    <div class="metric-val" style="font-size:18px;">5:12</div>
+                    <div class="metric-lbl">Avg pace</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mod-card">
+              <div class="mod-header">
+                <span class="mod-title">📅 Calendar</span>
+                <span class="mod-badge" style="background:rgba(92,184,160,0.15); color:#5CB8A0;">Live</span>
+              </div>
+              <div class="mod-body">
+                <div style="padding:8px; background:#162436; border-radius:8px; font-size:12px; color:#B8CCE0;">
+                  <div style="margin-bottom:4px;">🔵 10:00 — Team standup</div>
+                  <div style="margin-bottom:4px;">🟠 14:00 — Client call</div>
+                  <div>⚪ 17:00 — Gym</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <div class="tab-item active">
+              <span class="tab-icon">📦</span>
+              <span>Home</span>
+              <div class="tab-indicator"></div>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">⚙️</span>
+              <span>Settings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CHAT TAB: Conversation ===== -->
+    <div class="phone-wrapper">
+      <div class="phone-label">💬 Chat — Conversation</div>
+      <div class="phone-sublabel">Talk to the agent. Module links bridge to Home.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient" style="background:radial-gradient(ellipse at 40% 30%, #1A2844 0%, transparent 50%);"></div>
+
+          <div class="app-header">
+            <div class="self-orb" style="width:28px; height:28px;"></div>
+            <span class="app-title">Self</span>
+            <div class="app-status">
+              <div class="status-dot"></div>
+              Connected
+            </div>
+          </div>
+
+          <div class="scroll-area">
+            <div class="user-msg">Track my running this week</div>
+
+            <div class="agent-msg">
+              I'll create a running tracker for you! Let me set that up.
+            </div>
+
+            <div class="creation-ceremony">
+              <div class="creation-glow"></div>
+              <div class="creation-text">
+                <div style="margin-bottom:8px;"><div class="self-orb-creating" style="width:28px; height:28px;"></div></div>
+                <div class="creation-status">Creating Running Log...</div>
+                <div class="creation-detail">Connecting to fitness data</div>
+                <div class="shimmer-bar"></div>
+              </div>
+            </div>
+
+            <div class="agent-msg">
+              Done! Your running tracker is ready. It shows your weekly distance and average pace.
+            </div>
+
+            <!-- Module link — the bridge -->
+            <div class="module-link">
+              <span class="module-link-title">🏃 Running Log</span>
+              <span class="module-link-action">voir &rarr;</span>
+            </div>
+
+            <div class="user-msg">And the marine weather for Brest?</div>
+
+            <div class="agent-msg">
+              On it! Creating a marine weather module for Brest.
+            </div>
+
+            <div class="module-link">
+              <span class="module-link-title">🌊 Marine Brest</span>
+              <span class="module-link-action">voir &rarr;</span>
+            </div>
+          </div>
+
+          <!-- Chat input -->
+          <div class="chat-input-bar">
+            <input class="chat-field" type="text" placeholder="Message...">
+            <button class="send-btn">▶</button>
+          </div>
+
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <div class="tab-item">
+              <span class="tab-icon">📦</span>
+              <span>Home</span>
+              <div class="tab-badge">2</div>
+            </div>
+            <div class="tab-item active">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+              <div class="tab-indicator"></div>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">⚙️</span>
+              <span>Settings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== HOME: Empty state ===== -->
+    <div class="phone-wrapper">
+      <div class="phone-label">📦 Home — Empty State</div>
+      <div class="phone-sublabel">Day 1. No modules yet.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient" style="background:radial-gradient(ellipse at 50% 40%, #1A2844 0%, transparent 50%);"></div>
+
+          <div class="app-header">
+            <div class="self-orb" style="width:28px; height:28px;"></div>
+            <span class="app-title">Self</span>
+            <div class="app-status">
+              <div class="status-dot"></div>
+              Connected
+            </div>
+          </div>
+
+          <div class="empty-state">
+            <div class="self-orb" style="width:64px; height:64px;"></div>
+            <div class="empty-title">No modules yet</div>
+            <div class="empty-action">💬 Ask Self to create one &rarr;</div>
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab-item active">
+              <span class="tab-icon">📦</span>
+              <span>Home</span>
+              <div class="tab-indicator"></div>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">⚙️</span>
+              <span>Settings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Second row of mockups -->
+  <div class="phones-row" style="margin-top: 32px;">
+
+    <!-- ===== SETTINGS TAB ===== -->
+    <div class="phone-wrapper">
+      <div class="phone-label">⚙️ Settings</div>
+      <div class="phone-sublabel">Backend config. Room to grow.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient" style="background:radial-gradient(ellipse at 50% 30%, #1A2844 0%, transparent 50%);"></div>
+
+          <div class="app-header">
+            <div class="self-orb" style="width:28px; height:28px;"></div>
+            <span class="app-title">Settings</span>
+          </div>
+
+          <div class="scroll-area">
+            <div class="settings-section-title">Connection</div>
+            <div class="settings-group">
+              <div class="settings-label">Backend URL</div>
+              <input class="settings-field" value="wss://my-tunnel.trycloudflare.com/ws" readonly>
+              <div style="height:12px;"></div>
+              <div class="settings-label">Status</div>
+              <div class="settings-value" style="color:#5CB8A0;">● Connected</div>
+            </div>
+
+            <div class="settings-section-title">Session</div>
+            <div class="settings-group">
+              <div class="settings-label">Paired since</div>
+              <div class="settings-value">Feb 24, 2026 — 2:14 PM</div>
+              <div style="height:8px;"></div>
+              <div class="settings-label">Modules</div>
+              <div class="settings-value">4 active</div>
+              <button class="settings-btn" style="background:transparent; color:#CC5F5F; border:1px solid rgba(204,95,95,0.3);">Disconnect &amp; Re-pair</button>
+            </div>
+
+            <div class="settings-section-title">About</div>
+            <div class="settings-group">
+              <div class="settings-label">Version</div>
+              <div class="settings-value">1.0.0 (dev)</div>
+            </div>
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab-item">
+              <span class="tab-icon">📦</span>
+              <span>Home</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+            </div>
+            <div class="tab-item active">
+              <span class="tab-icon">⚙️</span>
+              <span>Settings</span>
+              <div class="tab-indicator"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== HOME: Module highlighted after "voir" ===== -->
+    <div class="phone-wrapper">
+      <div class="phone-label">📦 Home — After "voir &rarr;"</div>
+      <div class="phone-sublabel">User tapped "voir" in chat. Module highlighted.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient" style="background:radial-gradient(ellipse at 50% 25%, #1A2844 0%, transparent 55%), radial-gradient(ellipse at 60% 80%, rgba(232,168,76,0.08) 0%, transparent 40%);"></div>
+
+          <div class="app-header">
+            <div class="self-orb" style="width:28px; height:28px;"></div>
+            <span class="app-title">Self</span>
+            <div class="app-status">
+              <div class="status-dot"></div>
+              Connected
+            </div>
+          </div>
+
+          <div class="scroll-area">
+            <div class="mod-card" style="opacity:0.5;">
+              <div class="mod-header">
+                <span class="mod-title">📊 MRR Tracker</span>
+              </div>
+              <div class="mod-body">
+                <div class="metric-grid">
+                  <div class="metric-item"><div class="metric-val" style="font-size:16px;">€4.2k</div><div class="metric-lbl">MRR</div></div>
+                  <div class="metric-item"><div class="metric-val" style="font-size:16px; color:#5CB8A0;">+12%</div><div class="metric-lbl">Growth</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Highlighted module -->
+            <div class="mod-card highlight">
+              <div class="mod-header">
+                <span class="mod-title">🏃 Running Log</span>
+                <span class="mod-badge" style="background:rgba(232,168,76,0.15); color:#E8A84C;">New</span>
+              </div>
+              <div class="mod-body">
+                <div class="metric-grid">
+                  <div class="metric-item"><div class="metric-val" style="font-size:18px;">42 km</div><div class="metric-lbl">This week</div></div>
+                  <div class="metric-item"><div class="metric-val" style="font-size:18px;">5:12</div><div class="metric-lbl">Avg pace</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mod-card" style="opacity:0.5;">
+              <div class="mod-header">
+                <span class="mod-title">🌊 Marine Brest</span>
+              </div>
+              <div class="mod-body">
+                <div class="metric-grid">
+                  <div class="metric-item"><div class="metric-val" style="font-size:16px;">14 kn</div><div class="metric-lbl">Wind</div></div>
+                  <div class="metric-item"><div class="metric-val" style="font-size:16px;">1.2 m</div><div class="metric-lbl">Waves</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab-item active">
+              <span class="tab-icon">📦</span>
+              <span>Home</span>
+              <div class="tab-indicator"></div>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">⚙️</span>
+              <span>Settings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS: Not paired ===== -->
+    <div class="phone-wrapper">
+      <div class="phone-label">⚙️ Settings — Not Paired</div>
+      <div class="phone-sublabel">First launch. Must pair before using app.</div>
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-content">
+          <div class="ambient" style="background:radial-gradient(ellipse at 50% 30%, #1A2844 0%, transparent 50%);"></div>
+
+          <div class="app-header">
+            <div class="self-orb" style="width:28px; height:28px;"></div>
+            <span class="app-title">Settings</span>
+          </div>
+
+          <div class="scroll-area">
+            <div class="settings-section-title">Connect to Backend</div>
+            <div class="settings-group">
+              <div class="settings-label">Backend URL</div>
+              <input class="settings-field" value="" placeholder="wss://your-backend.com/ws">
+              <div style="height:12px;"></div>
+              <div class="settings-label">Pairing Token</div>
+              <input class="settings-field" value="" placeholder="Paste token here">
+              <button class="settings-btn">Connect</button>
+            </div>
+
+            <div class="design-note" style="margin:14px; font-size:12px;">
+              <strong>Tip:</strong> Run <span style="font-family:monospace; color:#E4ECF4;">./self.sh</span> on your machine to get the backend URL and pairing token.
+            </div>
+          </div>
+
+          <div class="tab-bar">
+            <div class="tab-item">
+              <span class="tab-icon">📦</span>
+              <span>Home</span>
+            </div>
+            <div class="tab-item">
+              <span class="tab-icon">💬</span>
+              <span>Chat</span>
+            </div>
+            <div class="tab-item active">
+              <span class="tab-icon">⚙️</span>
+              <span>Settings</span>
+              <div class="tab-indicator"></div>
+              <div class="tab-badge" style="background:#CC5F5F;">!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 4. MODULE LINK SPEC ========== -->
+<div class="section">
+  <div class="section-title">Module Link — The Bridge</div>
+  <div class="section-desc">When the agent creates a module during chat, a compact link card appears inline. Tapping "voir" switches to the Home tab and scrolls to the module with a highlight animation.</div>
+
+  <table class="spec-table">
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Component</td><td class="token">ModuleLink</td></tr>
+    <tr><td>Context</td><td>Chat tab only, after agent confirms module creation</td></tr>
+    <tr><td>Content</td><td>Module emoji + title (left) — "voir →" action (right)</td></tr>
+    <tr><td>Tap action</td><td>1. Switch to Home tab<br>2. Scroll to target module<br>3. Play highlight animation (amber border pulse, 2 cycles)</td></tr>
+    <tr><td>Background</td><td class="token">#101C2C</td></tr>
+    <tr><td>Border</td><td class="token">#1E2E44</td> (hover: <span class="token">#E8A84C</span>)</tr>
+    <tr><td>Border radius</td><td class="token">10px</td></tr>
+    <tr><td>Padding</td><td class="token">10px 14px</td></tr>
+  </table>
+
+  <div class="design-note">
+    <strong>Highlight animation:</strong> When the Home tab receives focus via a "voir" action, the target module card gets a temporary amber border (<span style="font-family:monospace; color:#E8A84C;">#E8A84C</span>) with a pulsing glow effect. Other cards dim to 50% opacity. Animation runs 2 cycles (3s total), then all cards return to normal.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 5. TAB BAR SPEC ========== -->
+<div class="section">
+  <div class="section-title">Tab Bar Specification</div>
+  <div class="section-desc">A thin, discreet bottom bar. Always visible. No surprises.</div>
+
+  <table class="spec-table">
+    <tr><th>Property</th><th>Value</th></tr>
+    <tr><td>Position</td><td>Bottom of screen, above safe area inset</td></tr>
+    <tr><td>Height</td><td class="token">~50px</td> (icon + label + padding)</tr>
+    <tr><td>Background</td><td class="token">#0C1420</td></tr>
+    <tr><td>Top border</td><td class="token">1px solid #1E2E44</td></tr>
+    <tr><td>Active tab color</td><td class="token">#E8A84C</td></tr>
+    <tr><td>Inactive tab color</td><td class="token">#5A7A9A</td></tr>
+    <tr><td>Active indicator</td><td>2px amber line below icon (<span class="token">20px wide, 2px tall</span>)</td></tr>
+    <tr><td>Badge (notifications)</td><td>Circle on tab icon — amber for count, red for alert</td></tr>
+    <tr><td>Animation</td><td>None. Instant tab switch. No slide, no fade.</td></tr>
+  </table>
+
+  <div class="design-note">
+    <strong>Badge rules:</strong><br>
+    • <strong>Home tab badge</strong> — Shows count of new modules created since user last viewed Home tab<br>
+    • <strong>Settings tab badge</strong> — Red "!" when not paired (required action)<br>
+    • <strong>Chat tab</strong> — No badge (user initiates conversation, not the other way)
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 6. NAVIGATION FLOWS ========== -->
+<div class="section">
+  <div class="section-title">Navigation Flows</div>
+  <div class="section-desc">Every user journey mapped.</div>
+
+  <table class="spec-table">
+    <tr><th>Scenario</th><th>Flow</th></tr>
+    <tr>
+      <td><strong>First launch (not paired)</strong></td>
+      <td>App opens → Home tab (empty state) → Settings tab has red badge "!" → User taps Settings → Enters URL + token → Connects → Badge disappears → User goes to Chat or stays on Home</td>
+    </tr>
+    <tr>
+      <td><strong>First launch (paired, 0 modules)</strong></td>
+      <td>App opens → Home tab (empty state with orb + "Ask Self to create one →") → User taps link or Chat tab → Types request → Module created → Module link appears → User taps "voir →" → Home tab with highlighted module</td>
+    </tr>
+    <tr>
+      <td><strong>Return user (has modules)</strong></td>
+      <td>App opens → Home tab (module dashboard) → User browses modules → Taps Chat to ask something new → Returns to Home</td>
+    </tr>
+    <tr>
+      <td><strong>Module creation from chat</strong></td>
+      <td>User sends message → Agent responds → Creation ceremony animation → Agent confirms → Module link card appears → Badge increments on Home tab → User taps "voir →" → Home tab, scrolled to module, highlight pulse</td>
+    </tr>
+    <tr>
+      <td><strong>Background → Foreground</strong></td>
+      <td>App resumes on the same tab the user left. No mode evaluation. No transition.</td>
+    </tr>
+  </table>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 7. WHAT GETS REMOVED ========== -->
+<div class="section">
+  <div class="section-title">What Gets Removed</div>
+  <div class="section-desc">The new architecture eliminates all auto-transition logic from App.tsx.</div>
+
+  <table class="spec-table">
+    <tr><th>Removed</th><th>Replaced by</th></tr>
+    <tr><td class="token">screenModeStore</td><td>Tab navigator state (built-in)</td></tr>
+    <tr><td class="token">CROSSFADE_DURATION</td><td>Not needed — instant tab switch</td></tr>
+    <tr><td class="token">DASHBOARD_TRANSITION_DELAY</td><td>Not needed — no auto-transition</td></tr>
+    <tr><td class="token">BACKGROUND_THRESHOLD_MS</td><td>Not needed — resume on same tab</td></tr>
+    <tr><td class="token">chatOpacity / dashOpacity</td><td>Not needed — tabs are separate views</td></tr>
+    <tr><td class="token">dashboardTimerRef</td><td>Not needed — no timer</td></tr>
+    <tr><td class="token">backgroundTimeRef</td><td>Not needed — no foreground re-evaluation</td></tr>
+    <tr><td class="token">useKeyboardVisible hook</td><td>Not needed for navigation (may keep for input margin)</td></tr>
+    <tr><td class="token">PairingScreen (conditional render)</td><td>Settings tab with pairing form</td></tr>
+    <tr><td>Keyboard open → Chat mode</td><td>User taps Chat tab</td></tr>
+    <tr><td>Keyboard close + modules → Dashboard</td><td>User taps Home tab</td></tr>
+    <tr><td>AppState foreground handler</td><td>Nothing — tab state persists</td></tr>
+  </table>
+
+  <div class="design-note">
+    <strong>Estimated code reduction:</strong> ~120 lines of transition logic in App.tsx replaced by ~20 lines of tab navigator config. The <span style="font-family:monospace; color:#E4ECF4;">screenModeStore</span> file can be deleted entirely.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ========== 8. IMPLEMENTATION NOTES ========== -->
+<div class="section">
+  <div class="section-title">Implementation Notes</div>
+  <div class="section-desc">For the dev agent.</div>
+
+  <table class="spec-table">
+    <tr><th>Topic</th><th>Guidance</th></tr>
+    <tr>
+      <td>Tab navigator</td>
+      <td>Use <span class="token">@react-navigation/bottom-tabs</span> with <span class="token">createBottomTabNavigator</span>. Expo Router alternative: file-based <span class="token">app/(tabs)/</span> layout. Choose based on current routing setup.</td>
+    </tr>
+    <tr>
+      <td>Tab bar styling</td>
+      <td>Custom <span class="token">tabBar</span> component using Twilight tokens. Background <span class="token">#0C1420</span>, border <span class="token">#1E2E44</span>. Use existing <span class="token">tokens.ts</span> values.</td>
+    </tr>
+    <tr>
+      <td>"voir →" navigation</td>
+      <td>Use <span class="token">navigation.navigate('Home', { highlightModuleId: id })</span>. Home screen reads param, scrolls FlatList to index, applies highlight style.</td>
+    </tr>
+    <tr>
+      <td>Badge state</td>
+      <td>Track <span class="token">newModulesSinceLastHomeVisit</span> in moduleStore. Reset to 0 when Home tab gains focus.</td>
+    </tr>
+    <tr>
+      <td>Settings tab</td>
+      <td>Absorb <span class="token">PairingScreen</span> content into Settings. Remove conditional render from App.tsx. Show pairing form when not connected, connection info when connected.</td>
+    </tr>
+    <tr>
+      <td>Keyboard handling</td>
+      <td>Only needed in Chat tab for input margin. Remove all keyboard → mode transition logic.</td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>

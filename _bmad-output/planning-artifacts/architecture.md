@@ -588,50 +588,46 @@ Normalise sur 0-100. Recalcul : cron backend quotidien a 03:00 UTC. Pas d'appel 
 - **Data errors:** `try/catch` dans `ModuleCard` autour du data fetching → etat "Donnees indisponibles" affiche dans la card sans crash du composant.
 - Le `moduleStore` distingue ces deux cas via `dataStatus: 'ok' | 'stale' | 'error'`, distinct du lifecycle `status`. Un module peut etre `status: 'active'` mais `dataStatus: 'error'` si son dernier refresh a echoue.
 
-### Two-Mode Screen Architecture (Direction D — revised)
+### Tab Navigation Architecture (replaces Direction D two-mode system)
 
-The app has a single screen with **two exclusive display modes** — Chat Mode and Dashboard Mode. They are **never shown simultaneously**. The chat input bar is the constant anchor at the bottom of both modes. No tabs, no navigation — the content above the input evolves based on user intent.
+The app uses a **three-tab bottom navigation** — Home, Chat, Settings. Each tab is a full screen with independent scroll state. Navigation is explicit: the user taps a tab. No auto-transitions, no timers, no keyboard-driven mode switches.
 
-**Mode definitions:**
+**Tab definitions:**
 
-| Mode | When Active | Layout | Content |
-|------|-------------|--------|---------|
-| **Chat Mode** | 0 modules (always), keyboard open, active conversation | Full-screen: ChatThread (scrollable) + ChatInput | Chat messages + inline module cards in conversation flow |
-| **Dashboard Mode** | Modules exist + keyboard closed + no active conversation | Full-screen: StatusLine + ModuleList (scrollable) + ChatInput | Module cards in feed/grid layout, no chat visible |
+| Tab | Icon | Default? | Content | Role |
+|-----|------|----------|---------|------|
+| **Home** | 📦 | Yes | ModuleList (scrollable FlatList of ModuleCards) | Module dashboard — where users spend most time |
+| **Chat** | 💬 | No | ChatThread (scrollable) + ChatInput | Agent conversation with inline ModuleLinks |
+| **Settings** | ⚙️ | No | Backend pairing form / connection info / preferences | Replaces conditional PairingScreen |
 
-**Inline modules in Chat Mode:** When the agent creates a module during conversation, the ModuleCard is rendered **inside the ChatThread scroll**, immediately after the agent message that announced it. This reuses the same `ModuleCard` bridge component as Dashboard Mode. When the keyboard opens, inline modules scroll up naturally with the rest of the conversation — no layout competition.
+**ModuleLink bridge (Chat → Home):** When the agent creates a module during conversation, a compact `ModuleLink` card appears inline in the ChatThread — module emoji + title (left), "voir →" action (right). Tapping "voir →" switches to the Home tab, scrolls to the target module, and plays a highlight animation (amber border pulse, 2 cycles, 3s total).
 
-**Transition rules:**
+**Badge system:**
 
-| Trigger | From | To | Animation |
-|---------|------|----|-----------|
-| Tap on chat input | Dashboard | Chat | Crossfade 250ms |
-| Keyboard opens | Dashboard | Chat | Crossfade 250ms |
-| Keyboard closes + modules > 0 | Chat | Dashboard | 1s delay + crossfade 250ms |
-| Keyboard closes + 0 modules | Chat | Chat | No transition |
-| Agent sends message | Dashboard | Chat | Crossfade 250ms |
-| App opens / foreground resume | — | Dashboard (if modules) or Chat (if none) | Instant |
+| Tab | Badge | Trigger |
+|-----|-------|---------|
+| Home | Amber count | New modules created since user last visited Home tab (resets on tab focus) |
+| Settings | Red "!" | Not paired (required action) |
+| Chat | None | User initiates conversation |
 
 **Implementation pattern:**
 
 ```typescript
-// stores/screenModeStore.ts
-type ScreenMode = 'chat' | 'dashboard';
-
-// hooks/useKeyboardVisible.ts — keyboard event listener
-// App.tsx — conditional render: mode === 'chat' ? <ChatThread /> : <ModuleList />
-// ChatInput.tsx — onFocus triggers setMode('chat')
+// Tab navigator using @react-navigation/bottom-tabs or Expo Router app/(tabs)/
+// Home tab: <ModuleList /> with FlatList
+// Chat tab: <ChatThread /> + <ChatInput />
+// Settings tab: <SettingsScreen /> (absorbs PairingScreen)
+// ModuleLink: navigation.navigate('Home', { highlightModuleId: id })
+// Badge state: newModulesSinceLastHomeVisit in moduleStore, reset on Home focus
 ```
 
-`screenModeStore` is the source of truth for which mode is active. Transitions are driven by keyboard events (via `useKeyboardVisible` hook) and user intent (tapping input). Mode is **not persisted** — it is derived from state on every app open.
+Tab switching is **instant** — no animation, no crossfade. When `Reduce Motion` is enabled, behavior is identical (already instant). Tab state is not persisted — on app open, Home tab is selected by default.
 
-**Transition strategy:** Mode changes use `Animated.View` opacity crossfade (250ms ease-in-out). When `Reduce Motion` is enabled, mode changes are instant (no animation). The 1-second delay before switching from Chat → Dashboard prevents jarring transitions when the user briefly dismisses the keyboard.
+**StatusLine component (Home tab):**
 
-**StatusLine component (Dashboard Mode):**
+Contextual greeting + system status bar appearing above the module list in the Home tab. Content: time-aware greeting ("Good morning {user_name}"), connection status indicator, module freshness summary.
 
-Contextual greeting + system status bar appearing above the module list in Dashboard Mode. Content: time-aware greeting ("Good morning {user_name}"), connection status indicator, module freshness summary. Hidden in Chat Mode, visible in Dashboard Mode.
-
-**UX reference:** See `_bmad-output/planning-artifacts/ux-twilight-deep-dive.html` section "Screen Architecture: Chat & Dashboard" for visual mockups, transition diagrams, and before/after comparison.
+**UX reference:** See `_bmad-output/planning-artifacts/ux-tab-navigation.html` for visual mockups, tab bar specification, ModuleLink spec, and navigation flow diagrams.
 
 **Data freshness indicators per module:**
 
@@ -1159,7 +1155,7 @@ self-app/
 │   ├── mobile/                       # Expo SDK 54, RN 0.81, React 19.1
 │   │   ├── app/                      # Expo Router — pages only, minimal logic
 │   │   │   ├── _layout.tsx           # Root layout (Orb, connection status)
-│   │   │   └── index.tsx             # Single screen — two-mode rendering (Chat / Dashboard)
+│   │   │   └── index.tsx             # Tab navigator — Home / Chat / Settings
 │   │   ├── components/
 │   │   │   ├── shell/                # Static UI — always visible
 │   │   │   │   ├── Orb.tsx           # Pulsing brand mark + agent state
@@ -1186,7 +1182,7 @@ self-app/
 │   │   │       ├── templates.ts     # Composition template registry
 │   │   │       └── index.ts
 │   │   ├── hooks/                    # Custom React hooks
-│   │   │   ├── useKeyboardVisible.ts # Keyboard visibility detection for mode transitions
+│   │   │   ├── useKeyboardVisible.ts # Keyboard visibility detection for Chat tab input margin
 │   │   │   └── useModuleLifecycle.ts # Module state transitions
 │   │   ├── services/                 # Singletons
 │   │   │   ├── logger.ts             # Structured JSON → WS to backend
@@ -1195,7 +1191,7 @@ self-app/
 │   │   ├── stores/                   # Zustand — one per domain
 │   │   │   ├── moduleStore.ts        # Module specs, lifecycle state, dataStatus
 │   │   │   ├── chatStore.ts          # Chat messages, streaming state, inline module_card entries
-│   │   │   ├── screenModeStore.ts    # Screen mode: 'chat' | 'dashboard' + transitions
+
 │   │   │   ├── connectionStore.ts    # WS status, reconnection
 │   │   │   ├── authStore.ts          # Session token, API keys
 │   │   │   └── errorStore.ts         # Error accumulation for UI

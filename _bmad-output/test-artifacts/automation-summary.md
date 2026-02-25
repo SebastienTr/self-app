@@ -1,8 +1,8 @@
 ---
 stepsCompleted: ['step-01-preflight-and-context', 'step-02-identify-targets', 'step-03-generate-tests', 'step-04-validate']
 lastStep: 'step-04-validate'
-lastSaved: '2026-02-23'
-story: '2-1'
+lastSaved: '2026-02-25'
+story: '2-5b'
 inputDocuments:
   - _bmad-output/implementation-artifacts/3-3-module-rendering-pipeline.md
   - _bmad-output/implementation-artifacts/1-5-offline-message-queue-and-cached-data-rendering.md
@@ -672,3 +672,187 @@ The following critical paths and edge cases were identified as uncovered after r
 - P0 (Critical paths): 28 tests — LLM error path through WS stack, error format compliance (code/message/agent_action), status:idle always sent (recovery), message count invariants, streaming indicator component existence
 - P1 (Important features): 34 tests — empty message handling, _log_llm_usage failure isolation, ChatThread re-render behavior, mixed message types, streaming bubble lifecycle, sequential chats
 - P2 (Edge cases): 23 tests — NULL tokens in DB, very long content, empty content, DB path failures, large message lists, accessibility label format validation
+
+---
+
+# Test Automation Expansion — Story 2-5b
+
+## Summary
+
+Expanded test coverage for Story 2-5b (Tab Navigation Architecture) by adding 109 new tests across 10 new test files, bringing the mobile test total from 1122 to 1231 tests (66 suites). All tests pass with zero regressions. The story replaced the two-mode crossfade architecture with a standard three-tab bottom navigation and introduced ModuleLink, badge system, HomeScreen empty state, and SettingsScreen pairing/connection info modes.
+
+## Coverage Targets
+
+Mode: BMad-Integrated (using story 2-5b artifact for context)
+Coverage target: critical-paths + edge cases
+Detected stack: mobile frontend
+
+## Gap Analysis
+
+The dev phase (Task 9 notes) deferred new test creation: "New tests deferred (existing 1122 tests all pass)." This TEA expansion fills that gap by creating comprehensive unit tests and edge case tests for all 6 new files plus the new moduleStore badge actions.
+
+Coverage gaps identified:
+
+1. **TabNavigator** — No tests verifying 3-screen registration, Home as initial route, animation:none config, custom tabBar prop
+2. **CustomTabBar** — No tests for tab rendering, active state marking, press/navigation logic, Home badge (newModulesSinceLastHomeVisit), Settings badge (authStatus), prevented default, accessibility roles
+3. **HomeScreen** — No tests for empty state (Orb + CTA), ModuleList rendering, badge reset on focus, highlightModuleId param handling/clearing, focus listener cleanup
+4. **ChatScreen** — No tests for ChatThread+ChatInput rendering, input disabled state (agent busy / disconnected), handleSend wiring (wsClient + chatStore), ModuleLink press -> navigate Home with highlightModuleId
+5. **SettingsScreen** — No tests for pairing mode (unconfigured/auth_failed/pairing), connection info mode, disconnect flow (wsClient.disconnect + clearAuth), About section, authenticating state behavior
+6. **ModuleLink** — No tests for title/emoji rendering, "voir" action text, accessibility role/label, onPress callback, edge cases (long titles, special characters, missing emoji, rapid taps)
+7. **moduleStore badge actions** — incrementNewModuleCount and resetNewModuleCount not tested, independence from modules Map not verified
+
+## Tests Added
+
+### navigation/TabNavigator.test.tsx (7 new tests — NEW FILE)
+
+- Renders the tab navigator
+- Registers exactly 3 screens
+- Registers Home, Chat, and Settings screens
+- Sets Home as initial route
+- Configures headerShown to false
+- Configures animation to none for instant switching
+- Provides a custom tabBar component
+
+### navigation/TabBar.test.tsx (15 new tests — NEW FILE)
+
+- Renders three tabs
+- Renders Home, Chat, Settings labels
+- Renders tab icons (package, speech bubble, gear emojis)
+- Marks Home tab as selected when activeIndex is 0
+- Marks Chat tab as selected when activeIndex is 1
+- Marks Settings tab as selected when activeIndex is 2
+- Navigates to tab when pressing an inactive tab
+- Does not navigate when pressing the already-active tab
+- Emits tabPress event on press
+- Shows badge when newModulesSinceLastHomeVisit > 0
+- Does not show badge when newModulesSinceLastHomeVisit is 0
+- Shows "!" badge when not authenticated
+- Shows "!" badge during pairing state
+- Does not show "!" badge when authenticated
+- Never shows a badge on Chat tab
+
+### navigation/TabBar.edge.test.tsx (10 new tests — NEW FILE)
+
+- Shows badge with count 1 (boundary)
+- Shows badge with large count (99)
+- Shows both Home and Settings badges simultaneously
+- Does not navigate when event default is prevented
+- Shows Settings badge for auth_failed status
+- Shows Settings badge for authenticating status
+- Hides Settings badge when authenticated
+- Renders without crash when bottom inset is 0
+- Each tab has proper accessibility role
+- Tab accessibility labels default to tab name
+
+### screens/HomeScreen.test.tsx (11 new tests — NEW FILE)
+
+- Shows empty state when no modules exist
+- Shows Orb in empty state
+- Shows "Ask Self to create one" link in empty state
+- Navigates to Chat when empty state link is tapped
+- Empty state link has "link" accessibility role
+- Renders ModuleList when modules exist
+- Passes highlightModuleId to ModuleList
+- Resets newModulesSinceLastHomeVisit when focus event fires
+- Registers focus listener on mount
+- Clears highlightModuleId param after reading it
+- Does not call setParams when highlightModuleId is not set
+
+### screens/HomeScreen.edge.test.tsx (5 new tests — NEW FILE)
+
+- Unregisters focus listener on unmount
+- Resets badge count on every focus event
+- Is idempotent (resetting already-zero count is safe)
+- Switches from empty state to module list when modules are added
+- Shows empty state even if highlightModuleId is set but no modules exist
+
+### screens/ChatScreen.test.tsx (10 new tests — NEW FILE)
+
+- Renders without crashing
+- Renders ChatInput with "Message input" label
+- Renders ChatThread with "Conversation thread" label
+- Enables input when agent is idle and connection is connected
+- Disables input when agent is thinking
+- Disables input when connection is disconnected
+- Disables input when both agent is busy and disconnected
+- Sends message via wsClient when user submits text
+- Adds user message to chatStore when sending
+- Navigates to Home with highlightModuleId when ModuleLink is pressed
+
+### screens/SettingsScreen.test.tsx (15 new tests — NEW FILE)
+
+- Shows PairingScreen when authStatus is unconfigured
+- Shows PairingScreen when authStatus is auth_failed
+- Shows PairingScreen when authStatus is pairing
+- Shows Connection section title
+- Shows backend URL
+- Shows connection status
+- Shows module count
+- Does not show PairingScreen when authenticated
+- Renders disconnect button
+- Has accessibility label for disconnect button
+- Calls disconnect and clears auth on press
+- Resets auth store to unconfigured after disconnect
+- Shows About section title
+- Shows app name "Self"
+- Shows version number
+
+### screens/SettingsScreen.edge.test.tsx (6 new tests — NEW FILE)
+
+- Shows connection info during authenticating state (not pairing form)
+- Shows "N/A" when backendUrl is null
+- Shows 0 module count when store is empty
+- Shows "disconnected" when connection is disconnected
+- Shows "reconnecting" when connection is reconnecting
+- Shows "connecting" when connection is connecting
+
+### components/bridge/ModuleLink.test.tsx (9 new tests — NEW FILE)
+
+- Renders the module title
+- Renders the "voir" action text
+- Renders emoji when provided
+- Does not render emoji element when emoji is not provided
+- Has link accessibility role
+- Has descriptive accessibility label with module title
+- Calls onPress with moduleId when tapped
+- Does not crash when onPress is not provided
+- Calls onPress exactly once per tap
+
+### components/bridge/ModuleLink.edge.test.tsx (10 new tests — NEW FILE)
+
+- Renders very long title without crashing
+- Renders title with special characters
+- Renders title with unicode/emoji characters
+- Renders empty string title without crashing
+- Renders complex multi-codepoint emoji
+- Renders with empty string emoji (no crash)
+- Renders with undefined emoji (no emoji element)
+- Fires onPress for each rapid tap
+- Passes moduleId with special characters to onPress
+- Accessibility label reflects the exact title
+
+### stores/moduleStore.badge.test.ts (11 new tests — NEW FILE)
+
+- Starts with newModulesSinceLastHomeVisit at 0
+- Increments counter by 1
+- Increments counter multiple times
+- Increments from non-zero value
+- Resets counter to 0
+- Is idempotent (resetting 0 remains 0)
+- Handles full increment-reset cycle
+- Badge count is independent of modules being added
+- Badge count is independent of modules being removed
+- loadFromCache does not affect badge count
+- Multiple rapid increments produce correct count
+
+## Test Results (Story 2-5b expansion)
+
+- Mobile: 1231 tests, 66 suites, all passing (up from 1122)
+- Zero regressions from previous stories
+- New tests added: 109 mobile (10 new test files)
+
+## Priority Breakdown
+
+- P0 (Critical paths): 35 tests — Tab navigation structure (7), badge display on Home/Settings (7), empty state rendering + CTA navigation (5), ChatScreen message sending + disabled state (6), SettingsScreen disconnect flow (4), ModuleLink press navigation (3), badge increment/reset correctness (3)
+- P1 (Important features): 42 tests — Active tab marking (3), TabBar press handling (3), HomeScreen focus listener + badge reset (4), ChatScreen ModuleLink->Home navigation (1), SettingsScreen pairing/connection modes (8), ModuleLink accessibility (2), connection status display (3), authenticating state handling (1), highlight param passing + clearing (3), all accessibility roles and labels across components (11)
+- P2 (Edge cases): 32 tests — Badge boundary values (2), simultaneous badges (1), prevented default (1), long/special/unicode titles (5), empty emoji/title (4), rapid taps (2), focus cleanup/idempotency (3), empty-to-nonempty transition (1), highlightModuleId with empty store (1), null backendUrl (1), zero modules display (1), badge independence from modules Map (3), loadFromCache badge preservation (1), connection status variations (3), multiple rapid increments (1), unmount cleanup (1), multiple focus events (1)

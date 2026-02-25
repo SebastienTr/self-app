@@ -355,7 +355,7 @@ The architecture document has been updated since the last readiness check. All 5
 | Gap | Previous Status | Current Status | Resolution |
 |---|---|---|---|
 | Composition template registry | ❌ Missing | ✅ Resolved | Architecture lines 489-542: full `templateRegistry` TypeScript implementation with all 6 UX templates (metric-dashboard, data-card, map-with-details, timeline-view, simple-list, chart-with-context) |
-| Phase morphing specification | ❌ Missing | ✅ Superseded | Originally resolved with PhaseController (4-phase system). **Replaced (2026-02-24)** by Two-Mode Screen Architecture (Story 2.5): Chat Mode / Dashboard Mode with crossfade transitions. See architecture.md "Two-Mode Screen Architecture" section. |
+| Phase morphing specification | ❌ Missing | ✅ Superseded | Originally resolved with PhaseController (4-phase system). Replaced (2026-02-24) by Two-Mode Screen Architecture (Story 2.5), then **replaced again (2026-02-25)** by Tab Navigation Architecture (Story 2.5b): Home / Chat / Settings tabs. See architecture.md "Tab Navigation Architecture" section and `ux-tab-navigation.html`. |
 | V1 theme scope | ⚠️ Misaligned | ✅ Resolved | Both documents agree: Twilight only in V1, additional themes (Ink, Moss, Dawn) deferred to P1 via token swapping |
 | Design token specification | ❌ Missing | ✅ Resolved | Architecture lines 639-689: complete `tokens.ts` with 13 color tokens, 5 spacing values, 6 typography scales, 3 border radii, 2 shadow levels, 6 animation durations |
 | SDUI accessibility contract | ⚠️ Incomplete | ✅ Resolved | Architecture line 694-696: `accessibleLabel` required in Zod schema, `accessibleRole` props on interactive primitives, touch target minimums enforced |
@@ -364,17 +364,17 @@ The architecture document has been updated since the last readiness check. All 5
 
 **1. ~~Phase Threshold Discrepancy~~ — RESOLVED (2026-02-24)**
 
-~~UX and Architecture defined slightly different phase boundaries.~~ **No longer applicable.** The 4-phase layout system (Phase 0-3) has been replaced by a Two-Mode Screen Architecture (Story 2.5): Chat Mode (0 or any modules, full-screen conversation with inline module cards) and Dashboard Mode (modules > 0, full-screen module gallery). Phase thresholds are no longer relevant.
+~~UX and Architecture defined slightly different phase boundaries.~~ **No longer applicable.** The 4-phase layout system was replaced by Two-Mode Screen Architecture (Story 2.5), which was in turn replaced by Tab Navigation Architecture (Story 2.5b): Home / Chat / Settings tabs with explicit user-controlled navigation. Phase thresholds are no longer relevant.
 
 **2. StatusLine Component Underspecified (Low priority)**
 
-StatusLine appears in Dashboard Mode (when modules exist). Content, behavior, and interactions remain underspecified. This can be resolved during implementation of Epic 11 (Module Lifecycle & Organization) as it's a Growth-phase feature.
+StatusLine appears in the Home tab (above the module list). Content, behavior, and interactions remain underspecified. This can be resolved during implementation of Epic 11 (Module Lifecycle & Organization) as it's a Growth-phase feature.
 
 ### Warnings
 
 - No critical UX-Architecture alignment issues remaining
-- All foundational patterns (composition templates, two-mode screen architecture, design tokens, accessibility) are architecturally specified
-- Phase morphing has been replaced by two-mode architecture — no PhaseController needed
+- All foundational patterns (composition templates, tab navigation architecture, design tokens, accessibility) are architecturally specified
+- Phase morphing has been replaced by tab navigation architecture — no PhaseController or screenModeStore needed
 
 ---
 
@@ -487,7 +487,7 @@ The self-app project is **ready for implementation**. All planning artifacts are
 |---|---|---|
 | **Document Completeness** | ✅ Excellent | All 4 required documents present (PRD 83KB, Architecture 82KB, Epics 74KB, UX 94KB). No duplicates. No missing documents. |
 | **Requirements Coverage** | ✅ 100% | 61/61 FRs mapped to epics with traceable paths to specific stories. 0 orphan FRs. |
-| **UX-Architecture Alignment** | ✅ Resolved | All 5 previously critical gaps (composition templates, screen architecture, design tokens, accessibility, theme scope) now addressed in architecture. Phase morphing replaced by two-mode architecture (Story 2.5). 1 minor issue remains. |
+| **UX-Architecture Alignment** | ✅ Resolved | All 5 previously critical gaps (composition templates, screen architecture, design tokens, accessibility, theme scope) now addressed in architecture. Phase morphing replaced by tab navigation architecture (Story 2.5b). 1 minor issue remains. |
 | **Epic Quality** | ✅ Strong | 0 critical violations. 15 epics with forward-only dependencies. All stories use BDD format with measurable ACs. |
 | **NFR Coverage** | ✅ Complete | 38 NFRs with measurable targets, verification methods, and rationale. Referenced throughout story ACs. |
 
@@ -508,7 +508,7 @@ The self-app project is **ready for implementation**. All planning artifacts are
 
 ### Recommended Next Steps (Priority Order)
 
-1. ~~**Harmonize phase threshold discrepancy**~~ — **No longer applicable** (Phase system replaced by two-mode architecture, Story 2.5)
+1. ~~**Harmonize phase threshold discrepancy**~~ — **No longer applicable** (Phase system replaced by tab navigation architecture, Story 2.5b)
 2. **Harmonize FR phase count** — Align the FR distribution counts between PRD ("18+18+25") and Epics ("17+18+26") — the total (61) is correct in both
 3. **Consider splitting Story 1.6** — If implementation proves complex, split into auth + QR pairing + schema readiness substories
 4. **Begin Epic 1 (Story 1.1)** — Initialize monorepo with module-schema package. This is the critical path entry point.

@@ -101,6 +101,21 @@ export async function setStoredBackendUrl(url: string): Promise<void> {
   }
 }
 
+/**
+ * Remove the stored backend URL from SecureStore.
+ */
+export async function clearStoredBackendUrl(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(BACKEND_URL_KEY);
+    logger.info('auth', 'backend_url_cleared');
+  } catch (err) {
+    logger.error('auth', 'clear_backend_url_failed', {
+      error: String(err),
+      agent_action: 'Check expo-secure-store delete permissions',
+    });
+  }
+}
+
 // --- Token generation ---
 
 /**

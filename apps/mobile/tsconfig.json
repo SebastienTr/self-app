@@ -10,7 +10,9 @@
       "@/stores/*": ["./stores/*"],
       "@/types/*": ["./types/*"],
       "@/utils/*": ["./utils/*"],
-      "@/hooks/*": ["./hooks/*"]
+      "@/hooks/*": ["./hooks/*"],
+      "@/navigation/*": ["./navigation/*"],
+      "@/screens/*": ["./screens/*"]
     }
   }
 }

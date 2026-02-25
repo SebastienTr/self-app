@@ -1,44 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
-  AccessibilityInfo,
-  Animated,
-  AppState,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import type { AppStateStatus } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import * as NavigationBar from 'expo-navigation-bar';
 
 import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useModuleStore } from '@/stores/moduleStore';
 import { useChatStore } from '@/stores/chatStore';
-import { useScreenModeStore } from '@/stores/screenModeStore';
-import { connect, disconnect, loadPersistedMessages, send } from '@/services/wsClient';
+import { connect, disconnect, loadPersistedMessages } from '@/services/wsClient';
 import { initLocalDb, getCachedModules } from '@/services/localDb';
 import { getSessionToken, getStoredBackendUrl } from '@/services/auth';
 import { initModuleSync, cleanupModuleSync } from '@/services/moduleSync';
 import { initChatSync, cleanupChatSync } from '@/services/chatSync';
-import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { logger } from '@/services/logger';
-import { ModuleList, ChatThread } from '@/components/bridge';
-import { PairingScreen, Orb, ChatInput } from '@/components/shell';
+import { Orb } from '@/components/shell';
+import { TabNavigator } from '@/navigation/TabNavigator';
 import { tokens } from '@/constants/tokens';
 import type { ConnectionStatus } from '@/types/ws';
 
-/** Animation duration for crossfade (250ms per spec). */
-const CROSSFADE_DURATION = 250;
-
-/** Delay before transitioning from Chat to Dashboard (1s per spec). */
-const DASHBOARD_TRANSITION_DELAY = 1000;
-
-/** Minimum background time before re-evaluating mode on foreground (5s per spec). */
-const BACKGROUND_THRESHOLD_MS = 5000;
+/** Dark theme matching Twilight design tokens. */
+const TwilightTheme = {
+  ...DefaultTheme,
+  dark: true,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: tokens.colors.accent,
+    background: tokens.colors.background,
+    card: tokens.colors.background,
+    text: tokens.colors.text,
+    border: tokens.colors.border,
+    notification: tokens.colors.accent,
+  },
+};
 
 /** Map connection status to a colored indicator. */
 const STATUS_COLORS: Record<ConnectionStatus, string> = {
@@ -58,32 +58,8 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
 function AppContent() {
   const status = useConnectionStore((s) => s.status);
   const moduleCount = useModuleStore((s) => s.modules.size);
-  const authStatus = useAuthStore((s) => s.authStatus);
-  const agentStatus = useChatStore((s) => s.agentStatus);
-  const screenMode = useScreenModeStore((s) => s.mode);
   const [initialized, setInitialized] = useState(false);
   const insets = useSafeAreaInsets();
-  const { keyboardVisible } = useKeyboardVisible();
-
-  // Animated opacity values for crossfade
-  const chatOpacity = useRef(new Animated.Value(1)).current;
-  const dashOpacity = useRef(new Animated.Value(0)).current;
-
-  // Refs for transition management
-  const dashboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backgroundTimeRef = useRef<number>(0);
-  const reduceMotionRef = useRef(false);
-
-  // Check reduce motion accessibility setting
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      reduceMotionRef.current = enabled;
-    });
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
-      reduceMotionRef.current = enabled;
-    });
-    return () => sub.remove();
-  }, []);
 
   useEffect(() => {
     // Hide Android navigation bar (immersive mode)
@@ -132,11 +108,6 @@ function AppContent() {
       // 5b. Register chat sync handlers
       initChatSync();
 
-      // 6. Evaluate initial screen mode based on cached modules
-      const screenModeStore = useScreenModeStore.getState();
-      const initialMode = screenModeStore.evaluateMode();
-      screenModeStore.setMode(initialMode);
-
       setInitialized(true);
 
       const startupDuration = Date.now() - startTime;
@@ -144,13 +115,12 @@ function AppContent() {
         cached_modules: cached.length,
         startup_ms: startupDuration,
         has_session: !!token,
-        initial_mode: initialMode,
         agent_action: startupDuration > 2000
           ? 'Startup exceeded 2s target (NFR1). Investigate slow operations.'
           : null,
       });
 
-      // 7. Connect to WebSocket if session is configured
+      // 6. Connect to WebSocket if session is configured
       if (token && effectiveUrl) {
         connect(effectiveUrl);
       }
@@ -165,153 +135,37 @@ function AppContent() {
     };
   }, []);
 
-  // --- AppState foreground resume handler (AC #8) ---
-  useEffect(() => {
-    const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === 'background' || nextState === 'inactive') {
-        backgroundTimeRef.current = Date.now();
-      } else if (nextState === 'active' && backgroundTimeRef.current > 0) {
-        const elapsed = Date.now() - backgroundTimeRef.current;
-        backgroundTimeRef.current = 0;
-        if (elapsed >= BACKGROUND_THRESHOLD_MS) {
-          const newMode = useScreenModeStore.getState().evaluateMode();
-          useScreenModeStore.getState().setMode(newMode);
-        }
-      }
-    };
-
-    const sub = AppState.addEventListener('change', handleAppStateChange);
-    return () => sub.remove();
-  }, []);
-
-  // --- Crossfade animation when screenMode changes ---
-  useEffect(() => {
-    const toDash = screenMode === 'dashboard';
-    const duration = reduceMotionRef.current ? 0 : CROSSFADE_DURATION;
-
-    Animated.parallel([
-      Animated.timing(chatOpacity, {
-        toValue: toDash ? 0 : 1,
-        duration,
-        useNativeDriver: true,
-      }),
-      Animated.timing(dashOpacity, {
-        toValue: toDash ? 1 : 0,
-        duration,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [screenMode, chatOpacity, dashOpacity]);
-
-  // --- Keyboard close transition logic (AC #3, #4, #11) ---
-  // Deps: keyboardVisible, moduleCount, agentStatus — so this re-evaluates when
-  // a module is created or the agent finishes streaming, not just on keyboard toggle.
-  useEffect(() => {
-    if (!keyboardVisible && moduleCount > 0 && agentStatus === 'idle') {
-      // AC #3: keyboard closed + modules exist + agent idle → dashboard after delay
-      dashboardTimerRef.current = setTimeout(() => {
-        useScreenModeStore.getState().setMode('dashboard');
-        dashboardTimerRef.current = null;
-      }, DASHBOARD_TRANSITION_DELAY);
-    } else if (keyboardVisible) {
-      // Keyboard opened — cancel any pending dashboard transition
-      if (dashboardTimerRef.current !== null) {
-        clearTimeout(dashboardTimerRef.current);
-        dashboardTimerRef.current = null;
-      }
-    }
-    // AC #4: 0 modules → stay in chat (no action needed)
-    // AC #11: agent streaming → effect will re-run when agentStatus becomes 'idle'
-
-    return () => {
-      if (dashboardTimerRef.current !== null) {
-        clearTimeout(dashboardTimerRef.current);
-        dashboardTimerRef.current = null;
-      }
-    };
-  }, [keyboardVisible, moduleCount, agentStatus]);
-
-  /** Handle ChatInput focus → switch to Chat Mode (AC #2). */
-  const handleInputFocus = useCallback(() => {
-    useScreenModeStore.getState().setMode('chat');
-  }, []);
-
-  /** Handle sending a chat message: add to store + send to backend. */
-  function handleSend(message: string) {
-    useChatStore.getState().addUserMessage(message);
-    send({ type: 'chat', payload: { message } });
-  }
-
-  // Show pairing screen if not configured or auth failed
-  const showPairing =
-    authStatus === 'unconfigured' ||
-    authStatus === 'auth_failed' ||
-    authStatus === 'pairing';
-
-  const isInputDisabled = agentStatus !== 'idle' || status !== 'connected';
-
   return (
-    <KeyboardAvoidingView
-      style={styles.flex1}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <View
+      style={[styles.container, { paddingTop: insets.top + tokens.spacing.sm }]}
     >
-      <View
-        style={[styles.container, { paddingTop: insets.top + tokens.spacing.sm }]}
-      >
-        {initialized && showPairing ? (
-          <PairingScreen />
-        ) : (
-          <>
-            {/* Compact header: Orb + title + status on one line */}
-            <View style={styles.header}>
-              <Orb size={32} />
-              <Text style={styles.title}>Self</Text>
-              <View style={styles.statusBadge}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    { backgroundColor: STATUS_COLORS[status] },
-                  ]}
-                />
-                <Text style={styles.statusText}>
-                  {STATUS_LABELS[status]}
-                  {moduleCount > 0 ? ` \u00B7 ${moduleCount}` : ''}
-                </Text>
-              </View>
-            </View>
-
-            {/* Two-mode rendering with crossfade (story 2-5) */}
-            {initialized && (
-              <View style={styles.flex1}>
-                <Animated.View
-                  style={[styles.modeLayer, { opacity: chatOpacity }]}
-                  pointerEvents={screenMode === 'chat' ? 'auto' : 'none'}
-                >
-                  <ChatThread />
-                </Animated.View>
-                <Animated.View
-                  style={[styles.modeLayer, { opacity: dashOpacity }]}
-                  pointerEvents={screenMode === 'dashboard' ? 'auto' : 'none'}
-                >
-                  <ModuleList />
-                </Animated.View>
-              </View>
-            )}
-
-            {/* ChatInput: always visible at bottom (constant anchor — AC #10) */}
-            {initialized && (
-              <ChatInput
-                onSend={handleSend}
-                disabled={isInputDisabled}
-                onInputFocus={handleInputFocus}
-              />
-            )}
-          </>
-        )}
-
-        <StatusBar style="light" />
+      {/* Compact header: Orb + title + status on one line */}
+      <View style={styles.header}>
+        <Orb size={32} />
+        <Text style={styles.title}>Self</Text>
+        <View style={styles.statusBadge}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: STATUS_COLORS[status] },
+            ]}
+          />
+          <Text style={styles.statusText}>
+            {STATUS_LABELS[status]}
+            {moduleCount > 0 ? ` \u00B7 ${moduleCount}` : ''}
+          </Text>
+        </View>
       </View>
-    </KeyboardAvoidingView>
+
+      {/* Tab navigator — replaces two-mode crossfade (story 2-5b) */}
+      {initialized && (
+        <NavigationContainer theme={TwilightTheme}>
+          <TabNavigator />
+        </NavigationContainer>
+      )}
+
+      <StatusBar style="light" />
+    </View>
   );
 }
 
@@ -324,12 +178,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  flex1: {
-    flex: 1,
-  },
-  modeLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
   container: {
     flex: 1,
     backgroundColor: tokens.colors.background,

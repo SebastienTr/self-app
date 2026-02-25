@@ -913,46 +913,24 @@ flowchart TD
     G3 -->|No after 2 attempts| I3[Agent asks clarifying question instead of guessing]
 ```
 
-### Flow P1-B: Two-Mode Screen Architecture (Direction D — revised)
+### Flow P1-B: ~~Two-Mode Screen Architecture~~ → Tab Navigation Architecture
 
-The app has **two exclusive display modes** — Chat Mode and Dashboard Mode — that are **never shown simultaneously**. The chat input bar is the constant anchor at the bottom of both modes. No tabs, no navigation.
+> **SUPERSEDED (2026-02-25):** The two-mode auto-transition architecture below has been replaced by a three-tab navigation system (Home / Chat / Settings). See `_bmad-output/planning-artifacts/ux-tab-navigation.html` for the current specification with mockups, tab bar spec, ModuleLink spec, and navigation flows.
 
-```mermaid
-flowchart LR
-    CM[Chat Mode — Full-screen conversation + inline module cards]
-    DM[Dashboard Mode — Full-screen module gallery + StatusLine]
+**Current architecture:** Three-tab bottom navigation — Home (module dashboard, default), Chat (agent conversation + ModuleLink bridge), Settings (pairing, preferences). User-controlled navigation via tab bar. No auto-transitions, no timers, no keyboard-driven mode switches.
 
-    CM -->|Keyboard closes + modules > 0| DM
-    DM -->|Tap input / Keyboard opens| CM
-    DM -->|Agent sends message| CM
-```
+<details>
+<summary>Original two-mode architecture (historical reference)</summary>
 
-**Mode definitions:**
+The app had two exclusive display modes — Chat Mode and Dashboard Mode — never shown simultaneously. The chat input bar was the constant anchor at the bottom of both modes.
 
-| Mode | When Active | Layout | Content |
-|---|---|---|---|
-| **Chat Mode** | 0 modules (always), keyboard open, active conversation | Full-screen ChatThread (scrollable) + ChatInput | Chat messages + inline ModuleCards in conversation flow |
-| **Dashboard Mode** | Modules exist + keyboard closed + no active conversation | Full-screen StatusLine + ModuleList (scrollable) + ChatInput | Module cards in feed/grid, no chat visible |
+Mode definitions: Chat Mode (0 modules / keyboard open / active conversation) showed full-screen ChatThread + ChatInput. Dashboard Mode (modules exist + keyboard closed) showed StatusLine + ModuleList + ChatInput.
 
-**Transition rules:**
+Transition rules included crossfade 250ms on keyboard/input events, 1s delay on keyboard close, and instant mode on app open. Implementation used screenModeStore as source of truth with useKeyboardVisible hook driving transitions.
 
-| Trigger | From | To | Animation |
-|---|---|---|---|
-| Tap on chat input | Dashboard | Chat | Crossfade 250ms |
-| Keyboard opens | Dashboard | Chat | Crossfade 250ms |
-| Keyboard closes + modules > 0 | Chat | Dashboard | 1s delay + crossfade 250ms |
-| Keyboard closes + 0 modules | Chat | Chat | No transition |
-| Agent sends message | Dashboard | Chat | Crossfade 250ms |
-| App opens / foreground | — | Dashboard (if modules) or Chat (if none) | Instant |
+This approach was replaced because: 7 transition triggers made behavior unpredictable, ~120 lines of transition logic was overengineered, the app decided which screen users saw instead of the user deciding.
 
-**Inline modules in Chat Mode:** When the agent creates a module during conversation, the ModuleCard is rendered inside the ChatThread scroll, immediately after the agent message that announced it. This uses the same ModuleCard component as Dashboard Mode.
-
-**Critical rules:**
-- Chat and modules **never share screen space simultaneously**. When the keyboard is open, only the chat thread and input are visible — no cramped split layout.
-- Transitions are **smooth and intent-driven**. Tap the input → you want to talk (Chat Mode). Close the keyboard → you want to browse (Dashboard Mode after 1s delay).
-- **Bidirectional:** Deleting all modules transitions back to Chat Mode. Creating the first module enables Dashboard Mode on keyboard close.
-
-**Visual reference:** See `_bmad-output/planning-artifacts/ux-twilight-deep-dive.html` section "Screen Architecture: Chat & Dashboard" for mockups and before/after comparison.
+</details>
 
 ### Design Notes: P2 Flows
 
@@ -1023,7 +1001,7 @@ Components in Self are organized in three distinct layers. The critical insight:
 
 #### ChatInputBar
 
-The most-used component in the app. Always visible at the bottom of the screen in both Chat Mode and Dashboard Mode — the constant anchor.
+The most-used component in the app. Visible in the Chat tab at the bottom of the screen — the input anchor for conversation.
 
 **States:**
 
@@ -1032,7 +1010,7 @@ The most-used component in the app. Always visible at the bottom of the screen i
 | `idle` | Placeholder "Type anything...", send button dimmed (#1E2E44) | No text entered |
 | `typing` | Text visible, send button amber (#E8A84C) active | User typing |
 | `agent-working` | Input disabled, miniature orb pulses in field | Agent processing a request |
-| `focused` | Tapping input in Dashboard Mode triggers transition to Chat Mode | User wants to type → mode switches to Chat |
+| `focused` | Input field has focus, keyboard open | User is typing a message |
 
 **Accessibility:** Send button minimum 44×44pt. Input field announces state changes to VoiceOver/TalkBack ("Agent is thinking", "Ready for input").
 
@@ -1073,7 +1051,7 @@ Tappable suggestion chips on the Magical First Screen. Disappear permanently aft
 
 #### StatusLine
 
-Appears in Dashboard Mode (when modules exist and keyboard is closed). Contextual greeting + system status.
+Appears in the Home tab above the module list. Contextual greeting + system status.
 
 **Format:** Left: "Good morning Seb ●" (orb-status). Right: "All fresh" (success color) or "2 updating..." (accent color).
 
@@ -1147,7 +1125,7 @@ Equal-weight presentation: no option is visually prioritized over another.
 | Phase | Components | Rationale |
 |---|---|---|
 | **First Light** | ChatInputBar (idle + typing + agent-working), AgentMessage + UserMessage, ModuleCard bridge (loading + ceremony + rendered), Orb (hero + creating), CreationCeremony | Absolute minimum for 5-minute magic. 5 components that enable the core loop. |
-| **MVP** | + StatusLine, UndoToast, PromptChips, FailureMessage (3 types), PersonaSelector, ThemeSelector, AgentTypingIndicator (orb-typing) | Full onboarding flow, failure handling, and Dashboard Mode support. |
+| **MVP** | + StatusLine, UndoToast, PromptChips, FailureMessage (3 types), PersonaSelector, ThemeSelector, AgentTypingIndicator (orb-typing) | Full onboarding flow, failure handling, and Home tab dashboard support. |
 | **P1** | + ModuleActionSheet, ModuleCard (stale + refreshing + error states), Orb (status variant) | Dashboard maturity: user sovereignty tools, heartbeat-driven freshness, module organization. |
 
 **First Light constraint:** 5 components, each with minimal state variants. The goal is a working core loop, not a complete design system. Every component added to First Light is a component that must work perfectly on Day 1 — keep the surface area small.
@@ -1186,14 +1164,14 @@ This is not a "nice to have" — it is the fundamental pattern that defines each
 
 The most frequent interaction in Self. How a module "lands" in the interface after the agent finishes creating it.
 
-**Mode-dependent behavior:**
+**Tab-dependent behavior:**
 
-| Mode | Module Appearance | Agent Message |
+| Tab | Module Appearance | Bridge |
 |---|---|---|
-| **Chat Mode** (active conversation) | Module appears **inline** in the conversation, directly after the agent message. Like a rich embed in Slack/Discord. Same ModuleCard component as Dashboard. | "Here's your module! Tap to explore." |
-| **Dashboard Mode** (browsing, keyboard closed) | Module appears at the top of the module feed. Brief amber flash on its border signals "new." | When user returns to Chat Mode, the creation message and inline card are visible in the conversation history. |
+| **Chat tab** (active conversation) | Agent confirms creation → **ModuleLink** card appears inline: module emoji + title + "voir →" action. Compact — not the full ModuleCard. | Tapping "voir →" switches to Home tab and highlights the module. |
+| **Home tab** (module dashboard) | Module appears in the FlatList. Brief amber border flash signals "new" (if created while user was on Chat tab). Badge count on Home tab increments. | User sees all modules in their dashboard context. |
 
-**The transition feels natural to the user** — they speak, the agent works, the module appears inline in the chat. When they close the keyboard, the module is also visible in the Dashboard alongside all other modules. The same ModuleCard component renders in both contexts.
+**The flow feels natural** — user speaks on Chat tab, agent works, ModuleLink appears inline. User taps "voir →" to see the full module on their Home dashboard. The Home tab badge keeps users informed of new modules without interrupting the conversation.
 
 ### Chip Hierarchy
 
@@ -1318,7 +1296,7 @@ V1 ships one density. P1 introduces a compact/comfortable toggle affecting spaci
 
 iPad and Android tablets are not V1 targets. The single-column Direction D layout will render on tablets at phone width (centered with margins), which is functional but not optimized.
 
-**P1 tablet enhancement:** Two-column module grid for tablets in landscape (Dashboard Mode). Chat input stays full-width at bottom. Modules arrange in a masonry-style grid. The two-mode architecture (Chat / Dashboard) applies identically on tablets — only the Dashboard Mode module grid benefits from the wider viewport.
+**P1 tablet enhancement:** Two-column module grid for tablets in landscape (Home tab). Chat input stays full-width at bottom of Chat tab. Modules arrange in a masonry-style grid. The tab navigation architecture applies identically on tablets — only the Home tab module grid benefits from the wider viewport.
 
 ### Accessibility Compliance
 

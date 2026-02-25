@@ -206,7 +206,7 @@ This document provides the complete epic and story breakdown for self-app, decom
 
 **From UX Design Specification:**
 
-- Two-mode screen architecture (Direction D revised): single screen with two exclusive display modes — Chat Mode (full-screen conversation with inline module cards) and Dashboard Mode (full-screen module gallery). Never shown simultaneously. Transitions driven by keyboard events and user intent (tap input → Chat, keyboard close + modules → Dashboard after 1s delay).
+- Tab navigation architecture (replaces Direction D two-mode system): three-tab layout — Home (module dashboard, default tab), Chat (agent conversation), Settings (pairing, preferences). User-controlled navigation via bottom tab bar. ModuleLink component in Chat bridges to Home tab with highlight animation. See `ux-tab-navigation.html` for full specification.
 - Twilight theme as default (deep navy #0C1420 + amber #E8A84C) — V1 ships Twilight only; additional themes (Ink, Moss, Dawn) deferred to P1 via token swapping
 - Theme selection deferred to P1 — V1 onboarding includes persona selection only
 - Orb as brand mark: amber pulsing circle communicating agent state (4s rest, 1.5s creating, static settled)
@@ -652,7 +652,31 @@ so that I never see a cramped split of chat, modules, and keyboard competing for
 
 **Given** any screen mode **Then** the chat input bar is always visible at the bottom of the screen
 
-**Note:** Depends on Story 2.1 (ChatThread) and Story 3.3 (ModuleCard). Blocks Story 2.4 (empty state is Chat Mode with 0 modules).
+**Note:** Depends on Story 2.1 (ChatThread) and Story 3.3 (ModuleCard). **Superseded by Story 2.5b** (Tab Navigation Architecture). The two-mode crossfade approach was replaced by explicit tab navigation after UX review. Story 2.5's implementation will be removed by 2.5b.
+
+### Story 2.5b: Tab Navigation Architecture
+
+As a user,
+I want to navigate between my module dashboard, chat, and settings using a tab bar,
+so that I always know where I am and can switch screens with a single tap. (FR8, FR17, FR49)
+
+**Acceptance Criteria:**
+
+**Given** the app is open **When** I see the screen **Then** a bottom tab bar shows three tabs: Home (📦), Chat (💬), Settings (⚙️) with Home selected by default
+
+**Given** I am on any tab **When** I tap a different tab **Then** the app instantly switches to that tab with no transition animation
+
+**Given** the agent creates a module during chat **When** the creation is confirmed **Then** a ModuleLink card appears inline in chat with the module title + "voir →" action
+
+**Given** a ModuleLink is displayed in chat **When** I tap "voir →" **Then** the app switches to the Home tab, scrolls to the target module, and plays a highlight animation (amber border pulse, 2 cycles)
+
+**Given** modules are created while I'm on the Chat tab **When** I look at the tab bar **Then** the Home tab shows a badge with the count of new modules since my last Home visit
+
+**Given** the app is not paired **When** I see the tab bar **Then** the Settings tab shows a red "!" badge indicating required action
+
+**Given** I am on the Home tab with 0 modules **When** I see the empty state **Then** an orb + "Ask Self to create one →" call-to-action is displayed, linking to the Chat tab
+
+**Note:** Replaces Story 2.5 (Screen Mode Architecture). Depends on Story 2.1 (ChatThread) and Story 3.3 (ModuleCard). Blocks Story 2.4 (empty state is Home tab with 0 modules). See `ux-tab-navigation.html` for visual specification.
 
 ### Story 2.4: Contextual Empty State
 
@@ -660,13 +684,13 @@ As a user,
 I want to see an inviting empty state that guides me to start a conversation when no modules exist,
 So that I know what to do on first use. (FR8)
 
-**Note:** Depends on Story 2.5 (Screen Mode Architecture). The empty state IS Chat Mode with 0 modules.
+**Note:** Depends on Story 2.5b (Tab Navigation Architecture). The empty state is the Home tab with 0 modules, showing an orb + "Ask Self to create one →" call-to-action.
 
 **Acceptance Criteria:**
 
 **Given** the app has no modules and no conversation history
 **When** the user opens the app
-**Then** the app is in Chat Mode with a contextual empty state inviting the first conversation (FR8)
+**Then** the Home tab displays a contextual empty state inviting the first conversation (FR8)
 **And** the orb is visible with its ambient breathing animation (6s cycle, opacity 0.3→0.55)
 
 **Given** the empty state is displayed
@@ -1444,12 +1468,12 @@ So that my dashboard reflects my priorities and mental model. (FR20, FR22)
 **When** saved
 **Then** the order and categories persist across sessions
 
-**Given** the Dashboard Mode is active
+**Given** the Home tab is active
 **When** reorganized
-**Then** the layout adapts within the full-screen module gallery
+**Then** the layout adapts within the module gallery
 
 **Given** "Reduce Motion" system setting is enabled
-**When** modules are added, removed, or modes transition (Chat ↔ Dashboard)
+**When** modules are added or removed
 **Then** layout changes are instant (no animated transitions)
 
 ---

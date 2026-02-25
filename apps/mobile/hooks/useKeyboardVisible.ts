@@ -1,27 +1,34 @@
 /**
- * useKeyboardVisible — pure utility hook for keyboard visibility.
+ * useKeyboardVisible — pure utility hook for keyboard visibility + height.
  *
  * Listens to keyboardWillShow/keyboardWillHide (iOS) and
  * keyboardDidShow/keyboardDidHide (Android) events.
  *
- * Returns { keyboardVisible: boolean }.
+ * Returns { keyboardVisible: boolean, keyboardHeight: number }.
  *
  * PURE hook — no store dependencies, no side effects beyond keyboard listening.
- * Transition logic lives in App.tsx, not here.
  */
 
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform } from 'react-native';
+import type { KeyboardEvent } from 'react-native';
 
-export function useKeyboardVisible(): { keyboardVisible: boolean } {
+export function useKeyboardVisible(): { keyboardVisible: boolean; keyboardHeight: number } {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, (e: KeyboardEvent) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
 
     return () => {
       showSub.remove();
@@ -29,5 +36,5 @@ export function useKeyboardVisible(): { keyboardVisible: boolean } {
     };
   }, []);
 
-  return { keyboardVisible };
+  return { keyboardVisible, keyboardHeight };
 }
