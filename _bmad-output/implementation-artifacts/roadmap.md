@@ -1,8 +1,9 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-24T21:00 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-25T10:00 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
 > **Baseline note:** dashboard/wave totals track `59` epic stories currently in `sprint-status.yaml` (including post-PRD additions `1.7`, `2.5`, and `2.5b`) + `Prep.1` = `60` total stories.
+> **Latest change:** Story 2.5b (Tab Navigation Architecture) completed — replaces crossfade with 3-tab bottom navigation.
 
 ## Dashboard
 
@@ -12,7 +13,7 @@
 ║  Next milestone: First Light Complete                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓▓░░░░░░░░░░░░░░░]  16/60 done (27%)
+TOTAL   [▓▓▓▓▓▓░░░░░░░░░░░░░░]  17/60 done (28%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
@@ -20,7 +21,7 @@ W1  Bootstrap      ▓▓▓▓▓▓▓▓                   8/8   ✓ DONE    
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
 W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro ✓
 PP  Preparation    ▓                           1/1   ✓ DONE
-W4  Backfill       ▓▓······                    2/8   << ICI        🔄 E2+E4, First Light retro
+W4  Backfill       ▓▓▓·····                    3/8   << ICI        🔄 E2+E4, First Light retro
 W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
 W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
 W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
@@ -28,7 +29,7 @@ W7  Growth         ···················         0/19  * GROWTH
 ─── Epics (vue feature) ──────────────────────────────────────
 
 E1  Bootstrap      ▓▓▓▓▓▓▓▓   8/8  ✓
-E2  Conversation   ▓▓▓···     3/6  <<    ┐
+E2  Conversation   ▓▓▓▓··     4/6  <<    ┐
 E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
 E4  Freshness      ···        0/3         ┘
 PP  Preparation    ▓          1/1  ✓   (critical path cleared)
@@ -167,7 +168,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 
 - `[x]` **2.2** — Agent Identity Persistence (SOUL.md) — *blocks Epic 5*
 - `[x]` **2.5** — Screen Mode Architecture (Chat & Dashboard) — *blocks 2.5b*
-- `[ ]` **2.5b** — Tab Navigation Architecture (Home/Chat/Settings) — *depends on 2.5, blocks 2.4*
+- `[x]` **2.5b** — Tab Navigation Architecture (Home/Chat/Settings) — *depends on 2.5, blocks 2.4*
 - `[ ]` **2.3** — Persona Preset Selection — *blocks Epic 6*
 - `[ ]` **2.4** — Contextual Empty State — *depends on 2.5b*
 - `[ ]` **4.1** — Cron-Based Background Refresh — *blocks 4.2, 10.1*

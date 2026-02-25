@@ -22,7 +22,7 @@ Most apps decide what you can do before you open them. Self flips that:
 
 - **You talk, it builds.** Describe a need in plain language — the agent discovers APIs, creates a native UI module, and fetches live data. No templates, no app store.
 - **Server-Driven UI.** The backend sends structured rendering instructions; the mobile client renders real native components. No webviews.
-- **Morphing interface.** The screen transforms from full-chat (0 modules) to a module dashboard (9+) — one continuous experience, no navigation.
+- **Three-tab navigation.** Home (module dashboard), Chat (conversation), Settings — with badge notifications for new modules and pairing status.
 - **4-layer memory.** Identity file (SOUL.md) + key-value store + vector episodes + semantic dedup. The agent remembers context without repeating itself.
 - **5 LLM providers, one abstraction.** Claude, DeepSeek, Codex — swap with a single config change. CLI mode uses Claude Max at $0.
 - **Self-hosted, BYOK, open source.** SQLite database + SOUL.md plain text file. Backup = copy a folder. Runs on a Raspberry Pi.
@@ -43,19 +43,19 @@ Most apps decide what you can do before you open them. Self flips that:
 ## Project Status
 
 ```
-[▓▓▓▓▓░░░░░░░░░░░░░░░] 16/59 stories (27%)
+[▓▓▓▓▓▓░░░░░░░░░░░░░░] 17/60 stories (28%)
 ```
 
-Baseline metrics = `58` epic stories currently tracked in `sprint-status.yaml` (includes post-PRD additions `1.7` and `2.5`) + `Prep.1` (`59` total).
+Baseline metrics = `59` epic stories currently tracked in `sprint-status.yaml` (includes post-PRD additions `1.7`, `2.5`, and `2.5b`) + `Prep.1` (`60` total).
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 20 | 15 | **In Progress** |
+| First Light | 21 | 16 | **In Progress** |
 | Preparation | 1 | 1 | **Done** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
-**Current focus:** Wave 4 — Backfill First Light (stories 2.3–2.4, 4.1–4.3)
+**Current focus:** Wave 4 — Backfill First Light (stories 2.3, 2.4, 4.1–4.3)
 **Next milestone:** First Light Complete
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
@@ -66,12 +66,17 @@ See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for det
 self-app/
 ├── apps/
 │   ├── mobile/             # Expo React Native thin client
+│   │   ├── navigation/     # Tab navigator + custom tab bar
+│   │   ├── screens/        # Home, Chat, Settings screens
+│   │   ├── components/     # shell/ bridge/ sdui/ layers
+│   │   ├── stores/         # Zustand state management
+│   │   └── services/       # WebSocket, auth, sync
 │   └── backend/            # Python FastAPI + agent orchestration
 ├── packages/
 │   └── module-schema/      # Zod schema (single source of truth)
-├── scripts/                # Dev tooling
 ├── .github/workflows/      # CI pipeline
 ├── self.sh                 # Dev service launcher
+├── dev-tools.sh            # Emulator & debug tooling
 ├── pnpm-workspace.yaml
 └── tsconfig.json
 ```
@@ -121,6 +126,8 @@ pnpm typecheck        # TypeScript type checking
 ```
 
 ## Architecture Highlights
+
+**3-tab navigation** — Home (module dashboard), Chat (conversation), Settings (pairing & config). Bottom tab bar with badges — instant switching, no transition animations.
 
 **3-layer component model** — Shell (static chrome: Orb, ChatInput) → Bridge (lifecycle wrappers: ErrorBoundary, CreationCeremony) → SDUI (pure stateless primitives: props in, JSX out).
 
@@ -196,6 +203,8 @@ See the [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep
 | [Story 2.2 — Agent Identity Persistence](_bmad-output/implementation-artifacts/2-2-agent-identity-persistence.md) | Done |
 | [Story 1.7 — Observability & Correlation IDs](_bmad-output/implementation-artifacts/1-7-observability-and-correlation-ids.md) | Done |
 | [Story 2.5 — Screen Mode Architecture](_bmad-output/implementation-artifacts/2-5-screen-mode-architecture.md) | Done |
+| [Story 2.5 — Screen Mode Architecture](_bmad-output/implementation-artifacts/2-5-screen-mode-architecture.md) | Done |
+| [Story 2.5b — Tab Navigation Architecture](_bmad-output/implementation-artifacts/2-5b-tab-navigation-architecture.md) | Done |
 | [Story Prep.1 — Agent Dev Autonomy](_bmad-output/implementation-artifacts/prep-1-agent-dev-autonomy.md) | Done |
 
 </details>
