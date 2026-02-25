@@ -66,6 +66,8 @@ class TestModulesTableSchema:
             "user_id",
             "created_at",
             "updated_at",
+            "last_refreshed_at",
+            "last_refresh_error",
         }
         assert expected == columns
 
@@ -289,7 +291,7 @@ class TestSchemaVersionTableSchema:
             cursor = await db.execute("SELECT version FROM schema_version ORDER BY version;")
             rows = await cursor.fetchall()
             versions = [r[0] for r in rows]
-            assert versions == [1, 2]
+            assert versions == [1, 2, 3]
 
 
 # ---------------------------------------------------------------------------

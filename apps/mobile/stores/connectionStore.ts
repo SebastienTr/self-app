@@ -20,6 +20,7 @@ interface ConnectionStore {
   status: ConnectionStatus;
   reconnectAttempts: number;
   lastSync: string | null;
+  lastSeq: number;
   backendUrl: string;
   persona: PersonaType | null;
 
@@ -29,6 +30,7 @@ interface ConnectionStore {
   incrementReconnectAttempts: () => void;
   resetReconnectAttempts: () => void;
   setLastSync: (timestamp: string) => void;
+  setLastSeq: (seq: number) => void;
   setPersona: (persona: PersonaType | null) => void;
 
   // Selectors (get + descriptive noun)
@@ -41,6 +43,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   status: 'disconnected',
   reconnectAttempts: 0,
   lastSync: null,
+  lastSeq: 0,
   backendUrl: getBackendUrl(),
   persona: null,
 
@@ -51,6 +54,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     set((state) => ({ reconnectAttempts: state.reconnectAttempts + 1 })),
   resetReconnectAttempts: () => set({ reconnectAttempts: 0 }),
   setLastSync: (timestamp) => set({ lastSync: timestamp }),
+  setLastSeq: (seq) => set({ lastSeq: seq }),
   setPersona: (persona) => set({ persona }),
 
   // Selectors

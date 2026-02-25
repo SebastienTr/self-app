@@ -24,6 +24,7 @@ import { Orb } from '@/components/shell';
 import { TabNavigator } from '@/navigation/TabNavigator';
 import { tokens } from '@/constants/tokens';
 import type { ConnectionStatus } from '@/types/ws';
+import { useAppStateConnection } from '@/hooks/useAppStateConnection';
 
 /** Dark theme matching Twilight design tokens. */
 const TwilightTheme = {
@@ -60,6 +61,8 @@ function AppContent() {
   const moduleCount = useModuleStore((s) => s.modules.size);
   const [initialized, setInitialized] = useState(false);
   const insets = useSafeAreaInsets();
+
+  useAppStateConnection();
 
   useEffect(() => {
     // Hide Android navigation bar (immersive mode)

@@ -45,7 +45,7 @@ describe('WSMessage type definitions', () => {
 
     const syncMsg: WSMessage = {
       type: 'sync',
-      payload: { lastSync: '2024-01-01T00:00:00Z' },
+      payload: { lastSync: '2024-01-01T00:00:00Z', lastSeq: 12 },
     };
     expect(syncMsg.type).toBe('sync');
 
@@ -112,7 +112,7 @@ describe('WSMessage type definitions', () => {
     expect(usageSummaryMsg.type).toBe('usage_summary');
   });
 
-  it('has 16 message types in the union', () => {
+  it('has 17 message types in the union', () => {
     // Exhaustive type list — if any are removed/added, this array fails typecheck
     const allTypes: WSMessageType[] = [
       'auth',
@@ -123,6 +123,7 @@ describe('WSMessage type definitions', () => {
       'module_updated',
       'module_list',
       'module_sync',
+      'module_refresh_failed',
       'sync',
       'set_persona',
       'error',
@@ -132,7 +133,7 @@ describe('WSMessage type definitions', () => {
       'module_action',
       'log',
     ];
-    expect(allTypes).toHaveLength(16);
+    expect(allTypes).toHaveLength(17);
   });
 
   it('supports ConnectionStatus enum values', () => {
@@ -146,8 +147,15 @@ describe('WSMessage type definitions', () => {
   });
 
   it('supports AgentState enum values', () => {
-    const states: AgentState[] = ['idle', 'thinking', 'discovering', 'composing'];
-    expect(states).toHaveLength(4);
+    const states: AgentState[] = [
+      'idle',
+      'thinking',
+      'streaming',
+      'discovering',
+      'composing',
+      'saving',
+    ];
+    expect(states).toHaveLength(6);
   });
 
   it('supports PersonaType enum values', () => {

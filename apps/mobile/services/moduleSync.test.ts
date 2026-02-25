@@ -68,11 +68,12 @@ beforeEach(() => {
 });
 
 describe('moduleSync', () => {
-  it('registers handlers for module_created, module_updated, module_list, module_sync', () => {
+  it('registers handlers for all module message types', () => {
     expect(mockRegisteredHandlers.has('module_created')).toBe(true);
     expect(mockRegisteredHandlers.has('module_updated')).toBe(true);
     expect(mockRegisteredHandlers.has('module_list')).toBe(true);
     expect(mockRegisteredHandlers.has('module_sync')).toBe(true);
+    expect(mockRegisteredHandlers.has('module_refresh_failed')).toBe(true);
   });
 
   describe('module_created handler', () => {
@@ -225,7 +226,7 @@ describe('moduleSync', () => {
     it('unregisters all handlers', () => {
       const { cleanupModuleSync } = require('./moduleSync');
 
-      expect(mockRegisteredHandlers.size).toBe(4);
+      expect(mockRegisteredHandlers.size).toBe(5);
       cleanupModuleSync();
       expect(mockRegisteredHandlers.size).toBe(0);
     });
@@ -249,8 +250,8 @@ describe('moduleSync', () => {
       const { initModuleSync } = require('./moduleSync');
       initModuleSync();
 
-      // Should still have exactly 4 handlers (not 8)
-      expect(mockRegisteredHandlers.size).toBe(4);
+      // Should still have exactly 5 handlers (not 10)
+      expect(mockRegisteredHandlers.size).toBe(5);
     });
   });
 
@@ -288,6 +289,59 @@ describe('moduleSync', () => {
       const mod = useModuleStore.getState().getModule('mod-new');
       expect(mod).toBeDefined();
       expect((mod!.spec as any).name).toBe('Brand New via Update');
+    });
+
+    it('sets dataStatus to ok on module_updated (Story 4-1 AC #7)', () => {
+      // First add a module with error dataStatus
+      useModuleStore.getState().addModule(
+        { moduleId: 'mod-err', name: 'Error Module' },
+        '2024-01-01T00:00:00Z',
+      );
+      useModuleStore.getState().setModuleDataStatus('mod-err', 'error');
+      expect(useModuleStore.getState().getModule('mod-err')!.dataStatus).toBe('error');
+
+      // module_updated should reset dataStatus to ok
+      const handler = mockRegisteredHandlers.get('module_updated')!;
+      handler({
+        type: 'module_updated',
+        payload: {
+          moduleId: 'mod-err',
+          spec: { moduleId: 'mod-err', name: 'Refreshed Module' },
+        },
+      });
+
+      const mod = useModuleStore.getState().getModule('mod-err');
+      expect(mod!.dataStatus).toBe('ok');
+    });
+  });
+
+  describe('module_refresh_failed handler (Story 4-1)', () => {
+    it('sets dataStatus to error on refresh failure', () => {
+      // Add a module with ok status
+      useModuleStore.getState().addModule(
+        { moduleId: 'mod-fail', name: 'Failing Module' },
+        '2024-01-01T00:00:00Z',
+      );
+      expect(useModuleStore.getState().getModule('mod-fail')!.dataStatus).toBe('ok');
+
+      const handler = mockRegisteredHandlers.get('module_refresh_failed')!;
+      handler({
+        type: 'module_refresh_failed',
+        payload: { moduleId: 'mod-fail', error: 'HTTP 500' },
+      });
+
+      const mod = useModuleStore.getState().getModule('mod-fail');
+      expect(mod!.dataStatus).toBe('error');
+    });
+
+    it('handles refresh failure for non-existent module without crashing', () => {
+      const handler = mockRegisteredHandlers.get('module_refresh_failed')!;
+      // Should not throw
+      handler({
+        type: 'module_refresh_failed',
+        payload: { moduleId: 'nonexistent', error: 'timeout' },
+      });
+      expect(useModuleStore.getState().getModule('nonexistent')).toBeUndefined();
     });
   });
 

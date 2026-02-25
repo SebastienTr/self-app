@@ -15,7 +15,6 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { tokens } from '@/constants/tokens';
-import { StreamingIndicator } from './StreamingIndicator';
 
 export interface ChatBubbleProps {
   role: 'user' | 'agent';
@@ -46,7 +45,14 @@ export function ChatBubble({ role, content, isStreaming, isError }: ChatBubblePr
       >
         {content}
       </Text>
-      {isStreaming && !isUser && <StreamingIndicator />}
+      {isStreaming && !isUser && (
+        <Text
+          testID="streaming-cursor"
+          style={styles.streamingCursor}
+        >
+          |
+        </Text>
+      )}
     </View>
   );
 }
@@ -83,5 +89,11 @@ const styles = StyleSheet.create({
   },
   errorText: {
     opacity: 0.85,
+  },
+  streamingCursor: {
+    ...tokens.typography.body,
+    color: tokens.colors.textSecondary,
+    marginLeft: tokens.spacing.xs,
+    paddingBottom: 1,
   },
 });

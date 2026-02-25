@@ -73,24 +73,24 @@ describe('ChatBubble', () => {
     });
 
     it('renders streaming indicator', () => {
-      const { getByTestId } = render(
+      const { getByText } = render(
         <ChatBubble role="agent" content="Hello" isStreaming />
       );
-      expect(getByTestId('streaming-indicator')).toBeTruthy();
+      expect(getByText('|')).toBeTruthy();
     });
 
     it('does not render streaming indicator when not streaming', () => {
-      const { queryByTestId } = render(
+      const { queryByText } = render(
         <ChatBubble role="agent" content="Complete response" />
       );
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByText('|')).toBeNull();
     });
 
     it('does not render streaming indicator for user messages', () => {
-      const { queryByTestId } = render(
+      const { queryByText } = render(
         <ChatBubble role="user" content="User message" isStreaming />
       );
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByText('|')).toBeNull();
     });
   });
 

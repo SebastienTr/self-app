@@ -8,8 +8,10 @@
  * States:
  *   idle        — slow 4s pulse cycle
  *   thinking /
+ *   streaming /
  *   discovering /
- *   composing   — fast 1.5s pulse cycle
+ *   composing /
+ *   saving      — fast 1.5s pulse cycle
  *
  * Reduced motion: renders static amber circle if AccessibilityInfo.isReduceMotionEnabled().
  *
@@ -59,8 +61,10 @@ export function Orb({ size = DEFAULT_SIZE }: OrbProps) {
 
     const isActive =
       agentStatus === 'thinking' ||
+      agentStatus === 'streaming' ||
       agentStatus === 'discovering' ||
-      agentStatus === 'composing';
+      agentStatus === 'composing' ||
+      agentStatus === 'saving';
 
     const halfCycle = isActive
       ? tokens.animation.orbCreating.duration / 2

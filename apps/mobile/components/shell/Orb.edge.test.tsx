@@ -4,6 +4,8 @@
  * Covers paths NOT exercised by Orb.test.tsx:
  *   - accessibility label for 'discovering' state
  *   - accessibility label for 'composing' state
+ *   - accessibility label for 'streaming' state
+ *   - accessibility label for 'saving' state
  *   - connectionStore disconnected state does not crash Orb
  *   - reduced motion with non-idle agentStatus (labels still correct)
  *   - reduced motion check is called on mount
@@ -71,6 +73,22 @@ describe('Orb — edge cases', () => {
       const { getByLabelText } = render(<Orb />);
       await waitFor(() => {
         expect(getByLabelText('Agent status: thinking')).toBeTruthy();
+      });
+    });
+
+    it('has correct accessibility label for streaming state', async () => {
+      mockUseChatStore.mockReturnValue('streaming' as ReturnType<typeof useChatStore>);
+      const { getByLabelText } = render(<Orb />);
+      await waitFor(() => {
+        expect(getByLabelText('Agent status: streaming')).toBeTruthy();
+      });
+    });
+
+    it('has correct accessibility label for saving state', async () => {
+      mockUseChatStore.mockReturnValue('saving' as ReturnType<typeof useChatStore>);
+      const { getByLabelText } = render(<Orb />);
+      await waitFor(() => {
+        expect(getByLabelText('Agent status: saving')).toBeTruthy();
       });
     });
   });

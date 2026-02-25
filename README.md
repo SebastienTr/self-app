@@ -43,19 +43,19 @@ Most apps decide what you can do before you open them. Self flips that:
 ## Project Status
 
 ```
-[▓▓▓▓▓▓░░░░░░░░░░░░░░] 19/60 stories (32%)
+[▓▓▓▓▓▓▓░░░░░░░░░░░░░░] 21/61 stories (34%)
 ```
 
-Baseline metrics = `59` epic stories currently tracked in `sprint-status.yaml` (includes post-PRD additions `1.7`, `2.5`, and `2.5b`) + `Prep.1` (`60` total).
+Baseline metrics = `60` epic stories currently tracked in `sprint-status.yaml` (includes post-PRD additions `1.7`, `2.5`, `2.5b`, and `4.0`) + `Prep.1` (`61` total).
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 21 | 18 | **In Progress** |
+| First Light | 22 | 20 | **In Progress** |
 | Preparation | 1 | 1 | **Done** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
-**Current focus:** Wave 4 — Backfill First Light (stories 4.1–4.3)
+**Current focus:** Wave 4 — Backfill First Light (stories 4.2–4.3)
 **Next milestone:** First Light Complete
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
@@ -208,6 +208,7 @@ See the [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep
 | [Story 2.3 — Persona Preset Selection](_bmad-output/implementation-artifacts/2-3-persona-preset-selection.md) | Done |
 | [Story 2.4 — Contextual Empty State](_bmad-output/implementation-artifacts/2-4-contextual-empty-state.md) | Done |
 | [Story Prep.1 — Agent Dev Autonomy](_bmad-output/implementation-artifacts/prep-1-agent-dev-autonomy.md) | Done |
+| [Story 4.0 — Robust Chat Streaming & Session Recovery](_bmad-output/implementation-artifacts/4-0-robust-chat-streaming-and-session-recovery.md) | Done |
 
 </details>
 

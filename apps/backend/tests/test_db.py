@@ -69,7 +69,7 @@ class TestRunMigrations:
     async def test_applies_all_migrations(self, tmp_path):
         db_path = str(tmp_path / "test.db")
         count = await run_migrations(db_path, MIGRATIONS_DIR)
-        assert count == 2
+        assert count == 3
 
     async def test_creates_schema_version_table(self, tmp_path):
         db_path = str(tmp_path / "test.db")
@@ -77,7 +77,7 @@ class TestRunMigrations:
         async with aiosqlite.connect(db_path) as db:
             cursor = await db.execute("SELECT MAX(version) FROM schema_version;")
             row = await cursor.fetchone()
-            assert row[0] == 2
+            assert row[0] == 3
 
     async def test_creates_all_tables(self, tmp_path):
         db_path = str(tmp_path / "test.db")
@@ -104,7 +104,7 @@ class TestRunMigrations:
         db_path = str(tmp_path / "test.db")
         count1 = await run_migrations(db_path, MIGRATIONS_DIR)
         count2 = await run_migrations(db_path, MIGRATIONS_DIR)
-        assert count1 == 2
+        assert count1 == 3
         assert count2 == 0
 
     async def test_creates_backup_before_migration(self, tmp_path):
@@ -176,7 +176,7 @@ class TestGetSchemaVersion:
         await run_migrations(db_path, MIGRATIONS_DIR)
         async with aiosqlite.connect(db_path) as db:
             version = await get_schema_version(db)
-            assert version == 2
+            assert version == 3
 
 
 class TestDryRun:
@@ -185,7 +185,7 @@ class TestDryRun:
     async def test_dry_run_does_not_apply_migrations(self, tmp_path):
         db_path = str(tmp_path / "test.db")
         pending = await run_migrations(db_path, MIGRATIONS_DIR, dry_run=True)
-        assert pending == 2
+        assert pending == 3
         # DB should not have the tables
         async with aiosqlite.connect(db_path) as db:
             cursor = await db.execute(

@@ -46,6 +46,8 @@ class AgentTaskManager:
         self._queues: dict[str, asyncio.Queue] = {}
         # Per-session writer notification queues: session_id -> asyncio.Queue
         self._writer_queues: dict[str, asyncio.Queue] = {}
+        # Per-session chat worker tasks (background processors)
+        self._chat_workers: dict[str, asyncio.Task] = {}
 
     def buffer_message(self, session_id: str, payload: dict) -> int:
         """Append a message to the session's buffer with a monotonic seq.
@@ -137,6 +139,20 @@ class AgentTaskManager:
             self._queues[session_id] = asyncio.Queue()
         return await self._queues[session_id].get()
 
+    def try_dequeue_chat_nowait(self, session_id: str) -> str | None:
+        """Dequeue a chat message immediately, or return None if the queue is empty."""
+        if session_id not in self._queues:
+            self._queues[session_id] = asyncio.Queue()
+        try:
+            return self._queues[session_id].get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def has_pending_chat(self, session_id: str) -> bool:
+        """Return True if the session chat queue currently has queued messages."""
+        q = self._queues.get(session_id)
+        return bool(q is not None and not q.empty())
+
     def get_writer_queue(self, session_id: str) -> asyncio.Queue:
         """Get or create the writer notification queue for a session.
 
@@ -151,6 +167,22 @@ class AgentTaskManager:
         """
         if session_id not in self._writer_queues:
             self._writer_queues[session_id] = asyncio.Queue()
+        return self._writer_queues[session_id]
+
+    def reset_writer_queue(self, session_id: str) -> asyncio.Queue:
+        """Replace the writer queue with a fresh one for reconnection.
+
+        Avoids stale asyncio.Queue state when a session reconnects
+        (previous get() cancellation can leave the queue unable to
+        wake new waiters on Python 3.14).
+
+        Args:
+            session_id: The WebSocket session identifier.
+
+        Returns:
+            A fresh asyncio.Queue for writer notifications.
+        """
+        self._writer_queues[session_id] = asyncio.Queue()
         return self._writer_queues[session_id]
 
     async def notify_writer(self, session_id: str) -> None:
@@ -182,6 +214,16 @@ class AgentTaskManager:
         await self.notify_writer(session_id)
         return seq
 
+    def active_session_ids(self) -> list[str]:
+        """Return a snapshot of all session IDs that have active writer queues.
+
+        Used by the refresh scheduler to push updates to all connected clients.
+
+        Returns:
+            List of session ID strings.
+        """
+        return list(self._writer_queues.keys())
+
     def cleanup_session(self, session_id: str) -> None:
         """Remove all state for a session (on disconnect).
 
@@ -192,6 +234,52 @@ class AgentTaskManager:
         self._seq_counters.pop(session_id, None)
         self._queues.pop(session_id, None)
         self._writer_queues.pop(session_id, None)
+        worker = self._chat_workers.get(session_id)
+        if worker and worker.done():
+            self._chat_workers.pop(session_id, None)
+
+    def get_chat_worker(self, session_id: str) -> asyncio.Task | None:
+        """Return the active chat worker for a session, if any.
+
+        Completed workers are pruned lazily.
+        """
+        worker = self._chat_workers.get(session_id)
+        if worker and worker.done():
+            self._chat_workers.pop(session_id, None)
+            return None
+        return worker
+
+    def set_chat_worker(self, session_id: str, worker: asyncio.Task) -> None:
+        """Register the background chat worker task for a session."""
+        self._chat_workers[session_id] = worker
+
+    def clear_chat_worker(
+        self, session_id: str, worker: asyncio.Task | None = None
+    ) -> None:
+        """Clear a session's worker registration.
+
+        If `worker` is provided, clears only when it matches the current task.
+        """
+        current = self._chat_workers.get(session_id)
+        if current is None:
+            return
+        if worker is None or current is worker:
+            self._chat_workers.pop(session_id, None)
+
+    async def cancel_all_workers(self) -> None:
+        """Cancel all registered chat workers (application shutdown)."""
+        workers = list(self._chat_workers.values())
+        self._chat_workers.clear()
+        for worker in workers:
+            if not worker.done():
+                worker.cancel()
+        for worker in workers:
+            try:
+                await asyncio.wait_for(worker, timeout=0.5)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            except Exception:
+                pass
 
 
 # Singleton instance — shared across the application

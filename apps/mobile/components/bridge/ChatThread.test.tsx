@@ -22,7 +22,17 @@ const mockUseChatStore = useChatStore as jest.MockedFunction<typeof useChatStore
 
 /** Helper to build a partial store state for selector-based mocking */
 function makeState(partial: Partial<ChatStore>): ChatStore {
-  return partial as unknown as ChatStore;
+  const inferredAgentStatus =
+    partial.agentStatus ??
+    (partial.streamingMessage !== undefined && partial.streamingMessage !== null
+      ? 'streaming'
+      : 'idle');
+  return {
+    messages: [],
+    streamingMessage: null,
+    agentStatus: inferredAgentStatus,
+    ...partial,
+  } as unknown as ChatStore;
 }
 
 describe('ChatThread', () => {
@@ -164,7 +174,7 @@ describe('ChatThread', () => {
       );
 
       const { getByTestId } = render(<ChatThread />);
-      expect(getByTestId('streaming-indicator')).toBeTruthy();
+      expect(getByTestId('streaming-cursor')).toBeTruthy();
     });
 
     it('does not render streaming bubble when streamingMessage is null', () => {
@@ -173,7 +183,7 @@ describe('ChatThread', () => {
       );
 
       const { queryByTestId } = render(<ChatThread />);
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByTestId('streaming-cursor')).toBeNull();
     });
   });
 });

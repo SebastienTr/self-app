@@ -1,19 +1,19 @@
 # self-app — Roadmap
 
-> **Last updated:** 2026-02-25T14:00 | **Updated by:** SM Agent (Bob)
+> **Last updated:** 2026-02-25T21:20 | **Updated by:** SM Agent (Bob)
 > **Source of truth:** `sprint-status.yaml` — this file is a visual projection, updated by the SM agent.
-> **Baseline note:** dashboard/wave totals track `59` epic stories currently in `sprint-status.yaml` (including post-PRD additions `1.7`, `2.5`, and `2.5b`) + `Prep.1` = `60` total stories.
-> **Latest change:** Story 2.4 (Contextual Empty State) completed — PromptChips, AmbientBackground, NudgePrompt on Home tab. **Epic 2 done (6/6).** First Light: 18/21.
+> **Baseline note:** dashboard/wave totals track `60` epic stories currently in `sprint-status.yaml` (including post-PRD additions `1.7`, `2.5`, `2.5b`, and `4.0`) + `Prep.1` = `61` total stories.
+> **Latest change:** Story 4.1 (Cron-Based Background Refresh) completed — asyncio scheduler, httpx data fetch, refresh pipeline with no-change detection, WS push to all sessions, mobile freshness indicators. **Epic 4 progress: 2/4.** First Light: 20/22.
 
 ## Dashboard
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  WAVE 4 · Story 4.1 · BACKLOG                              ║
+║  WAVE 4 · Story 4.2 · BACKLOG                              ║
 ║  Next milestone: First Light Complete                       ║
 ╚══════════════════════════════════════════════════════════════╝
 
-TOTAL   [▓▓▓▓▓▓░░░░░░░░░░░░░░]  19/60 done (32%)
+TOTAL   [▓▓▓▓▓▓▓░░░░░░░░░░░░░░]  21/61 done (34%)
 
 ─── Waves (ordre d'exécution) ── chaque bloc = 1 story ───────
 
@@ -21,7 +21,7 @@ W1  Bootstrap      ▓▓▓▓▓▓▓▓                   8/8   ✓ DONE    
 W2  Chat+Render    ▓▓▓▓                        4/4   ✓ DONE
 W3  First Module   ▓                           1/1   ✓ DONE        🔄 E3 retro ✓
 PP  Preparation    ▓                           1/1   ✓ DONE
-W4  Backfill       ▓▓▓▓▓···                    5/8   << ICI        🔄 E2 retro pending, E4, First Light retro
+W4  Backfill       ▓▓▓▓▓▓▓··                   7/9   << ICI        🔄 E2 retro pending, E4, First Light retro
 W5  MVP Core       ··············              0/14                🔄 E5-E8 retros
 W6  Security       ·····                       0/5   * MVP DONE   🔄 E9+E10, MVP retro
 W7  Growth         ···················         0/19  * GROWTH      🔄 E11-E15, Growth retro
@@ -31,7 +31,7 @@ W7  Growth         ···················         0/19  * GROWTH
 E1  Bootstrap      ▓▓▓▓▓▓▓▓   8/8  ✓
 E2  Conversation   ▓▓▓▓▓▓     6/6  ✓      ┐
 E3  Creation       ▓▓▓▓       4/4  ✓      ├ First Light
-E4  Freshness      ···        0/3  <<     ┘
+E4  Freshness      ▓▓··       2/4  <<     ┘
 PP  Preparation    ▓          1/1  ✓   (critical path cleared)
 E5  Memory         ···        0/3  ┐
 E6  Onboarding     ····       0/4  │
@@ -80,7 +80,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 | **2** | Chat + Primitives | 3.1, 3.2, 2.1, 3.3 | Agent talks + modules render | — |
 | **3** | Module Creation E2E | 3.4 | **First Module Test** | E3 retro ✓ |
 | **Prep** | Agent Dev Autonomy | Prep.1 | Agent can test, screenshot, debug autonomously | — |
-| **4** | Backfill First Light | 2.2, 2.5, 2.5b, 2.3, 2.4, 4.1, 4.2, 4.3 | First Light complete | E2 + E4 retro, **First Light retro** |
+| **4** | Backfill First Light | 2.2, 2.5, 2.5b, 2.3, 2.4, 4.0, 4.1, 4.2, 4.3 | First Light complete | E2 + E4 retro, **First Light retro** |
 | **5** | MVP Core | 5.x, 6.x, 7.x, 8.x | Memory + onboarding + interactions | E5, E6, E7, E8 retros |
 | **6** | MVP Security | 9.x, 10.x | Multi-provider + heartbeat | E9 + E10 retro, **MVP retro** |
 | **7** | Growth | 11.x–15.x | Lifecycle + genome + admin | E11–E15 retros, **Growth retro** |
@@ -161,7 +161,7 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 ## Wave 4 — Backfill First Light (Epics 2 & 4)
 
 > Goal: complete all First Light stories skipped during the sprint to 3.4
-> 8 stories (+ 1.5 if skipped in Wave 1)
+> 9 stories (+ 1.5 if skipped in Wave 1)
 > Features clés: architecture écran two-mode (Chat/Dashboard), persistance d'identité agent, presets de persona, empty state contextuel, refresh cron, scoring de vitalité, archive/restore.
 > Objectif: terminer le socle "First Light" laissé de côté pour débloquer proprement memory, onboarding, lifecycle et proactivité.
 > Sortie attendue: First Light complet avec dépendances critiques levées pour accélérer les waves MVP suivantes.
@@ -171,7 +171,8 @@ Stories are **not** executed epic-by-epic. They follow the **critical path** to 
 - `[x]` **2.5b** — Tab Navigation Architecture (Home/Chat/Settings) — *depends on 2.5, blocks 2.4*
 - `[x]` **2.3** — Persona Preset Selection — *blocks Epic 6*
 - `[x]` **2.4** — Contextual Empty State — *depends on 2.5b*
-- `[ ]` **4.1** — Cron-Based Background Refresh — *blocks 4.2, 10.1*
+- `[x]` **4.0** — Robust Chat Streaming & Session Recovery — *priority backfill from Epic 2 retro*
+- `[x]` **4.1** — Cron-Based Background Refresh — *blocks 4.2, 10.1*
 - `[ ]` **4.2** — Module Vitality Scoring — *blocks 11.1*
 - `[ ]` **4.3** — Module Delete, Archive & Restore
 

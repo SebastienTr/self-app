@@ -29,6 +29,7 @@ import {
 const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 1_000;
 const MAX_PENDING_MESSAGES = 200;
+const LOG_TEXT_PREVIEW = 180;
 
 // --- Internal state ---
 
@@ -48,6 +49,36 @@ const handlers = new Map<WSMessageType, Set<MessageHandler>>();
 function getBackoffDelay(attempt: number): number {
   const delay = BASE_BACKOFF_MS * Math.pow(2, attempt);
   return Math.min(delay, MAX_BACKOFF_MS);
+}
+
+function truncateLogText(value: string): string {
+  if (value.length <= LOG_TEXT_PREVIEW) return value;
+  return `${value.slice(0, LOG_TEXT_PREVIEW)}...[truncated]`;
+}
+
+function summarizePayloadForLog(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object') return payload;
+
+  const input = payload as Record<string, unknown>;
+  const summary: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === 'string') {
+      summary[key] = truncateLogText(value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      summary[key] = `[array:${value.length}]`;
+      continue;
+    }
+    if (value && typeof value === 'object') {
+      summary[key] = '[object]';
+      continue;
+    }
+    summary[key] = value;
+  }
+
+  return summary;
 }
 
 // --- Flush pending messages ---
@@ -72,16 +103,22 @@ function sendImmediate(msg: WSMessage): void {
   if (!ws) return;
   const wireMsg = { type: msg.type, payload: toSnake(msg.payload) };
   ws.send(JSON.stringify(wireMsg));
-  logger.debug('ws', 'message_sent', { type: msg.type });
+  logger.debug('ws', 'message_sent', {
+    type: msg.type,
+    payload: summarizePayloadForLog(msg.payload),
+  });
 }
 
 // --- Send a sync message on reconnection ---
 
 function sendSyncOnReconnect(): void {
-  const { lastSync } = useConnectionStore.getState();
+  const { lastSync, lastSeq } = useConnectionStore.getState();
   const syncMsg: WSMessage = {
     type: 'sync',
-    payload: { lastSync: lastSync ?? new Date().toISOString() },
+    payload: {
+      lastSync: lastSync ?? new Date().toISOString(),
+      lastSeq: lastSeq > 0 ? lastSeq : 0,
+    },
   };
   sendImmediate(syncMsg);
 }
@@ -190,10 +227,18 @@ function doConnect(url: string): void {
       const raw = JSON.parse((event as MessageEvent).data);
       const msgType = raw.type as WSMessageType;
       const payload = toCamel(raw.payload);
+      const seq = typeof raw.seq === 'number' ? raw.seq : undefined;
+      if (typeof seq === 'number') {
+        useConnectionStore.getState().setLastSeq(seq);
+      }
 
-      const msg = { type: msgType, payload } as WSMessage;
+      const msg = { type: msgType, payload, seq } as WSMessage;
 
-      logger.debug('ws', 'message_received', { type: msgType });
+      logger.debug('ws', 'message_received', {
+        type: msgType,
+        seq,
+        payload: summarizePayloadForLog(payload),
+      });
 
       // Check for auth errors and update auth state
       if (msgType === 'error' && payload) {

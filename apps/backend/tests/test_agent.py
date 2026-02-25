@@ -193,6 +193,44 @@ class TestHandleChat:
         assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
+    async def test_cli_fallback_single_final_chunk_with_content_still_streams_response(
+        self, ws, tmp_path
+    ):
+        """Backward compatibility: done=True chunk carrying text still emits chat_stream content."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
+
+        provider = MagicMock()
+        provider.name = "claude-cli"
+
+        async def single_final_chunk_stream(prompt: str = "", **kwargs):
+            yield LLMStreamChunk(
+                delta="CLI fallback response",
+                accumulated="CLI fallback response",
+                done=True,
+                tokens_in=None,
+                tokens_out=None,
+                model="unknown",
+                provider="claude-cli",
+                latency_ms=42,
+            )
+
+        provider.stream = single_final_chunk_stream
+        provider.execute = AsyncMock()  # not used
+
+        await handle_chat(ws, "Hello", provider, db_path)
+
+        types = [m["type"] for m in ws.sent]
+        assert types == ["status", "status", "chat_stream", "chat_stream", "status"]
+
+        stream_msgs = [m for m in ws.sent if m["type"] == "chat_stream"]
+        assert stream_msgs[0]["payload"] == {
+            "delta": "CLI fallback response",
+            "done": False,
+        }
+        assert stream_msgs[1]["payload"] == {"delta": "", "done": True}
+
+    @pytest.mark.asyncio
     async def test_llm_error_sends_error_message(
         self, ws, mock_provider_error, tmp_path
     ):

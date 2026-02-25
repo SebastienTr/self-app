@@ -12,10 +12,24 @@
 
 import type { WSMessage } from '@/types/ws';
 import { onMessage } from '@/services/wsClient';
+import {
+  bufferToken,
+  flushImmediately,
+  resetStreamBuffer,
+  setStreamBufferSink,
+} from '@/services/streamBuffer';
 import { useChatStore } from '@/stores/chatStore';
 
 /** Unsubscribe functions returned by onMessage registrations. */
 let unsubscribers: (() => void)[] = [];
+let highestSeqSeen = 0;
+
+function shouldSkipDuplicate(msg: WSMessage): boolean {
+  if (typeof msg.seq !== 'number') return false;
+  if (msg.seq <= highestSeqSeen) return true;
+  highestSeqSeen = msg.seq;
+  return false;
+}
 
 /**
  * Initialize chat sync handlers.
@@ -26,11 +40,15 @@ let unsubscribers: (() => void)[] = [];
 export function initChatSync(): () => void {
   // Clean up any previous registrations
   cleanupChatSync();
+  setStreamBufferSink((delta) => {
+    useChatStore.getState().appendStreamDelta(delta);
+  });
 
   // chat_stream — agent response streaming
   unsubscribers.push(
     onMessage('chat_stream', (msg: WSMessage) => {
       if (msg.type !== 'chat_stream') return;
+      if (shouldSkipDuplicate(msg)) return;
       const store = useChatStore.getState();
 
       if (!msg.payload.done) {
@@ -38,8 +56,9 @@ export function initChatSync(): () => void {
         if (store.streamingMessage === null) {
           store.startAgentStream();
         }
-        store.appendStreamDelta(msg.payload.delta);
+        bufferToken(msg.payload.delta);
       } else {
+        flushImmediately();
         store.finalizeAgentMessage();
       }
     }),
@@ -49,6 +68,10 @@ export function initChatSync(): () => void {
   unsubscribers.push(
     onMessage('status', (msg: WSMessage) => {
       if (msg.type !== 'status') return;
+      if (shouldSkipDuplicate(msg)) return;
+      if (msg.payload.state !== 'streaming') {
+        flushImmediately();
+      }
       useChatStore.getState().setAgentStatus(msg.payload.state);
     }),
   );
@@ -57,7 +80,9 @@ export function initChatSync(): () => void {
   unsubscribers.push(
     onMessage('error', (msg: WSMessage) => {
       if (msg.type !== 'error') return;
+      if (shouldSkipDuplicate(msg)) return;
       const store = useChatStore.getState();
+      flushImmediately();
       // Only handle errors when the agent was actively processing
       // AUTH errors (AUTH_REQUIRED, etc.) are handled by wsClient itself
       if (store.agentStatus !== 'idle') {
@@ -74,8 +99,13 @@ export function initChatSync(): () => void {
  * Clean up chat sync handlers.
  */
 export function cleanupChatSync(): void {
+  if (unsubscribers.length > 0 || highestSeqSeen > 0) {
+    flushImmediately();
+    resetStreamBuffer();
+  }
   for (const unsub of unsubscribers) {
     unsub();
   }
   unsubscribers = [];
+  highestSeqSeen = 0;
 }

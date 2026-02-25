@@ -25,6 +25,7 @@ jest.mock('@/stores/chatStore', () => ({
 import { onMessage, send } from '@/services/wsClient';
 import { useChatStore } from '@/stores/chatStore';
 import { initChatSync, cleanupChatSync } from '@/services/chatSync';
+import { flushImmediately } from '@/services/streamBuffer';
 
 const mockOnMessage = onMessage as jest.MockedFunction<typeof onMessage>;
 const mockSend = send as jest.MockedFunction<typeof send>;
@@ -120,6 +121,7 @@ describe('Chat Integration', () => {
         type: 'chat_stream',
         payload: { delta: 'Hello world', done: false },
       });
+      flushImmediately(); // stream buffer batches tokens per-frame
 
       expect(mockStore.appendStreamDelta).toHaveBeenCalledWith('Hello world');
     });
@@ -131,6 +133,7 @@ describe('Chat Integration', () => {
         type: 'chat_stream',
         payload: { delta: ' more', done: false },
       });
+      flushImmediately(); // stream buffer batches tokens per-frame
 
       expect(mockStore.startAgentStream).not.toHaveBeenCalled();
       expect(mockStore.appendStreamDelta).toHaveBeenCalledWith(' more');

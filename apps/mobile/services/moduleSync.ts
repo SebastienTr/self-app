@@ -100,7 +100,7 @@ export function initModuleSync(): void {
     }),
   );
 
-  // module_updated — an existing module was updated
+  // module_updated — an existing module was updated (including background refresh)
   unsubscribers.push(
     onMessage('module_updated', (msg: WSMessage) => {
       if (msg.type !== 'module_updated') return;
@@ -108,8 +108,24 @@ export function initModuleSync(): void {
       const updatedAt = new Date().toISOString();
 
       useModuleStore.getState().updateModule(payload.moduleId, payload.spec, updatedAt);
+      // Confirm data freshness on update (Story 4-1 AC #7, #10)
+      useModuleStore.getState().setModuleDataStatus(payload.moduleId, 'ok');
       logger.info('moduleSync', 'module_updated', {
         module_id: payload.moduleId,
+      });
+    }),
+  );
+
+  // module_refresh_failed — background refresh failed for a module (Story 4-1 AC #3)
+  unsubscribers.push(
+    onMessage('module_refresh_failed', (msg: WSMessage) => {
+      if (msg.type !== 'module_refresh_failed') return;
+      const payload = msg.payload as { moduleId: string; error?: string };
+
+      useModuleStore.getState().setModuleDataStatus(payload.moduleId, 'error');
+      logger.warning('moduleSync', 'module_refresh_failed', {
+        module_id: payload.moduleId,
+        error: payload.error,
       });
     }),
   );

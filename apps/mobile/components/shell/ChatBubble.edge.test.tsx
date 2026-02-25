@@ -82,11 +82,11 @@ describe('ChatBubble — edge cases', () => {
     it('does not show streaming indicator when isError is true and role is agent with isStreaming', () => {
       // isStreaming takes effect, but combined with isError — component renders both
       // The component shows streaming indicator if isStreaming && !isUser
-      const { getByTestId } = render(
+      const { getByText } = render(
         <ChatBubble role="agent" content="Error while streaming" isError isStreaming />
       );
-      // StreamingIndicator IS rendered (isStreaming=true, role=agent)
-      expect(getByTestId('streaming-indicator')).toBeTruthy();
+      // Streaming cursor is rendered (isStreaming=true, role=agent)
+      expect(getByText('|')).toBeTruthy();
     });
 
     it('error bubble with streaming has correct accessibility label', () => {
@@ -114,10 +114,10 @@ describe('ChatBubble — edge cases', () => {
 
   describe('streaming indicator user role guard', () => {
     it('user bubble with isStreaming=true does not show streaming indicator', () => {
-      const { queryByTestId } = render(
+      const { queryByText } = render(
         <ChatBubble role="user" content="Hello" isStreaming />
       );
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByText('|')).toBeNull();
     });
   });
 

@@ -74,6 +74,11 @@ describe('Orb', () => {
       expect(() => render(<Orb />)).not.toThrow();
     });
 
+    it('renders for streaming agentStatus', () => {
+      mockUseChatStore.mockReturnValue('streaming' as ReturnType<typeof useChatStore>);
+      expect(() => render(<Orb />)).not.toThrow();
+    });
+
     it('renders for discovering agentStatus', () => {
       mockUseChatStore.mockReturnValue('discovering' as ReturnType<typeof useChatStore>);
       expect(() => render(<Orb />)).not.toThrow();
@@ -81,6 +86,11 @@ describe('Orb', () => {
 
     it('renders for composing agentStatus', () => {
       mockUseChatStore.mockReturnValue('composing' as ReturnType<typeof useChatStore>);
+      expect(() => render(<Orb />)).not.toThrow();
+    });
+
+    it('renders for saving agentStatus', () => {
+      mockUseChatStore.mockReturnValue('saving' as ReturnType<typeof useChatStore>);
       expect(() => render(<Orb />)).not.toThrow();
     });
   });

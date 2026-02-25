@@ -77,7 +77,9 @@ beforeEach(() => {
     status: 'disconnected',
     reconnectAttempts: 0,
     lastSync: null,
+    lastSeq: 0,
     backendUrl: 'ws://localhost:8000/ws',
+    persona: null,
   });
 });
 
@@ -257,6 +259,19 @@ describe('wsClient', () => {
       expect(payload.moduleId).toBe('abc');
       expect(payload.spec.displayName).toBe('Test');
     });
+
+    it('tracks top-level seq on incoming server messages', () => {
+      wsClient.connect('ws://localhost:8000/ws');
+      mockWsInstances[0].simulateOpen();
+
+      mockWsInstances[0].simulateMessage({
+        type: 'status',
+        seq: 37,
+        payload: { state: 'idle' },
+      });
+
+      expect(useConnectionStore.getState().lastSeq).toBe(37);
+    });
   });
 
   describe('offline message queue', () => {
@@ -361,6 +376,7 @@ describe('wsClient', () => {
 
     it('sends sync message on reconnect with lastSync', () => {
       useConnectionStore.getState().setLastSync('2024-01-01T00:00:00Z');
+      useConnectionStore.getState().setLastSeq(88);
 
       wsClient.connect('ws://localhost:8000/ws');
       mockWsInstances[0].simulateOpen();
@@ -377,6 +393,7 @@ describe('wsClient', () => {
       expect(syncMsg).toBeDefined();
       const parsed = JSON.parse(syncMsg!);
       expect(parsed.payload.last_sync).toBe('2024-01-01T00:00:00Z');
+      expect(parsed.payload.last_seq).toBe(88);
     });
 
     it('does not reconnect after manual disconnect', () => {

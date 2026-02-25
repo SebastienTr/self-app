@@ -39,6 +39,30 @@ from app.modules import create_module
 # Type for the send callback: async (payload: dict) -> None
 SendFn = Callable[[dict], Coroutine[Any, Any, None]]
 
+# Hook called after module creation (set by main.py for scheduler registration)
+# Signature: (module_id: str, refresh_interval: int) -> None
+_on_module_created_hook: Callable[[str, int], None] | None = None
+
+
+def _preview_text(text: str | None, limit: int = 240) -> str | None:
+    """Return a single-line truncated preview for debug logs."""
+    if text is None:
+        return None
+    compact = text.replace("\n", "\\n")
+    if len(compact) <= limit:
+        return compact
+    return compact[:limit] + "...[truncated]"
+
+
+def set_on_module_created_hook(hook: Callable[[str, int], None] | None) -> None:
+    """Set the hook called after module creation.
+
+    Args:
+        hook: Callable (module_id, refresh_interval) -> None, or None to clear.
+    """
+    global _on_module_created_hook
+    _on_module_created_hook = hook
+
 # ---------------------------------------------------------------------------
 # SOUL.md — Agent Identity Persistence
 # ---------------------------------------------------------------------------
@@ -720,6 +744,21 @@ async def _handle_module_creation(
         module_name=module_name,
     )
 
+    # Notify scheduler hook for auto-registration (Story 4-1, AC #6)
+    refresh_interval = module_spec.get("refresh_interval", 0)
+    data_sources = module_spec.get("data_sources") or []
+    if _on_module_created_hook and refresh_interval > 0 and len(data_sources) > 0:
+        try:
+            _on_module_created_hook(saved["id"], refresh_interval)
+        except Exception as e:
+            log.warning(
+                "module_scheduler_hook_failed",
+                module_id=saved["id"],
+                error=str(e),
+                agent_action="Module created but scheduler registration failed. "
+                "Module will be picked up on next backend restart.",
+            )
+
 
 async def handle_chat(
     ws: WebSocket | SendFn,
@@ -768,6 +807,13 @@ async def handle_chat(
 
         # Build prompt with SOUL identity, persona instructions, and module creation instructions
         prompt = _build_module_prompt(message, soul_content, persona_content)
+        log.debug(
+            "llm_request_prepared",
+            provider=provider.name,
+            user_message_preview=_preview_text(message, 160),
+            prompt_chars=len(prompt),
+            prompt_preview=_preview_text(prompt, 320),
+        )
 
         # Stream tokens from the provider
         accumulated = ""
@@ -778,7 +824,26 @@ async def handle_chat(
         latency_ms = 0
 
         async for chunk in provider.stream(prompt=prompt):
+            log.debug(
+                "llm_stream_chunk",
+                provider=provider.name,
+                done=chunk.done,
+                delta_chars=len(chunk.delta),
+                delta_preview=_preview_text(chunk.delta, 160),
+                accumulated_chars=len(chunk.accumulated),
+            )
             if chunk.done:
+                # Backward-compatible CLI fallback path:
+                # some providers emit a single final chunk (done=True) carrying
+                # the whole content in `delta`. Treat it as a content chunk too.
+                if chunk.delta:
+                    if first_token:
+                        await send({"type": "status", "payload": {"state": "streaming", "persona": persona_type}})
+                        first_token = False
+                    await send({
+                        "type": "chat_stream",
+                        "payload": {"delta": chunk.delta, "done": False},
+                    })
                 # Final metadata chunk — capture metrics
                 accumulated = chunk.accumulated
                 tokens_in = chunk.tokens_in
@@ -811,6 +876,15 @@ async def handle_chat(
 
         # Check if response contains a module spec (on full accumulated text)
         spec_result = _try_extract_module_spec(accumulated)
+        log.debug(
+            "llm_response_complete",
+            provider=provider.name,
+            content_chars=len(accumulated),
+            content_preview=_preview_text(accumulated, 320),
+            has_module_spec=spec_result.spec is not None,
+            has_code_fence=spec_result.has_code_fence,
+            parse_error=spec_result.error,
+        )
 
         if spec_result.spec is not None:
             # Module creation pipeline — valid spec found

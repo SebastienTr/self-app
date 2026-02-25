@@ -8,6 +8,7 @@ describe('connectionStore', () => {
       status: 'disconnected',
       reconnectAttempts: 0,
       lastSync: null,
+      lastSeq: 0,
       backendUrl: 'ws://localhost:8000/ws',
       persona: null,
     });
@@ -19,6 +20,7 @@ describe('connectionStore', () => {
       expect(state.status).toBe('disconnected');
       expect(state.reconnectAttempts).toBe(0);
       expect(state.lastSync).toBeNull();
+      expect(state.lastSeq).toBe(0);
       expect(state.backendUrl).toBe('ws://localhost:8000/ws');
     });
   });
@@ -76,6 +78,12 @@ describe('connectionStore', () => {
       const ts = '2024-01-15T10:30:00Z';
       setLastSync(ts);
       expect(useConnectionStore.getState().lastSync).toBe(ts);
+    });
+
+    it('setLastSeq updates the sequence number', () => {
+      const { setLastSeq } = useConnectionStore.getState();
+      setLastSeq(123);
+      expect(useConnectionStore.getState().lastSeq).toBe(123);
     });
   });
 
@@ -208,12 +216,14 @@ describe('connectionStore', () => {
       state.setStatus('connected');
       state.incrementReconnectAttempts();
       state.setLastSync('2024-01-01');
+      state.setLastSeq(9);
       state.setBackendUrl('ws://other:8000/ws');
 
       const current = useConnectionStore.getState();
       expect(current.status).toBe('connected');
       expect(current.reconnectAttempts).toBe(1);
       expect(current.lastSync).toBe('2024-01-01');
+      expect(current.lastSeq).toBe(9);
       expect(current.backendUrl).toBe('ws://other:8000/ws');
     });
 
@@ -223,6 +233,7 @@ describe('connectionStore', () => {
       state.incrementReconnectAttempts();
       state.incrementReconnectAttempts();
       state.setLastSync('2024-06-01');
+      state.setLastSeq(12);
 
       state.resetReconnectAttempts();
 
@@ -230,6 +241,7 @@ describe('connectionStore', () => {
       expect(current.reconnectAttempts).toBe(0);
       expect(current.status).toBe('reconnecting'); // unchanged
       expect(current.lastSync).toBe('2024-06-01'); // unchanged
+      expect(current.lastSeq).toBe(12); // unchanged
     });
   });
 
@@ -273,12 +285,14 @@ describe('connectionStore', () => {
       const state = useConnectionStore.getState();
       state.setStatus('connected');
       state.setLastSync('2024-01-01');
+      state.setLastSeq(5);
       state.setPersona('flame');
 
       const current = useConnectionStore.getState();
       expect(current.persona).toBe('flame');
       expect(current.status).toBe('connected');
       expect(current.lastSync).toBe('2024-01-01');
+      expect(current.lastSeq).toBe(5);
     });
   });
 });

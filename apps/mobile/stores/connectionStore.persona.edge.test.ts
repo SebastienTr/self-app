@@ -17,6 +17,7 @@ describe('connectionStore persona edge cases', () => {
       status: 'disconnected',
       reconnectAttempts: 0,
       lastSync: null,
+      lastSeq: 0,
       backendUrl: 'ws://localhost:8000/ws',
       persona: null,
     });
@@ -154,6 +155,7 @@ describe('connectionStore persona edge cases', () => {
         status: 'disconnected',
         reconnectAttempts: 0,
         lastSync: null,
+        lastSeq: 0,
         backendUrl: 'ws://localhost:8000/ws',
         persona: null,
       });

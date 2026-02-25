@@ -30,7 +30,17 @@ import { ChatThread } from './ChatThread';
 const mockUseChatStore = useChatStore as jest.MockedFunction<typeof useChatStore>;
 
 function makeState(partial: Partial<ChatStore>): ChatStore {
-  return partial as unknown as ChatStore;
+  const inferredAgentStatus =
+    partial.agentStatus ??
+    (partial.streamingMessage !== undefined && partial.streamingMessage !== null
+      ? 'streaming'
+      : 'idle');
+  return {
+    messages: [],
+    streamingMessage: null,
+    agentStatus: inferredAgentStatus,
+    ...partial,
+  } as unknown as ChatStore;
 }
 
 describe('ChatThread — edge cases', () => {
@@ -46,7 +56,7 @@ describe('ChatThread — edge cases', () => {
 
       const { getByTestId } = render(<ChatThread />);
       // Empty string is not null — streaming bubble should appear
-      expect(getByTestId('streaming-indicator')).toBeTruthy();
+      expect(getByTestId('streaming-cursor')).toBeTruthy();
     });
 
     it('renders streaming bubble with empty content when streamingMessage is empty string', () => {
@@ -161,7 +171,7 @@ describe('ChatThread — edge cases', () => {
       const { getByText, getByTestId } = render(<ChatThread />);
       expect(getByText('What is 2+2?')).toBeTruthy();
       expect(getByText('The answer is...')).toBeTruthy();
-      expect(getByTestId('streaming-indicator')).toBeTruthy();
+      expect(getByTestId('streaming-cursor')).toBeTruthy();
     });
 
     it('renders exactly one streaming indicator when messages exist + streaming', () => {
@@ -191,7 +201,7 @@ describe('ChatThread — edge cases', () => {
 
       const { getAllByTestId } = render(<ChatThread />);
       // Only the active streaming bubble should have the indicator
-      expect(getAllByTestId('streaming-indicator')).toHaveLength(1);
+      expect(getAllByTestId('streaming-cursor')).toHaveLength(1);
     });
   });
 
@@ -215,7 +225,7 @@ describe('ChatThread — edge cases', () => {
       );
 
       const { queryByTestId } = render(<ChatThread />);
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByTestId('streaming-cursor')).toBeNull();
     });
 
     it('error messages do not show streaming indicator', () => {
@@ -238,7 +248,7 @@ describe('ChatThread — edge cases', () => {
       );
 
       const { queryByTestId } = render(<ChatThread />);
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByTestId('streaming-cursor')).toBeNull();
     });
   });
 
@@ -339,7 +349,7 @@ describe('ChatThread — edge cases', () => {
       );
 
       const { rerender, queryByTestId } = render(<ChatThread />);
-      expect(queryByTestId('streaming-indicator')).toBeTruthy();
+      expect(queryByTestId('streaming-cursor')).toBeTruthy();
 
       // Simulate finalization
       mockUseChatStore.mockImplementation((selector) =>
@@ -360,7 +370,7 @@ describe('ChatThread — edge cases', () => {
       );
 
       rerender(<ChatThread />);
-      expect(queryByTestId('streaming-indicator')).toBeNull();
+      expect(queryByTestId('streaming-cursor')).toBeNull();
     });
   });
 });

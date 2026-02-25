@@ -17,6 +17,13 @@ jest.mock('@/services/wsClient', () => ({
   onMessage: jest.fn(),
 }));
 
+jest.mock('@/services/streamBuffer', () => ({
+  bufferToken: jest.fn(),
+  flushImmediately: jest.fn(),
+  resetStreamBuffer: jest.fn(),
+  setStreamBufferSink: jest.fn(),
+}));
+
 // Mock chatStore before imports
 jest.mock('@/stores/chatStore', () => ({
   useChatStore: {
@@ -25,10 +32,20 @@ jest.mock('@/stores/chatStore', () => ({
 }));
 
 import { onMessage } from '@/services/wsClient';
+import {
+  bufferToken,
+  flushImmediately,
+  resetStreamBuffer,
+  setStreamBufferSink,
+} from '@/services/streamBuffer';
 import { useChatStore } from '@/stores/chatStore';
 import { initChatSync, cleanupChatSync } from './chatSync';
 
 const mockOnMessage = onMessage as jest.MockedFunction<typeof onMessage>;
+const mockBufferToken = bufferToken as jest.MockedFunction<typeof bufferToken>;
+const mockFlushImmediately = flushImmediately as jest.MockedFunction<typeof flushImmediately>;
+const mockResetStreamBuffer = resetStreamBuffer as jest.MockedFunction<typeof resetStreamBuffer>;
+const mockSetStreamBufferSink = setStreamBufferSink as jest.MockedFunction<typeof setStreamBufferSink>;
 const mockGetState = useChatStore.getState as jest.MockedFunction<typeof useChatStore.getState>;
 
 describe('chatSync — edge cases', () => {
@@ -125,7 +142,7 @@ describe('chatSync — edge cases', () => {
       initChatSync();
     });
 
-    it('calls appendStreamDelta with empty string when delta is empty and done is false', () => {
+    it('buffers empty string delta when done is false', () => {
       mockStore.streamingMessage = '';
 
       handlers.get('chat_stream')?.({
@@ -133,7 +150,8 @@ describe('chatSync — edge cases', () => {
         payload: { delta: '', done: false },
       });
 
-      expect(mockStore.appendStreamDelta).toHaveBeenCalledWith('');
+      expect(mockStore.appendStreamDelta).not.toHaveBeenCalled();
+      expect(mockBufferToken).toHaveBeenCalledWith('');
     });
 
     it('calls startAgentStream for empty delta if streamingMessage is null', () => {
@@ -145,7 +163,7 @@ describe('chatSync — edge cases', () => {
       });
 
       expect(mockStore.startAgentStream).toHaveBeenCalledTimes(1);
-      expect(mockStore.appendStreamDelta).toHaveBeenCalledWith('');
+      expect(mockBufferToken).toHaveBeenCalledWith('');
     });
   });
 
@@ -160,8 +178,9 @@ describe('chatSync — edge cases', () => {
         payload: { delta: 'some trailing content', done: true },
       });
 
+      expect(mockFlushImmediately).toHaveBeenCalledTimes(1);
       expect(mockStore.finalizeAgentMessage).toHaveBeenCalledTimes(1);
-      expect(mockStore.appendStreamDelta).not.toHaveBeenCalled();
+      expect(mockBufferToken).not.toHaveBeenCalled();
       expect(mockStore.startAgentStream).not.toHaveBeenCalled();
     });
   });
@@ -187,6 +206,15 @@ describe('chatSync — edge cases', () => {
       });
 
       expect(mockStore.setAgentStatus).toHaveBeenCalledWith('composing');
+    });
+
+    it('calls setAgentStatus with saving', () => {
+      handlers.get('status')?.({
+        type: 'status',
+        payload: { state: 'saving' },
+      });
+
+      expect(mockStore.setAgentStatus).toHaveBeenCalledWith('saving');
     });
   });
 
@@ -253,6 +281,8 @@ describe('chatSync — edge cases', () => {
       for (const unsub of registeredUnsubs) {
         expect(unsub).toHaveBeenCalledTimes(1);
       }
+      expect(mockFlushImmediately).toHaveBeenCalled();
+      expect(mockResetStreamBuffer).toHaveBeenCalledTimes(1);
     });
 
     it('returned cleanup function is idempotent (can be called multiple times)', () => {
@@ -277,7 +307,7 @@ describe('chatSync — edge cases', () => {
       });
 
       expect(mockStore.startAgentStream).not.toHaveBeenCalled();
-      expect(mockStore.appendStreamDelta).not.toHaveBeenCalled();
+      expect(mockBufferToken).not.toHaveBeenCalled();
     });
 
     it('status handler ignores message with null type', () => {
@@ -298,6 +328,29 @@ describe('chatSync — edge cases', () => {
       });
 
       expect(mockStore.addErrorMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('seq deduplication', () => {
+    beforeEach(() => {
+      initChatSync();
+    });
+
+    it('drops duplicate status messages with same seq', () => {
+      const statusHandler = handlers.get('status')!;
+      statusHandler({ type: 'status', seq: 42, payload: { state: 'thinking' } });
+      statusHandler({ type: 'status', seq: 42, payload: { state: 'idle' } });
+
+      expect(mockStore.setAgentStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('accepts messages without seq (backward compatibility)', () => {
+      handlers.get('chat_stream')?.({
+        type: 'chat_stream',
+        payload: { delta: 'legacy', done: false },
+      });
+
+      expect(mockBufferToken).toHaveBeenCalledWith('legacy');
     });
   });
 });

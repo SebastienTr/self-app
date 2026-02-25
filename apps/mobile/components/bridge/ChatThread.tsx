@@ -56,6 +56,7 @@ function renderMessage(msg: ChatMessage, onModuleLinkPress?: (moduleId: string) 
 export function ChatThread({ onModuleLinkPress }: ChatThreadProps = {}) {
   const messages = useChatStore((s) => s.messages);
   const streamingMessage = useChatStore((s) => s.streamingMessage);
+  const agentStatus = useChatStore((s) => s.agentStatus);
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -80,7 +81,7 @@ export function ChatThread({ onModuleLinkPress }: ChatThreadProps = {}) {
           <ChatBubble
             role="agent"
             content={streamingMessage}
-            isStreaming
+            isStreaming={agentStatus === 'streaming'}
           />
         )}
       </View>

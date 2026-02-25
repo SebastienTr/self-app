@@ -114,13 +114,15 @@ def _make_mock_provider(response_text: str = "Mock response") -> MagicMock:
 _TEST_TOKEN = "test-ws-token"
 
 
-def _auth(ws, token: str = _TEST_TOKEN) -> None:
+def _auth(ws, token: str = _TEST_TOKEN) -> dict:
     """Authenticate a WebSocket connection with the given token."""
     ws.send_json({"type": "auth", "payload": {"token": token}})
     # Server sends status:idle after successful auth — consume it
     ack = ws.receive_json()
     assert ack["type"] == "status"
     assert ack["payload"]["state"] == "idle"
+    assert isinstance(ack.get("seq"), int)
+    return ack
 
 
 @pytest.fixture
@@ -417,27 +419,64 @@ class TestResponseFormat:
             _auth(ws)
             ws.send_json({"type": "chat", "payload": {"message": "test"}})
             response = ws.receive_json()
-            assert set(response.keys()) == {"type", "payload"}
+            assert set(response.keys()) == {"type", "payload", "seq"}
+            assert isinstance(response["seq"], int)
 
     def test_module_list_response_format(self, client):
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "sync", "payload": {"last_sync": ""}})
             response = ws.receive_json()
-            assert set(response.keys()) == {"type", "payload"}
+            assert set(response.keys()) == {"type", "payload", "seq"}
+            assert isinstance(response["seq"], int)
 
     def test_error_response_format(self, client):
         with client.websocket_connect("/ws") as ws:
             _auth(ws)
             ws.send_json({"type": "bad_type", "payload": {}})
             response = ws.receive_json()
-            assert set(response.keys()) == {"type", "payload"}
+            assert set(response.keys()) == {"type", "payload", "seq"}
+            assert isinstance(response["seq"], int)
 
     def test_invalid_json_error_format(self, client):
         with client.websocket_connect("/ws") as ws:
             ws.send_text("bad")
             response = ws.receive_json()
-            assert set(response.keys()) == {"type", "payload"}
+            assert set(response.keys()) == {"type", "payload", "seq"}
+            assert isinstance(response["seq"], int)
+
+
+class TestSeqReplay:
+    """Story 4.0: sequence numbers and sync replay behavior."""
+
+    def test_sync_replays_buffered_messages_in_order_before_module_list(self, client):
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "chat", "payload": {"message": "replay me"}})
+            chat_msgs = [ws.receive_json() for _ in range(5)]
+            last_seen_seq = chat_msgs[2]["seq"]  # replay the tail of the chat flow
+
+            ws.send_json({
+                "type": "sync",
+                "payload": {"last_sync": "", "last_seq": last_seen_seq},
+            })
+
+            replay_1 = ws.receive_json()
+            replay_2 = ws.receive_json()
+            module_list = ws.receive_json()
+
+            replayed = [replay_1, replay_2]
+            seqs = [m["seq"] for m in replayed]
+            assert seqs == sorted(seqs)
+            assert all(seq > last_seen_seq for seq in seqs)
+
+            assert replay_1["type"] == "chat_stream"
+            assert replay_1["payload"]["done"] is True
+            assert replay_2["type"] == "status"
+            assert replay_2["payload"]["state"] == "idle"
+
+            assert module_list["type"] == "module_list"
+            assert module_list["seq"] > replay_2["seq"]
 
 
 class TestMultipleMessages:

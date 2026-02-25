@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     self_data_dir: str = "data"
     self_db_name: str = "self.db"
 
+    # Background refresh
+    self_refresh_timeout: int = Field(default=10, ge=1)  # per-source HTTP timeout (seconds)
+
     @property
     def db_path(self) -> str:
         """Full path to the SQLite database file."""

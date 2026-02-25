@@ -11,7 +11,13 @@
 
 // --- Supporting types ---
 
-export type AgentState = 'idle' | 'thinking' | 'discovering' | 'composing';
+export type AgentState =
+  | 'idle'
+  | 'thinking'
+  | 'streaming'
+  | 'discovering'
+  | 'composing'
+  | 'saving';
 
 export type PersonaType = 'flame' | 'tree' | 'star';
 
@@ -64,7 +70,7 @@ export interface LogMessage {
 
 export interface SyncMessage {
   type: 'sync';
-  payload: { lastSync: string };
+  payload: { lastSync: string; lastSeq?: number };
 }
 
 export interface SetPersonaMessage {
@@ -119,9 +125,14 @@ export interface UsageSummaryMessage {
   payload: { daily: number; weekly: number; monthly: number };
 }
 
+export interface ModuleRefreshFailedMessage {
+  type: 'module_refresh_failed';
+  payload: { moduleId: string; error?: string };
+}
+
 // --- Discriminated union ---
 
-export type WSMessage =
+export type WSMessage = (
   | AuthMessage
   | AuthResetMessage
   | ChatMessage
@@ -137,7 +148,9 @@ export type WSMessage =
   | StatusMessage
   | UsageSummaryMessage
   | ModuleActionMessage
-  | LogMessage;
+  | LogMessage
+  | ModuleRefreshFailedMessage
+) & { seq?: number };
 
 /** All valid WS message type discriminators. */
 export type WSMessageType = WSMessage['type'];
