@@ -12,6 +12,7 @@ from app.llm.base import (
     CLIProvider,
     LLMProvider,
     LLMResult,
+    LLMStreamChunk,
 )
 from app.llm.cli_claude import ClaudeCodeCLI
 from app.llm.cli_codex import CodexCLI
@@ -108,6 +109,7 @@ __all__ = [
     "CircuitBreakerOpenError",
     "LLMProvider",
     "LLMResult",
+    "LLMStreamChunk",
     "PROVIDER_REGISTRY",
     "RateLimiter",
     "RateLimitExceededError",

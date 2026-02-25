@@ -5,10 +5,11 @@ Executes LLM calls via the DeepSeek chat completions API with retry on transient
 
 import asyncio
 import time
+from collections.abc import AsyncIterator
 
 import openai
 
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 from app.logging import log
 
 # Default model — can be overridden via constructor
@@ -75,6 +76,52 @@ class DeepSeekAPI:
             tokens_out=response.usage.completion_tokens if response.usage else None,
             latency_ms=latency_ms,
             cost_estimate=None,
+        )
+
+    async def stream(self, prompt: str) -> AsyncIterator[LLMStreamChunk]:
+        """Stream tokens from the DeepSeek API.
+
+        Uses OpenAI-compatible streaming with stream_options for usage info.
+        Yields content chunks with accumulated text, then a final metadata chunk.
+        """
+        start = time.monotonic()
+        accumulated = ""
+        tokens_in = None
+        tokens_out = None
+        model_name = self._model
+
+        response = await self._client.chat.completions.create(
+            model=self._model,
+            messages=[{"role": "user", "content": prompt}],
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+
+        async for chunk in response:
+            if chunk.choices and chunk.choices[0].delta.content:
+                text = chunk.choices[0].delta.content
+                accumulated += text
+                yield LLMStreamChunk(
+                    delta=text,
+                    accumulated=accumulated,
+                    done=False,
+                )
+            if chunk.usage:
+                tokens_in = chunk.usage.prompt_tokens
+                tokens_out = chunk.usage.completion_tokens
+            if chunk.model:
+                model_name = chunk.model
+
+        latency_ms = int((time.monotonic() - start) * 1000)
+        yield LLMStreamChunk(
+            delta="",
+            accumulated=accumulated,
+            done=True,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            model=model_name,
+            provider=self.name,
+            latency_ms=latency_ms,
         )
 
     async def health_check(self) -> bool:

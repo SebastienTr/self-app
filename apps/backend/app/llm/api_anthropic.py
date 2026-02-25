@@ -5,10 +5,11 @@ Executes LLM calls via the Anthropic Messages API with retry on transient errors
 
 import asyncio
 import time
+from collections.abc import AsyncIterator
 
 import anthropic
 
-from app.llm.base import LLMResult
+from app.llm.base import LLMResult, LLMStreamChunk
 from app.logging import log
 
 # Default model — can be overridden via constructor
@@ -73,6 +74,40 @@ class AnthropicAPI:
             tokens_out=response.usage.output_tokens,
             latency_ms=latency_ms,
             cost_estimate=None,  # Cost calculation deferred
+        )
+
+    async def stream(self, prompt: str) -> AsyncIterator[LLMStreamChunk]:
+        """Stream tokens from the Anthropic Messages API.
+
+        Uses client.messages.stream() → stream.text_stream async iterator.
+        Yields content chunks with accumulated text, then a final metadata chunk.
+        """
+        start = time.monotonic()
+        accumulated = ""
+        async with self._client.messages.stream(
+            model=self._model,
+            max_tokens=DEFAULT_MAX_TOKENS,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            async for text in stream.text_stream:
+                accumulated += text
+                yield LLMStreamChunk(
+                    delta=text,
+                    accumulated=accumulated,
+                    done=False,
+                )
+            final_message = stream.get_final_message()
+
+        latency_ms = int((time.monotonic() - start) * 1000)
+        yield LLMStreamChunk(
+            delta="",
+            accumulated=accumulated,
+            done=True,
+            tokens_in=final_message.usage.input_tokens,
+            tokens_out=final_message.usage.output_tokens,
+            model=final_message.model,
+            provider=self.name,
+            latency_ms=latency_ms,
         )
 
     async def health_check(self) -> bool:

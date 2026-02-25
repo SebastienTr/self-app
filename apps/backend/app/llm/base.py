@@ -7,10 +7,25 @@ and CircuitBreaker for failure management.
 import abc
 import asyncio
 import time
-from dataclasses import dataclass
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from app.logging import log
+
+
+@dataclass
+class LLMStreamChunk:
+    """A single chunk from a streaming LLM response."""
+
+    delta: str
+    accumulated: str
+    done: bool
+    tokens_in: int | None = field(default=None)
+    tokens_out: int | None = field(default=None)
+    model: str | None = field(default=None)
+    provider: str | None = field(default=None)
+    latency_ms: int | None = field(default=None)
 
 
 @dataclass
@@ -125,6 +140,8 @@ class LLMProvider(Protocol):
 
     async def execute(self, prompt: str, tools: list | None = None) -> LLMResult: ...
 
+    def stream(self, prompt: str) -> AsyncIterator[LLMStreamChunk]: ...
+
     async def health_check(self) -> bool: ...
 
 
@@ -231,6 +248,24 @@ class CLIProvider(abc.ABC):
         result = self._parse_output(stdout_bytes.decode())
         result.latency_ms = int((time.monotonic() - start) * 1000)
         return result
+
+    async def stream(self, prompt: str) -> AsyncIterator[LLMStreamChunk]:
+        """Default stream() for CLI providers — yields single chunk from execute().
+
+        CLI providers cannot truly stream (subprocess blocks until completion).
+        This fallback calls execute() and yields the full response as one chunk.
+        """
+        result = await self.execute(prompt=prompt)
+        yield LLMStreamChunk(
+            delta=result.content,
+            accumulated=result.content,
+            done=True,
+            tokens_in=result.tokens_in,
+            tokens_out=result.tokens_out,
+            model=result.model,
+            provider=result.provider,
+            latency_ms=result.latency_ms,
+        )
 
     async def health_check(self) -> bool:
         """Check if the CLI binary is available on the system."""
