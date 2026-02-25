@@ -31,6 +31,7 @@ interface ModuleStore {
   loadFromCache: (modules: CachedModule[]) => void;
   incrementNewModuleCount: () => void;
   resetNewModuleCount: () => void;
+  clearAll: () => void;
 
   // Selectors (get + descriptive noun)
   getModule: (id: string) => ModuleState | undefined;
@@ -151,6 +152,10 @@ export const useModuleStore = create<ModuleStore>((set, get) => ({
 
   resetNewModuleCount: () => {
     set({ newModulesSinceLastHomeVisit: 0 });
+  },
+
+  clearAll: () => {
+    set({ modules: new Map(), newModulesSinceLastHomeVisit: 0 });
   },
 
   // Selectors

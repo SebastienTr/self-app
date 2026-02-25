@@ -9,12 +9,17 @@
 
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useState } from 'react';
+import { Alert } from 'react-native';
+
 import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useModuleStore } from '@/stores/moduleStore';
+import { useChatStore } from '@/stores/chatStore';
 import { PairingScreen } from '@/components/shell';
 import { disconnect } from '@/services/wsClient';
 import { clearSessionToken, clearStoredBackendUrl } from '@/services/auth';
+import { clearModulesCache, clearPendingMessages } from '@/services/localDb';
 import { tokens } from '@/constants/tokens';
 
 export function SettingsScreen() {
@@ -22,6 +27,8 @@ export function SettingsScreen() {
   const backendUrl = useAuthStore((s) => s.backendUrl);
   const connectionStatus = useConnectionStore((s) => s.status);
   const moduleCount = useModuleStore((s) => s.modules.size);
+
+  const [resetting, setResetting] = useState(false);
 
   const showPairing =
     authStatus === 'unconfigured' ||
@@ -33,6 +40,28 @@ export function SettingsScreen() {
     await clearSessionToken();
     await clearStoredBackendUrl();
     useAuthStore.getState().clearAuth();
+  }
+
+  function handleResetDb() {
+    Alert.alert(
+      'Reset local data',
+      'This will clear all cached modules, messages, and chat history. Connection settings are preserved.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setResetting(true);
+            await clearModulesCache();
+            await clearPendingMessages();
+            useModuleStore.getState().clearAll();
+            useChatStore.getState().clearMessages();
+            setResetting(false);
+          },
+        },
+      ],
+    );
   }
 
   if (showPairing) {
@@ -65,6 +94,16 @@ export function SettingsScreen() {
         accessibilityLabel="Disconnect and re-pair"
       >
         <Text style={styles.disconnectText}>Disconnect & Re-pair</Text>
+      </TouchableOpacity>
+
+      <Text style={[styles.sectionTitle, { marginTop: tokens.spacing.xl }]}>Data</Text>
+      <TouchableOpacity
+        style={styles.resetButton}
+        onPress={handleResetDb}
+        disabled={resetting}
+        accessibilityLabel="Reset local data"
+      >
+        <Text style={styles.resetText}>{resetting ? 'Resetting...' : 'Reset local data'}</Text>
       </TouchableOpacity>
 
       <Text style={[styles.sectionTitle, { marginTop: tokens.spacing.xl }]}>About</Text>
@@ -132,5 +171,18 @@ const styles = StyleSheet.create({
   disconnectText: {
     ...tokens.typography.subtitle,
     color: tokens.colors.text,
+  },
+  resetButton: {
+    backgroundColor: tokens.colors.surface,
+    borderColor: tokens.colors.border,
+    borderWidth: 1,
+    borderRadius: tokens.radii.md,
+    paddingVertical: tokens.spacing.md,
+    alignItems: 'center' as const,
+    minHeight: 48,
+  },
+  resetText: {
+    ...tokens.typography.body,
+    color: tokens.colors.warning,
   },
 });
