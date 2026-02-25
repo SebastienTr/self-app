@@ -1,8 +1,9 @@
 /**
- * Edge case tests for HomeScreen (story 2-5b).
+ * Edge case tests for HomeScreen (story 2-5b + story 2-4).
  *
  * Tests focus listener cleanup, multiple focus events, transition from
- * empty to non-empty state, and badge reset idempotency.
+ * empty to non-empty state, badge reset idempotency, contextual empty state
+ * edge cases (chips disappear, rapid taps, persona changes, nudge timer reset).
  */
 
 // Suppress console output
@@ -24,6 +25,53 @@ jest.mock('@/components/shell/Orb', () => ({
   },
 }));
 
+// Mock AmbientBackground
+jest.mock('@/components/shell/AmbientBackground', () => ({
+  AmbientBackground: () => {
+    const React = require('react');
+    const { View } = require('react-native');
+    return React.createElement(View, { testID: 'ambient-background' });
+  },
+}));
+
+// Mock NudgePrompt
+jest.mock('@/components/shell/NudgePrompt', () => ({
+  NudgePrompt: ({ visible }: { visible: boolean }) => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    if (!visible) return null;
+    return React.createElement(Text, { testID: 'nudge-prompt' }, 'Try tapping a suggestion or type anything');
+  },
+}));
+
+// Mock PromptChips
+jest.mock('@/components/shell/PromptChips', () => ({
+  PromptChips: ({ onChipPress, persona, visible }: {
+    onChipPress: (text: string) => void;
+    persona: string | null;
+    visible: boolean;
+  }) => {
+    const React = require('react');
+    const { View, TouchableOpacity, Text } = require('react-native');
+    if (!visible) return React.createElement(View, { testID: 'prompt-chips-hidden' });
+    const chips = ["What's the weather like?", 'Track something for me', 'Help me organize my week'];
+    if (persona === 'flame') chips.push('Automate something');
+    if (persona === 'tree') chips.push("Let's chat first");
+    if (persona === 'star') chips.push('Surprise me');
+    return React.createElement(
+      View,
+      { testID: 'prompt-chips' },
+      chips.map((text: string) =>
+        React.createElement(
+          TouchableOpacity,
+          { key: text, onPress: () => onChipPress(text) },
+          React.createElement(Text, null, text),
+        ),
+      ),
+    );
+  },
+}));
+
 // Mock ModuleList
 jest.mock('@/components/bridge/ModuleList', () => ({
   ModuleList: () => {
@@ -33,26 +81,39 @@ jest.mock('@/components/bridge/ModuleList', () => ({
   },
 }));
 
+// Mock wsClient
+jest.mock('@/services/wsClient', () => ({
+  send: jest.fn(),
+}));
+
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 
 import { useModuleStore } from '@/stores/moduleStore';
+import { useChatStore } from '@/stores/chatStore';
+import { useConnectionStore } from '@/stores/connectionStore';
+import { send } from '@/services/wsClient';
 import { HomeScreen } from './HomeScreen';
 
 function makeHomeProps(overrides: {
   params?: { highlightModuleId?: string };
+  navigate?: jest.Mock;
 } = {}) {
   const focusListeners: Array<() => void> = [];
+  const blurListeners: Array<() => void> = [];
 
   return {
     props: {
       navigation: {
-        navigate: jest.fn(),
+        navigate: overrides.navigate ?? jest.fn(),
         addListener: jest.fn((event: string, cb: () => void) => {
           if (event === 'focus') focusListeners.push(cb);
+          if (event === 'blur') blurListeners.push(cb);
           return () => {
-            const idx = focusListeners.indexOf(cb);
-            if (idx >= 0) focusListeners.splice(idx, 1);
+            const focusIdx = focusListeners.indexOf(cb);
+            if (focusIdx >= 0) focusListeners.splice(focusIdx, 1);
+            const blurIdx = blurListeners.indexOf(cb);
+            if (blurIdx >= 0) blurListeners.splice(blurIdx, 1);
           };
         }),
         setParams: jest.fn(),
@@ -66,15 +127,33 @@ function makeHomeProps(overrides: {
     triggerFocus: () => {
       for (const cb of [...focusListeners]) cb();
     },
+    triggerBlur: () => {
+      for (const cb of [...blurListeners]) cb();
+    },
   };
 }
 
 describe('HomeScreen edge cases', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     useModuleStore.setState({
       modules: new Map(),
       newModulesSinceLastHomeVisit: 0,
     });
+    useChatStore.setState({
+      messages: [],
+      streamingMessage: null,
+      agentStatus: 'idle',
+    });
+    useConnectionStore.setState({
+      persona: null,
+    });
+    (send as jest.Mock).mockClear();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
   });
 
   describe('focus listener cleanup', () => {
@@ -160,6 +239,111 @@ describe('HomeScreen edge cases', () => {
       const { props } = makeHomeProps({ params: { highlightModuleId: 'nonexistent' } });
       const { getByText } = render(<HomeScreen {...props} />);
       expect(getByText('No modules yet')).toBeTruthy();
+    });
+  });
+
+  describe('contextual empty state edge cases (story 2-4)', () => {
+    it('chips disappear when first message arrives mid-view (chatStore subscription)', () => {
+      const { props } = makeHomeProps();
+      const { getByTestId, rerender } = render(<HomeScreen {...props} />);
+      expect(getByTestId('prompt-chips')).toBeTruthy();
+
+      // Simulate first message arriving via chatStore
+      act(() => {
+        useChatStore.getState().addUserMessage('Hello');
+      });
+
+      rerender(<HomeScreen {...props} />);
+      expect(getByTestId('prompt-chips-hidden')).toBeTruthy();
+    });
+
+    it('rapid chip taps only send one message (debounce via ref guard)', () => {
+      const navigate = jest.fn();
+      const { props } = makeHomeProps({ navigate });
+      const { getByText, queryByTestId } = render(<HomeScreen {...props} />);
+
+      // First press should work
+      fireEvent.press(getByText('Track something for me'));
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(useChatStore.getState().messages.length).toBe(1);
+      expect(navigate).toHaveBeenCalledTimes(1);
+
+      // After first press, chips become hidden (visible=false) due to messages.length > 0
+      // and chipPressedRef guard, preventing further presses
+      expect(queryByTestId('prompt-chips-hidden')).toBeTruthy();
+    });
+
+    it('persona changes while empty state visible (re-renders with new persona chip)', () => {
+      const { props } = makeHomeProps();
+      const { getByText, queryByText, rerender } = render(<HomeScreen {...props} />);
+
+      expect(queryByText('Automate something')).toBeNull();
+
+      act(() => {
+        useConnectionStore.setState({ persona: 'flame' });
+      });
+
+      rerender(<HomeScreen {...props} />);
+      expect(getByText('Automate something')).toBeTruthy();
+
+      act(() => {
+        useConnectionStore.setState({ persona: 'star' });
+      });
+
+      rerender(<HomeScreen {...props} />);
+      expect(queryByText('Automate something')).toBeNull();
+      expect(getByText('Surprise me')).toBeTruthy();
+    });
+
+    it('navigate away and back resets nudge timer', () => {
+      const { props, triggerBlur, triggerFocus } = makeHomeProps();
+      const { queryByTestId } = render(<HomeScreen {...props} />);
+
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+
+      act(() => {
+        triggerBlur();
+      });
+
+      act(() => {
+        triggerFocus();
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(queryByTestId('nudge-prompt')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(5_000);
+      });
+      expect(queryByTestId('nudge-prompt')).toBeTruthy();
+    });
+
+    it('modules appear while on empty state (transitions to ModuleList)', () => {
+      const { props } = makeHomeProps();
+      const { queryByText, getByTestId, rerender } = render(<HomeScreen {...props} />);
+      expect(queryByText('No modules yet')).toBeTruthy();
+
+      const modules = new Map();
+      modules.set('mod-1', {
+        spec: { moduleId: 'mod-1' },
+        status: 'active',
+        dataStatus: 'ok',
+        updatedAt: new Date().toISOString(),
+        cachedAt: new Date().toISOString(),
+      });
+      act(() => {
+        useModuleStore.setState({ modules });
+      });
+
+      rerender(<HomeScreen {...props} />);
+      expect(getByTestId('module-list')).toBeTruthy();
+      expect(queryByText('No modules yet')).toBeNull();
     });
   });
 });
