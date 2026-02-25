@@ -16,8 +16,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useModuleStore } from '@/stores/moduleStore';
 import { useChatStore } from '@/stores/chatStore';
-import { PairingScreen } from '@/components/shell';
-import { disconnect } from '@/services/wsClient';
+import { PairingScreen, PersonaSelector } from '@/components/shell';
+import { disconnect, sendSetPersona } from '@/services/wsClient';
 import { clearSessionToken, clearStoredBackendUrl } from '@/services/auth';
 import { clearModulesCache, clearPendingMessages } from '@/services/localDb';
 import { tokens } from '@/constants/tokens';
@@ -26,6 +26,7 @@ export function SettingsScreen() {
   const authStatus = useAuthStore((s) => s.authStatus);
   const backendUrl = useAuthStore((s) => s.backendUrl);
   const connectionStatus = useConnectionStore((s) => s.status);
+  const persona = useConnectionStore((s) => s.persona);
   const moduleCount = useModuleStore((s) => s.modules.size);
 
   const [resetting, setResetting] = useState(false);
@@ -40,6 +41,7 @@ export function SettingsScreen() {
     await clearSessionToken();
     await clearStoredBackendUrl();
     useAuthStore.getState().clearAuth();
+    useConnectionStore.getState().setPersona(null);
   }
 
   function handleResetDb() {
@@ -95,6 +97,9 @@ export function SettingsScreen() {
       >
         <Text style={styles.disconnectText}>Disconnect & Re-pair</Text>
       </TouchableOpacity>
+
+      <Text style={[styles.sectionTitle, { marginTop: tokens.spacing.xl }]}>Persona</Text>
+      <PersonaSelector currentPersona={persona} onSelect={sendSetPersona} />
 
       <Text style={[styles.sectionTitle, { marginTop: tokens.spacing.xl }]}>Data</Text>
       <TouchableOpacity

@@ -67,6 +67,37 @@ def mock_provider_error():
     return provider
 
 
+async def _setup_db(db_path: str) -> None:
+    """Create llm_usage + memory_core tables for basic handle_chat tests."""
+    db = await aiosqlite.connect(db_path)
+    try:
+        await db.execute("PRAGMA journal_mode=WAL;")
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS llm_usage (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                tokens_in INTEGER,
+                tokens_out INTEGER,
+                cost_estimate REAL,
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
 class TestHandleChat:
     """Tests for handle_chat orchestration function."""
 
@@ -76,34 +107,13 @@ class TestHandleChat:
     ):
         """handle_chat must send status:thinking before calling provider."""
         db_path = str(tmp_path / "test.db")
-
-        # Set up DB so _log_llm_usage can work
-        import aiosqlite
-        db = await aiosqlite.connect(db_path)
-        try:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute(
-                """CREATE TABLE IF NOT EXISTS llm_usage (
-                    id TEXT PRIMARY KEY,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    tokens_in INTEGER,
-                    tokens_out INTEGER,
-                    cost_estimate REAL,
-                    created_at TEXT NOT NULL
-                )"""
-            )
-            await db.commit()
-        finally:
-            await db.close()
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider, db_path)
 
         # First message should be status: thinking
-        assert ws.sent[0] == {
-            "type": "status",
-            "payload": {"state": "thinking"},
-        }
+        assert ws.sent[0]["type"] == "status"
+        assert ws.sent[0]["payload"]["state"] == "thinking"
 
     @pytest.mark.asyncio
     async def test_happy_path_sends_chat_stream_with_content(
@@ -111,25 +121,7 @@ class TestHandleChat:
     ):
         """handle_chat must send chat_stream with content from provider."""
         db_path = str(tmp_path / "test.db")
-
-        import aiosqlite
-        db = await aiosqlite.connect(db_path)
-        try:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute(
-                """CREATE TABLE IF NOT EXISTS llm_usage (
-                    id TEXT PRIMARY KEY,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    tokens_in INTEGER,
-                    tokens_out INTEGER,
-                    cost_estimate REAL,
-                    created_at TEXT NOT NULL
-                )"""
-            )
-            await db.commit()
-        finally:
-            await db.close()
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider, db_path)
 
@@ -157,57 +149,19 @@ class TestHandleChat:
     ):
         """handle_chat must send status:idle as the last message (in finally)."""
         db_path = str(tmp_path / "test.db")
-
-        import aiosqlite
-        db = await aiosqlite.connect(db_path)
-        try:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute(
-                """CREATE TABLE IF NOT EXISTS llm_usage (
-                    id TEXT PRIMARY KEY,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    tokens_in INTEGER,
-                    tokens_out INTEGER,
-                    cost_estimate REAL,
-                    created_at TEXT NOT NULL
-                )"""
-            )
-            await db.commit()
-        finally:
-            await db.close()
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider, db_path)
 
         # Last message should be status: idle
-        assert ws.sent[-1] == {
-            "type": "status",
-            "payload": {"state": "idle"},
-        }
+        assert ws.sent[-1]["type"] == "status"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
     async def test_happy_path_message_order(self, ws, mock_provider, tmp_path):
         """Messages must be: thinking → chat_stream(done=False) → chat_stream(done=True) → idle."""
         db_path = str(tmp_path / "test.db")
-
-        import aiosqlite
-        db = await aiosqlite.connect(db_path)
-        try:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute(
-                """CREATE TABLE IF NOT EXISTS llm_usage (
-                    id TEXT PRIMARY KEY,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    tokens_in INTEGER,
-                    tokens_out INTEGER,
-                    cost_estimate REAL,
-                    created_at TEXT NOT NULL
-                )"""
-            )
-            await db.commit()
-        finally:
-            await db.close()
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Test message", mock_provider, db_path)
 
@@ -224,6 +178,7 @@ class TestHandleChat:
     ):
         """On LLM error, handle_chat must send error message."""
         db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider_error, db_path)
 
@@ -239,14 +194,13 @@ class TestHandleChat:
     ):
         """On LLM error, status:idle must still be sent in the finally block."""
         db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider_error, db_path)
 
         # Last message should be idle (from finally)
-        assert ws.sent[-1] == {
-            "type": "status",
-            "payload": {"state": "idle"},
-        }
+        assert ws.sent[-1]["type"] == "status"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
     async def test_llm_error_no_chat_stream_sent(
@@ -254,6 +208,7 @@ class TestHandleChat:
     ):
         """On LLM error, no chat_stream messages should be sent."""
         db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider_error, db_path)
 
@@ -265,26 +220,8 @@ class TestHandleChat:
         self, ws, mock_provider, tmp_path
     ):
         """On success, LLM usage should be inserted into llm_usage table."""
-        import aiosqlite
-
         db_path = str(tmp_path / "test.db")
-        db = await aiosqlite.connect(db_path)
-        try:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute(
-                """CREATE TABLE IF NOT EXISTS llm_usage (
-                    id TEXT PRIMARY KEY,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    tokens_in INTEGER,
-                    tokens_out INTEGER,
-                    cost_estimate REAL,
-                    created_at TEXT NOT NULL
-                )"""
-            )
-            await db.commit()
-        finally:
-            await db.close()
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Hello", mock_provider, db_path)
 
@@ -303,25 +240,7 @@ class TestHandleChat:
     ):
         """provider.execute() must be called with an enriched prompt containing the user message."""
         db_path = str(tmp_path / "test.db")
-
-        import aiosqlite
-        db = await aiosqlite.connect(db_path)
-        try:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute(
-                """CREATE TABLE IF NOT EXISTS llm_usage (
-                    id TEXT PRIMARY KEY,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    tokens_in INTEGER,
-                    tokens_out INTEGER,
-                    cost_estimate REAL,
-                    created_at TEXT NOT NULL
-                )"""
-            )
-            await db.commit()
-        finally:
-            await db.close()
+        await _setup_db(db_path)
 
         await handle_chat(ws, "Tell me a story", mock_provider, db_path)
 
@@ -335,7 +254,7 @@ class TestHandleChat:
 
 
 async def _setup_full_db(db_path: str) -> None:
-    """Create llm_usage + modules tables for module creation tests."""
+    """Create llm_usage + modules + memory_core tables for module creation tests."""
     db = await aiosqlite.connect(db_path)
     try:
         await db.execute("PRAGMA journal_mode=WAL;")
@@ -360,6 +279,16 @@ async def _setup_full_db(db_path: str) -> None:
                 user_id TEXT NOT NULL DEFAULT 'default',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL
             )"""
         )
         await db.commit()
@@ -519,6 +448,9 @@ class TestHandleChatModuleCreation:
         ]
         states = [m["payload"]["state"] for m in status_msgs]
         assert states == ["thinking", "discovering", "composing", "idle"]
+        # All status messages include persona field (None when no persona set)
+        for sm in status_msgs:
+            assert "persona" in sm["payload"]
 
     @pytest.mark.asyncio
     async def test_module_creation_sends_chat_stream_before_module_created(self, ws, tmp_path):
@@ -667,10 +599,8 @@ class TestHandleChatModuleCreation:
 
         await handle_chat(ws, "Create a broken module", provider, db_path)
 
-        assert ws.sent[-1] == {
-            "type": "status",
-            "payload": {"state": "idle"},
-        }
+        assert ws.sent[-1]["type"] == "status"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
     async def test_regular_chat_still_works(self, ws, tmp_path):
@@ -733,6 +663,116 @@ class TestHandleChatModuleCreation:
         assert "moduleId" not in payload
         assert "dataSources" not in payload
         assert "refreshInterval" not in payload
+
+
+class TestBuildModulePromptPersona:
+    """Tests for persona injection in _build_module_prompt (Story 2.3, AC: #3)."""
+
+    def test_persona_content_injected_between_soul_and_instructions(self):
+        """When persona_content is provided, it appears between SOUL and Instructions."""
+        persona = "# Persona: Flame\n\nBe concise."
+        prompt = _build_module_prompt("hello", _TEST_SOUL, persona)
+        soul_pos = prompt.find("# Test SOUL")
+        persona_pos = prompt.find("# Persona")
+        instructions_pos = prompt.find("# Instructions")
+        user_msg_pos = prompt.find("User message: hello")
+        assert soul_pos < persona_pos < instructions_pos < user_msg_pos
+
+    def test_persona_content_text_present_in_prompt(self):
+        """The actual persona content text appears in the prompt."""
+        persona = "Be extremely concise and act first."
+        prompt = _build_module_prompt("hello", _TEST_SOUL, persona)
+        assert "Be extremely concise and act first." in prompt
+
+    def test_persona_header_present_when_persona_provided(self):
+        """The # Persona header is present when persona_content is not None."""
+        prompt = _build_module_prompt("hello", _TEST_SOUL, "Some persona content")
+        assert "# Persona" in prompt
+
+    def test_no_persona_section_when_none(self):
+        """When persona_content is None, no persona section header is in the prompt."""
+        prompt = _build_module_prompt("hello", _TEST_SOUL, None)
+        assert "\n# Persona\n" not in prompt
+
+    def test_no_persona_section_when_omitted(self):
+        """When persona_content parameter is omitted, no persona section is in the prompt (backward compat)."""
+        prompt = _build_module_prompt("hello", _TEST_SOUL)
+        assert "\n# Persona\n" not in prompt
+
+    def test_prompt_order_soul_persona_instructions_message(self):
+        """Full prompt order: Agent Identity > SOUL > Persona > Instructions > User message."""
+        persona = "# Persona: Star\n\nBalanced approach."
+        prompt = _build_module_prompt("test msg", _TEST_SOUL, persona)
+        identity_pos = prompt.find("# Agent Identity")
+        soul_pos = prompt.find("# Test SOUL")
+        persona_pos = prompt.find("# Persona: Star")
+        instructions_pos = prompt.find("# Instructions")
+        user_pos = prompt.find("User message: test msg")
+        assert identity_pos < soul_pos < persona_pos < instructions_pos < user_pos
+
+
+class TestHandleChatWithPersona:
+    """Tests for handle_chat when a persona is set (Story 2.3, AC: #3, #4, #5)."""
+
+    @pytest.mark.asyncio
+    async def test_status_messages_include_persona_when_set(self, ws, mock_provider, tmp_path):
+        """When persona is set, all status messages include the persona field."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
+
+        # Set persona in memory_core
+        from app.agent import set_persona_type
+        await set_persona_type(db_path, "flame")
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        status_msgs = [m for m in ws.sent if m["type"] == "status"]
+        assert len(status_msgs) >= 2  # thinking + idle
+        for sm in status_msgs:
+            assert sm["payload"]["persona"] == "flame"
+
+    @pytest.mark.asyncio
+    async def test_status_messages_include_none_persona_when_not_set(self, ws, mock_provider, tmp_path):
+        """When no persona is set, status messages include persona: None."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        status_msgs = [m for m in ws.sent if m["type"] == "status"]
+        assert len(status_msgs) >= 2
+        for sm in status_msgs:
+            assert sm["payload"]["persona"] is None
+
+    @pytest.mark.asyncio
+    async def test_prompt_includes_persona_content_when_set(self, ws, mock_provider, tmp_path):
+        """When persona is set, the LLM prompt includes persona instructions."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
+
+        # Set persona and create persona file
+        from app.agent import set_persona_type, _ensure_default_personas
+        await set_persona_type(db_path, "flame")
+        await _ensure_default_personas(str(tmp_path))
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        call_kwargs = mock_provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "# Persona" in prompt
+        assert "Flame" in prompt
+
+    @pytest.mark.asyncio
+    async def test_prompt_has_no_persona_when_not_set(self, ws, mock_provider, tmp_path):
+        """When no persona is set, the LLM prompt has no persona section."""
+        db_path = str(tmp_path / "test.db")
+        await _setup_db(db_path)
+
+        await handle_chat(ws, "Hello", mock_provider, db_path)
+
+        call_kwargs = mock_provider.execute.call_args
+        prompt = call_kwargs.kwargs.get("prompt", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "\n# Persona\n" not in prompt
 
 
 class TestHandleChatSoulInjection:
@@ -815,3 +855,5 @@ class TestHandleChatSoulInjection:
 
         types = [m["type"] for m in ws.sent]
         assert types == ["status", "chat_stream", "chat_stream", "status"]
+        assert ws.sent[0]["payload"]["state"] == "thinking"
+        assert ws.sent[-1]["payload"]["state"] == "idle"

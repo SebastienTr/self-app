@@ -63,6 +63,16 @@ async def _setup_chat_db(db_path: str, session_token: str = "chat-test-token") -
             )"""
         )
         await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
         await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
@@ -105,7 +115,8 @@ def _auth(ws, token: str = _TEST_TOKEN) -> None:
     ws.send_json({"type": "auth", "payload": {"token": token}})
     # Server sends status:idle after successful auth — consume it
     ack = ws.receive_json()
-    assert ack == {"type": "status", "payload": {"state": "idle"}}
+    assert ack["type"] == "status"
+    assert ack["payload"]["state"] == "idle"
 
 
 @pytest.fixture

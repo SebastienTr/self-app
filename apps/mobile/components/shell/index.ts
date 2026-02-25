@@ -9,3 +9,4 @@ export { PairingScreen } from './PairingScreen';
 export { ChatBubble } from './ChatBubble';
 export { ChatInput } from './ChatInput';
 export { Orb } from './Orb';
+export { PersonaSelector } from './PersonaSelector';

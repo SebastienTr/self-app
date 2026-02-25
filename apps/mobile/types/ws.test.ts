@@ -48,6 +48,12 @@ describe('WSMessage type definitions', () => {
       payload: { lastSync: '2024-01-01T00:00:00Z' },
     };
     expect(syncMsg.type).toBe('sync');
+
+    const setPersonaMsg: WSMessage = {
+      type: 'set_persona',
+      payload: { persona: 'flame' as PersonaType },
+    };
+    expect(setPersonaMsg.type).toBe('set_persona');
   });
 
   it('accepts valid server-to-client messages', () => {
@@ -106,7 +112,7 @@ describe('WSMessage type definitions', () => {
     expect(usageSummaryMsg.type).toBe('usage_summary');
   });
 
-  it('has 15 message types in the union', () => {
+  it('has 16 message types in the union', () => {
     // Exhaustive type list — if any are removed/added, this array fails typecheck
     const allTypes: WSMessageType[] = [
       'auth',
@@ -118,6 +124,7 @@ describe('WSMessage type definitions', () => {
       'module_list',
       'module_sync',
       'sync',
+      'set_persona',
       'error',
       'warning',
       'status',
@@ -125,7 +132,7 @@ describe('WSMessage type definitions', () => {
       'module_action',
       'log',
     ];
-    expect(allTypes).toHaveLength(15);
+    expect(allTypes).toHaveLength(16);
   });
 
   it('supports ConnectionStatus enum values', () => {

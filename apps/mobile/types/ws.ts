@@ -67,6 +67,11 @@ export interface SyncMessage {
   payload: { lastSync: string };
 }
 
+export interface SetPersonaMessage {
+  type: 'set_persona';
+  payload: { persona: PersonaType };
+}
+
 // --- Server-to-client message types ---
 
 export interface ChatStreamMessage {
@@ -126,6 +131,7 @@ export type WSMessage =
   | ModuleListMessage
   | ModuleSyncMessage
   | SyncMessage
+  | SetPersonaMessage
   | ErrorMessage
   | WarningMessage
   | StatusMessage

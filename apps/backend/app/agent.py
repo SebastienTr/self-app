@@ -145,6 +145,246 @@ async def load_soul(data_dir: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Persona — Instruction Files & Memory Core Storage (Story 2.3)
+# ---------------------------------------------------------------------------
+
+_VALID_PERSONA_TYPES = ("flame", "tree", "star")
+
+_DEFAULT_PERSONA_FLAME = """\
+# Persona: Flame (Autonomous)
+
+## Communication Style
+- Be extremely concise — 50% shorter than default responses
+- Act first, report after — do not ask for confirmation before creating modules
+- Use direct, efficient language — no pleasantries or filler
+- When the user describes a need, immediately create the module without asking
+- If something goes wrong, fix it and explain briefly what happened
+
+## Autonomy Level
+- Maximum autonomy — take action without asking
+- Create, modify, and remove modules proactively
+- Only ask for clarification when the request is genuinely ambiguous
+
+## Tone
+- Confident, competent, no-nonsense
+- Respect the user's time above all else
+- Assume the user knows what they want
+"""
+
+_DEFAULT_PERSONA_TREE = """\
+# Persona: Tree (Collaborative)
+
+## Communication Style
+- Use warm, reassuring language
+- Always explain what you're about to do before doing it
+- Ask for confirmation before creating, modifying, or removing any module
+- Use phrases like "Would you like me to..." and "I can help with that — shall I..."
+- Provide context and reasoning for suggestions
+
+## Autonomy Level
+- Minimal autonomy — always ask before acting
+- Present options rather than making decisions
+- Confirm before every significant action
+
+## Tone
+- Gentle, patient, encouraging
+- Never use technical jargon unless the user does first
+- Make the user feel supported and in control
+"""
+
+_DEFAULT_PERSONA_STAR = """\
+# Persona: Star (Balanced)
+
+## Communication Style
+- Balanced message length — concise but not terse
+- For new action types, ask for confirmation first
+- For repeated patterns the user has approved before, act autonomously
+- Adapt communication style to the user's own style over time
+
+## Autonomy Level
+- Adaptive autonomy — ask for new action types, auto-execute for established patterns
+- Suggest proactively but let the user decide
+- First-time actions require confirmation; repeated patterns auto-execute
+
+## Tone
+- Friendly and natural — like a capable colleague
+- Match the user's energy and formality level
+- Be direct when appropriate, warm when needed
+"""
+
+_PERSONA_DEFAULTS = {
+    "flame": _DEFAULT_PERSONA_FLAME,
+    "tree": _DEFAULT_PERSONA_TREE,
+    "star": _DEFAULT_PERSONA_STAR,
+}
+
+
+def _persona_dir(data_dir: str) -> Path:
+    """Return the path to the personas directory.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+
+    Returns:
+        Path object pointing to personas/ inside data_dir.
+    """
+    return Path(data_dir) / "personas"
+
+
+def _persona_path(data_dir: str, persona_type: str) -> Path:
+    """Return the path to a specific persona file.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+        persona_type: One of "flame", "tree", "star".
+
+    Returns:
+        Path object pointing to personas/{persona_type}.md inside data_dir.
+    """
+    return Path(data_dir) / "personas" / f"{persona_type}.md"
+
+
+async def ensure_default_personas(data_dir: str) -> None:
+    """Write default persona files to disk if they do not already exist.
+
+    Creates the personas/ directory and writes flame.md, tree.md, star.md
+    with default content. Does NOT overwrite existing files (user may have
+    edited them). Uses asyncio.to_thread for all I/O.
+
+    Public API — called from main.py lifespan at startup.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+    """
+    p_dir = _persona_dir(data_dir)
+    await asyncio.to_thread(p_dir.mkdir, parents=True, exist_ok=True)
+
+    created = 0
+    for persona_type, default_content in _PERSONA_DEFAULTS.items():
+        p_file = _persona_path(data_dir, persona_type)
+        if await asyncio.to_thread(p_file.exists):
+            continue
+        await asyncio.to_thread(p_file.write_text, default_content, encoding="utf-8")
+        created += 1
+        log.info(
+            "persona_file_created",
+            persona_type=persona_type,
+            path=str(p_file),
+        )
+
+    if created > 0:
+        log.info("personas_loaded", created=created, total=len(_PERSONA_DEFAULTS))
+    else:
+        log.info("personas_loaded", created=0, total=len(_PERSONA_DEFAULTS))
+
+
+# Backward-compat alias — tests import the private name
+_ensure_default_personas = ensure_default_personas
+
+
+async def load_persona(data_dir: str, persona_type: str | None) -> str | None:
+    """Load a persona instruction file from disk.
+
+    Args:
+        data_dir: The data directory (e.g. "data").
+        persona_type: One of "flame", "tree", "star", or None/empty.
+
+    Returns:
+        Content string if persona found, None otherwise.
+        Returns None for None/empty persona_type or invalid types.
+        Gracefully returns None if file is missing/corrupted.
+    """
+    if not persona_type:
+        return None
+
+    if persona_type not in _VALID_PERSONA_TYPES:
+        log.warning(
+            "persona_invalid_type",
+            persona_type=persona_type,
+            agent_action=f"Unknown persona type: {persona_type}. Valid types: {', '.join(_VALID_PERSONA_TYPES)}",
+        )
+        return None
+
+    p_file = _persona_path(data_dir, persona_type)
+    try:
+        content = await asyncio.to_thread(p_file.read_text, encoding="utf-8")
+        if not content.strip():
+            log.warning(
+                "persona_file_empty",
+                persona_type=persona_type,
+                agent_action=f"Persona file {p_file} is empty. Agent will proceed without persona.",
+            )
+            return None
+        return content
+    except FileNotFoundError:
+        log.warning(
+            "persona_file_not_found",
+            persona_type=persona_type,
+            agent_action=f"Persona file {p_file} not found. Agent will proceed without persona.",
+        )
+        return None
+    except (OSError, UnicodeDecodeError) as e:
+        log.warning(
+            "persona_file_read_failed",
+            persona_type=persona_type,
+            error=str(e),
+            agent_action=f"Persona file {p_file} corrupted. Agent will proceed without persona.",
+        )
+        return None
+
+
+async def get_persona_type(db_path: str) -> str | None:
+    """Get the current persona type from memory_core table.
+
+    Args:
+        db_path: Path to SQLite database.
+
+    Returns:
+        The persona type string ("flame"/"tree"/"star") or None if not set.
+    """
+    db = await get_connection(db_path)
+    try:
+        cursor = await db.execute(
+            "SELECT value FROM memory_core WHERE key = ? AND user_id = ?",
+            ("persona_type", "default"),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else None
+    finally:
+        await db.close()
+
+
+async def set_persona_type(db_path: str, persona_type: str) -> None:
+    """Set the persona type in memory_core table.
+
+    Uses delete + insert pattern (no UNIQUE constraint on key).
+
+    Args:
+        db_path: Path to SQLite database.
+        persona_type: One of "flame", "tree", "star".
+
+    Raises:
+        ValueError: If persona_type is not a valid value.
+    """
+    if persona_type not in _VALID_PERSONA_TYPES:
+        raise ValueError(f"Invalid persona type: {persona_type}. Must be one of: {', '.join(_VALID_PERSONA_TYPES)}")
+
+    db = await get_connection(db_path)
+    try:
+        await db.execute(
+            "DELETE FROM memory_core WHERE key = ? AND user_id = ?",
+            ("persona_type", "default"),
+        )
+        await db.execute(
+            "INSERT INTO memory_core (id, key, value, category, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), "persona_type", persona_type, "persona", "default", datetime.now(UTC).isoformat()),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+# ---------------------------------------------------------------------------
 # Module Spec Extraction & Prompt Assembly
 # ---------------------------------------------------------------------------
 
@@ -234,23 +474,29 @@ def _extract_chat_text(content: str) -> str:
     return text
 
 
-def _build_module_prompt(message: str, soul_content: str) -> str:
+def _build_module_prompt(message: str, soul_content: str, persona_content: str | None = None) -> str:
     """Build the prompt for the LLM that enables module creation.
 
-    Includes the agent's SOUL identity, system instructions for module creation,
-    schema requirements, and examples. The LLM will respond with both
-    conversational text and a JSON module spec code block when appropriate.
+    Includes the agent's SOUL identity, optional persona instructions,
+    system instructions for module creation, schema requirements, and examples.
+    The LLM will respond with both conversational text and a JSON module spec
+    code block when appropriate.
+
+    Prompt order: Agent Identity (SOUL) → Persona (optional) → Instructions → User message
 
     Args:
-        message:      The user's chat message.
-        soul_content: The SOUL.md content for agent identity.
+        message:         The user's chat message.
+        soul_content:    The SOUL.md content for agent identity.
+        persona_content: Optional persona instruction file content. If None, no
+                         persona section is included (backward compatible).
 
     Returns:
         The full prompt string for the LLM provider.
     """
+    persona_section = f"\n\n# Persona\n\n{persona_content}" if persona_content else ""
     return f"""# Agent Identity
 
-{soul_content}
+{soul_content}{persona_section}
 
 # Instructions
 
@@ -396,6 +642,7 @@ async def _handle_module_creation(
     result: LLMResult,
     module_spec: dict,
     db_path: str,
+    persona_type: str | None = None,
 ) -> None:
     """Handle the module creation pipeline after a module spec is detected.
 
@@ -406,10 +653,11 @@ async def _handle_module_creation(
     (thinking is sent before this, idle is sent after in handle_chat's finally)
 
     Args:
-        ws:          WebSocket connection.
-        result:      LLM result (for text extraction).
-        module_spec: Validated module spec dict from LLM.
-        db_path:     Path to SQLite database.
+        ws:           WebSocket connection.
+        result:       LLM result (for text extraction).
+        module_spec:  Validated module spec dict from LLM.
+        db_path:      Path to SQLite database.
+        persona_type: Current persona type for status messages.
     """
     # Send conversational text as chat_stream (before module_created)
     chat_text = _extract_chat_text(result.content)
@@ -424,10 +672,10 @@ async def _handle_module_creation(
     })
 
     # Status: discovering (after parsing LLM response)
-    await ws.send_json({"type": "status", "payload": {"state": "discovering"}})
+    await ws.send_json({"type": "status", "payload": {"state": "discovering", "persona": persona_type}})
 
     # Status: composing (during DB save)
-    await ws.send_json({"type": "status", "payload": {"state": "composing"}})
+    await ws.send_json({"type": "status", "payload": {"state": "composing", "persona": persona_type}})
 
     # Save module to database
     module_name = module_spec.get("name", "Unnamed Module")
@@ -489,16 +737,22 @@ async def handle_chat(
         provider: LLM provider instance (obtained via get_provider() in main.py)
         db_path:  Path to SQLite database for llm_usage logging
     """
+    # Load persona type once at the start — used for both prompt and status messages
+    data_dir = str(Path(db_path).parent)
+    persona_type = await get_persona_type(db_path)
+
     # Always notify thinking state before calling provider
-    await ws.send_json({"type": "status", "payload": {"state": "thinking"}})
+    await ws.send_json({"type": "status", "payload": {"state": "thinking", "persona": persona_type}})
 
     try:
         # Load agent identity from SOUL.md (read on every request, no caching)
-        data_dir = str(Path(db_path).parent)
         soul_content = await load_soul(data_dir)
 
-        # Build prompt with SOUL identity and module creation instructions
-        prompt = _build_module_prompt(message, soul_content)
+        # Load persona instructions if persona is set
+        persona_content = await load_persona(data_dir, persona_type) if persona_type else None
+
+        # Build prompt with SOUL identity, persona instructions, and module creation instructions
+        prompt = _build_module_prompt(message, soul_content, persona_content)
 
         # Call provider with the enriched prompt
         result = await provider.execute(prompt=prompt)
@@ -509,7 +763,7 @@ async def handle_chat(
         if spec_result.spec is not None:
             # Module creation pipeline — valid spec found
             try:
-                await _handle_module_creation(ws, result, spec_result.spec, db_path)
+                await _handle_module_creation(ws, result, spec_result.spec, db_path, persona_type)
             except Exception as e:
                 log.error(
                     "module_creation_failed",
@@ -594,4 +848,4 @@ async def handle_chat(
 
     finally:
         # Always reset to idle, even on error
-        await ws.send_json({"type": "status", "payload": {"state": "idle"}})
+        await ws.send_json({"type": "status", "payload": {"state": "idle", "persona": persona_type}})

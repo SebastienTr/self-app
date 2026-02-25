@@ -103,6 +103,9 @@ async def lifespan(app: FastAPI):
     else:
         log.info("soul_loaded", status="custom")
 
+    # Ensure persona instruction files exist (creates defaults on first boot)
+    await agent.ensure_default_personas(settings.self_data_dir)
+
     # Run database migrations
     migrations_applied = await run_migrations(settings.db_path, _MIGRATIONS_DIR)
     _state["migrations_applied"] = migrations_applied
@@ -310,9 +313,12 @@ async def _handle_auth_reset(
     new_token = str(uuid.uuid4())
     new_session = await create_session(settings.db_path, new_token)
 
+    # Load current persona for status message
+    persona_type = await agent.get_persona_type(settings.db_path)
+
     await ws.send_json({
         "type": "status",
-        "payload": {"state": "idle"},
+        "payload": {"state": "idle", "persona": persona_type},
     })
 
     log.info(
@@ -387,10 +393,12 @@ async def websocket_endpoint(ws: WebSocket):
                 if auth_result:
                     authenticated = True
                     session_id = sid
+                    # Load current persona for status message
+                    persona_type = await agent.get_persona_type(settings.db_path)
                     # Send status so client can infer auth success
                     await ws.send_json({
                         "type": "status",
-                        "payload": {"state": "idle"},
+                        "payload": {"state": "idle", "persona": persona_type},
                     })
                 continue
 
@@ -419,6 +427,29 @@ async def websocket_endpoint(ws: WebSocket):
                 log.info("mobile_log", mobile_payload=payload)
             elif msg_type == "sync":
                 await _handle_sync(ws, payload)
+            elif msg_type == "set_persona":
+                persona = payload.get("persona", "")
+                old_persona = await agent.get_persona_type(settings.db_path)
+                try:
+                    await agent.set_persona_type(settings.db_path, persona)
+                    await ws.send_json({
+                        "type": "status",
+                        "payload": {"state": "idle", "persona": persona},
+                    })
+                    log.info(
+                        "persona_changed",
+                        old_persona=old_persona,
+                        new_persona=persona,
+                    )
+                except ValueError:
+                    await ws.send_json({
+                        "type": "error",
+                        "payload": {
+                            "code": "PERSONA_INVALID",
+                            "message": f"Invalid persona type: {persona}. Must be flame, tree, or star.",
+                            "agent_action": "Check PersonaType enum in types/ws.ts",
+                        },
+                    })
             else:
                 await ws.send_json({
                     "type": "error",

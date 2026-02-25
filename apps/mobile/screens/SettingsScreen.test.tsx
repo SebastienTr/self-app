@@ -30,6 +30,7 @@ jest.mock('@/services/wsClient', () => ({
   connect: jest.fn(),
   onMessage: jest.fn(() => () => {}),
   loadPersistedMessages: jest.fn(async () => {}),
+  sendSetPersona: jest.fn(),
 }));
 
 // Mock getBackendUrl for PairingScreen
@@ -54,7 +55,7 @@ describe('SettingsScreen', () => {
       authStatus: 'unconfigured',
       pairingError: null,
     });
-    useConnectionStore.setState({ status: 'disconnected' });
+    useConnectionStore.setState({ status: 'disconnected', persona: null });
     useModuleStore.setState({ modules: new Map(), newModulesSinceLastHomeVisit: 0 });
   });
 
@@ -192,6 +193,45 @@ describe('SettingsScreen', () => {
     it('shows version number', () => {
       const { getByText } = render(<SettingsScreen />);
       expect(getByText('0.1.0')).toBeTruthy();
+    });
+  });
+
+  describe('persona section (Story 2.3)', () => {
+    beforeEach(() => {
+      useAuthStore.setState({ authStatus: 'authenticated' });
+      useConnectionStore.setState({ status: 'connected', persona: null });
+    });
+
+    it('shows Persona section title when authenticated', () => {
+      const { getByText } = render(<SettingsScreen />);
+      expect(getByText('Persona')).toBeTruthy();
+    });
+
+    it('renders PersonaSelector with three persona options', () => {
+      const { getByLabelText } = render(<SettingsScreen />);
+      expect(getByLabelText('Select Flame persona')).toBeTruthy();
+      expect(getByLabelText('Select Tree persona')).toBeTruthy();
+      expect(getByLabelText('Select Star persona')).toBeTruthy();
+    });
+
+    it('highlights the active persona', () => {
+      useConnectionStore.setState({ persona: 'tree' });
+      const { getByLabelText } = render(<SettingsScreen />);
+      const treeCard = getByLabelText('Select Tree persona');
+      expect(treeCard.props.accessibilityState).toEqual({ selected: true });
+    });
+
+    it('calls sendSetPersona when a persona is tapped', () => {
+      const wsClient = require('@/services/wsClient');
+      const { getByLabelText } = render(<SettingsScreen />);
+      fireEvent.press(getByLabelText('Select Flame persona'));
+      expect(wsClient.sendSetPersona).toHaveBeenCalledWith('flame');
+    });
+
+    it('does not show Persona section when in pairing mode', () => {
+      useAuthStore.setState({ authStatus: 'unconfigured' });
+      const { queryByText } = render(<SettingsScreen />);
+      expect(queryByText('Persona')).toBeNull();
     });
   });
 });

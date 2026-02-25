@@ -12,7 +12,7 @@
 
 import { create } from 'zustand';
 
-import type { ConnectionStatus } from '@/types/ws';
+import type { ConnectionStatus, PersonaType } from '@/types/ws';
 import { getBackendUrl } from '@/utils/getBackendUrl';
 
 interface ConnectionStore {
@@ -21,6 +21,7 @@ interface ConnectionStore {
   reconnectAttempts: number;
   lastSync: string | null;
   backendUrl: string;
+  persona: PersonaType | null;
 
   // Actions (imperative verbs)
   setStatus: (status: ConnectionStatus) => void;
@@ -28,6 +29,7 @@ interface ConnectionStore {
   incrementReconnectAttempts: () => void;
   resetReconnectAttempts: () => void;
   setLastSync: (timestamp: string) => void;
+  setPersona: (persona: PersonaType | null) => void;
 
   // Selectors (get + descriptive noun)
   getIsConnected: () => boolean;
@@ -40,6 +42,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   reconnectAttempts: 0,
   lastSync: null,
   backendUrl: getBackendUrl(),
+  persona: null,
 
   // Actions
   setStatus: (status) => set({ status }),
@@ -48,6 +51,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     set((state) => ({ reconnectAttempts: state.reconnectAttempts + 1 })),
   resetReconnectAttempts: () => set({ reconnectAttempts: 0 }),
   setLastSync: (timestamp) => set({ lastSync: timestamp }),
+  setPersona: (persona) => set({ persona }),
 
   // Selectors
   getIsConnected: () => get().status === 'connected',

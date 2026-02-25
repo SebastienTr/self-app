@@ -14,7 +14,7 @@
 
 import { useAuthStore } from '@/stores/authStore';
 import { useConnectionStore } from '@/stores/connectionStore';
-import type { WSMessage, WSMessageType } from '@/types/ws';
+import type { PersonaType, WSMessage, WSMessageType } from '@/types/ws';
 import { toCamel } from '@/utils/toCamel';
 import { toSnake } from '@/utils/toSnake';
 import { logger } from './logger';
@@ -217,6 +217,12 @@ function doConnect(url: string): void {
         }
       }
 
+      // Extract persona from status messages and update connectionStore
+      if (msgType === 'status' && payload) {
+        const personaValue = (payload as Record<string, unknown>).persona as PersonaType | null | undefined;
+        useConnectionStore.getState().setPersona(personaValue ?? null);
+      }
+
       // Detect successful auth (no error after auth message = success)
       // If we get a non-error message while in 'pairing' or 'authenticating', auth succeeded
       if (
@@ -389,4 +395,12 @@ export async function loadPersistedMessages(): Promise<void> {
  */
 export function getPendingMessageCount(): number {
   return pendingMessages.length;
+}
+
+/**
+ * Send a set_persona message to the backend.
+ * The backend will confirm with a status message including the new persona.
+ */
+export function sendSetPersona(persona: PersonaType): void {
+  send({ type: 'set_persona', payload: { persona } });
 }

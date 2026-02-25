@@ -60,7 +60,7 @@ def _make_provider(content: str = "Response content") -> MagicMock:
 
 
 async def _create_db_with_usage_table(db_path: str) -> None:
-    """Create a test DB with llm_usage table."""
+    """Create a test DB with llm_usage + memory_core tables."""
     db = await aiosqlite.connect(db_path)
     try:
         await db.execute("PRAGMA journal_mode=WAL;")
@@ -72,6 +72,16 @@ async def _create_db_with_usage_table(db_path: str) -> None:
                 tokens_in INTEGER,
                 tokens_out INTEGER,
                 cost_estimate REAL,
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
                 created_at TEXT NOT NULL
             )"""
         )
@@ -144,6 +154,7 @@ class TestHandleChatEdgeCases:
     async def test_error_payload_code_is_always_llm_chat_failed(self, ws, tmp_path):
         """LLM error always produces error payload with code=LLM_CHAT_FAILED."""
         db_path = str(tmp_path / "test.db")
+        await _create_db_with_usage_table(db_path)
 
         provider = MagicMock()
         provider.name = "failing-provider"
@@ -159,6 +170,7 @@ class TestHandleChatEdgeCases:
     async def test_error_payload_includes_provider_name_in_agent_action(self, ws, tmp_path):
         """Error's agent_action field references the provider name."""
         db_path = str(tmp_path / "test.db")
+        await _create_db_with_usage_table(db_path)
 
         provider = MagicMock()
         provider.name = "my-special-provider"
@@ -232,7 +244,8 @@ class TestHandleChatEdgeCases:
             await handle_chat(ws, "Hello", provider, db_path)
 
         # Despite _log_llm_usage failing, status:idle must still be sent
-        assert ws.sent[-1] == {"type": "status", "payload": {"state": "idle"}}
+        assert ws.sent[-1]["type"] == "status"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
     async def test_total_messages_on_success_is_four(self, ws, tmp_path):
@@ -249,6 +262,7 @@ class TestHandleChatEdgeCases:
     async def test_total_messages_on_error_is_three(self, ws, tmp_path):
         """Exactly 3 messages are sent on error path: thinking, error, idle."""
         db_path = str(tmp_path / "test.db")
+        await _create_db_with_usage_table(db_path)
 
         provider = MagicMock()
         provider.name = "error-provider"
@@ -264,6 +278,7 @@ class TestHandleChatEdgeCases:
     async def test_error_message_field_is_user_facing(self, ws, tmp_path):
         """Error message payload.message is a user-facing string (not the raw exception)."""
         db_path = str(tmp_path / "test.db")
+        await _create_db_with_usage_table(db_path)
 
         provider = MagicMock()
         provider.name = "test"

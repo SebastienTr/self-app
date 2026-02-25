@@ -72,7 +72,7 @@ def _make_provider(content: str) -> MagicMock:
 
 
 async def _setup_full_db(db_path: str) -> None:
-    """Create llm_usage + modules tables for module creation tests."""
+    """Create llm_usage + modules + memory_core tables for module creation tests."""
     db = await aiosqlite.connect(db_path)
     try:
         await db.execute("PRAGMA journal_mode=WAL;")
@@ -97,6 +97,16 @@ async def _setup_full_db(db_path: str) -> None:
                 user_id TEXT NOT NULL DEFAULT 'default',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL
             )"""
         )
         await db.commit()
@@ -427,7 +437,8 @@ class TestHandleChatModuleCreationEdgeCases:
         with patch("app.agent.create_module", side_effect=Exception("DB error")):
             await handle_chat(ws, "Create module", provider, db_path)
 
-        assert ws.sent[-1] == {"type": "status", "payload": {"state": "idle"}}
+        assert ws.sent[-1]["type"] == "status"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
 
     @pytest.mark.asyncio
     async def test_invalid_json_sends_chat_text_before_error(self, ws, tmp_path):

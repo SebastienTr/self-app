@@ -73,7 +73,7 @@ def _get_prompt(provider: MagicMock) -> str:
 
 
 async def _setup_db(db_path: str) -> None:
-    """Create llm_usage + modules tables for tests."""
+    """Create llm_usage + modules + memory_core tables for tests."""
     db = await aiosqlite.connect(db_path)
     try:
         await db.execute("PRAGMA journal_mode=WAL;")
@@ -98,6 +98,16 @@ async def _setup_db(db_path: str) -> None:
                 user_id TEXT NOT NULL DEFAULT 'default',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL
             )"""
         )
         await db.commit()
@@ -308,10 +318,8 @@ class TestHandleChatSoulEdgeCases:
             await handle_chat(ws, "Hello", provider, db_path)
 
         # idle must still be sent (finally block)
-        assert ws.sent[-1] == {
-            "type": "status",
-            "payload": {"state": "idle"},
-        }
+        assert ws.sent[-1]["type"] == "status"
+        assert ws.sent[-1]["payload"]["state"] == "idle"
 
         # Should have error message
         error_msgs = [m for m in ws.sent if m["type"] == "error"]

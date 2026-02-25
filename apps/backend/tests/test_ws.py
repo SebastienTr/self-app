@@ -64,6 +64,16 @@ async def _setup_ws_db(db_path: str, session_token: str = "test-ws-token") -> No
             )"""
         )
         await db.execute(
+            """CREATE TABLE IF NOT EXISTS memory_core (
+                id TEXT PRIMARY KEY,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                category TEXT,
+                user_id TEXT NOT NULL DEFAULT 'default',
+                created_at TEXT NOT NULL
+            )"""
+        )
+        await db.execute(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY)"
         )
         await db.execute("INSERT OR IGNORE INTO schema_version (version) VALUES (2)")
@@ -100,7 +110,8 @@ def _auth(ws, token: str = _TEST_TOKEN) -> None:
     ws.send_json({"type": "auth", "payload": {"token": token}})
     # Server sends status:idle after successful auth — consume it
     ack = ws.receive_json()
-    assert ack == {"type": "status", "payload": {"state": "idle"}}
+    assert ack["type"] == "status"
+    assert ack["payload"]["state"] == "idle"
 
 
 @pytest.fixture
@@ -1247,3 +1258,88 @@ class TestModuleCreationViaChat:
             first_stream = types.index("chat_stream")
             module_idx = types.index("module_created")
             assert first_stream < module_idx
+
+
+class TestSetPersonaWsHandler:
+    """Tests for the set_persona WebSocket message handler (Story 2.3, AC: #2, #4, #8)."""
+
+    def test_set_persona_flame_returns_status_with_persona(self, client):
+        """set_persona with 'flame' sends status:idle with persona='flame'."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": "flame"}})
+            response = ws.receive_json()
+            assert response["type"] == "status"
+            assert response["payload"]["state"] == "idle"
+            assert response["payload"]["persona"] == "flame"
+
+    def test_set_persona_tree_returns_status(self, client):
+        """set_persona with 'tree' sends status with persona='tree'."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": "tree"}})
+            response = ws.receive_json()
+            assert response["type"] == "status"
+            assert response["payload"]["persona"] == "tree"
+
+    def test_set_persona_star_returns_status(self, client):
+        """set_persona with 'star' sends status with persona='star'."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": "star"}})
+            response = ws.receive_json()
+            assert response["type"] == "status"
+            assert response["payload"]["persona"] == "star"
+
+    def test_set_persona_invalid_returns_error(self, client):
+        """set_persona with invalid type sends PERSONA_INVALID error."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": "invalid"}})
+            response = ws.receive_json()
+            assert response["type"] == "error"
+            assert response["payload"]["code"] == "PERSONA_INVALID"
+
+    def test_set_persona_empty_returns_error(self, client):
+        """set_persona with empty string sends PERSONA_INVALID error."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": ""}})
+            response = ws.receive_json()
+            assert response["type"] == "error"
+            assert response["payload"]["code"] == "PERSONA_INVALID"
+
+    def test_set_persona_persists_across_reconnections(self, client, test_settings):
+        """Persona set via set_persona persists and appears on next auth."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": "flame"}})
+            ws.receive_json()  # consume status response
+
+        # Reconnect and check the auth status message includes persona
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "auth", "payload": {"token": _TEST_TOKEN}})
+            ack = ws.receive_json()
+            assert ack["type"] == "status"
+            assert ack["payload"]["state"] == "idle"
+            assert ack["payload"]["persona"] == "flame"
+
+    def test_set_persona_change_updates_value(self, client):
+        """Setting persona twice updates to the new value."""
+        with client.websocket_connect("/ws") as ws:
+            _auth(ws)
+            ws.send_json({"type": "set_persona", "payload": {"persona": "flame"}})
+            r1 = ws.receive_json()
+            assert r1["payload"]["persona"] == "flame"
+
+            ws.send_json({"type": "set_persona", "payload": {"persona": "tree"}})
+            r2 = ws.receive_json()
+            assert r2["payload"]["persona"] == "tree"
+
+    def test_set_persona_without_auth_returns_auth_required(self, client):
+        """set_persona without authentication returns AUTH_REQUIRED."""
+        with client.websocket_connect("/ws") as ws:
+            ws.send_json({"type": "set_persona", "payload": {"persona": "flame"}})
+            response = ws.receive_json()
+            assert response["type"] == "error"
+            assert response["payload"]["code"] == "AUTH_REQUIRED"

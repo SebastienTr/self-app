@@ -1,5 +1,5 @@
 import { useConnectionStore } from './connectionStore';
-import type { ConnectionStatus } from '@/types/ws';
+import type { ConnectionStatus, PersonaType } from '@/types/ws';
 
 describe('connectionStore', () => {
   beforeEach(() => {
@@ -9,6 +9,7 @@ describe('connectionStore', () => {
       reconnectAttempts: 0,
       lastSync: null,
       backendUrl: 'ws://localhost:8000/ws',
+      persona: null,
     });
   });
 
@@ -229,6 +230,55 @@ describe('connectionStore', () => {
       expect(current.reconnectAttempts).toBe(0);
       expect(current.status).toBe('reconnecting'); // unchanged
       expect(current.lastSync).toBe('2024-06-01'); // unchanged
+    });
+  });
+
+  describe('persona (Story 2.3)', () => {
+    it('has null persona by default', () => {
+      const state = useConnectionStore.getState();
+      expect(state.persona).toBeNull();
+    });
+
+    it('setPersona updates persona to flame', () => {
+      useConnectionStore.getState().setPersona('flame');
+      expect(useConnectionStore.getState().persona).toBe('flame');
+    });
+
+    it('setPersona updates persona to tree', () => {
+      useConnectionStore.getState().setPersona('tree');
+      expect(useConnectionStore.getState().persona).toBe('tree');
+    });
+
+    it('setPersona updates persona to star', () => {
+      useConnectionStore.getState().setPersona('star');
+      expect(useConnectionStore.getState().persona).toBe('star');
+    });
+
+    it('setPersona can set back to null', () => {
+      useConnectionStore.getState().setPersona('flame');
+      expect(useConnectionStore.getState().persona).toBe('flame');
+      useConnectionStore.getState().setPersona(null);
+      expect(useConnectionStore.getState().persona).toBeNull();
+    });
+
+    it('setPersona cycles through all valid personas', () => {
+      const personas: PersonaType[] = ['flame', 'tree', 'star'];
+      for (const p of personas) {
+        useConnectionStore.getState().setPersona(p);
+        expect(useConnectionStore.getState().persona).toBe(p);
+      }
+    });
+
+    it('setPersona does not affect other state', () => {
+      const state = useConnectionStore.getState();
+      state.setStatus('connected');
+      state.setLastSync('2024-01-01');
+      state.setPersona('flame');
+
+      const current = useConnectionStore.getState();
+      expect(current.persona).toBe('flame');
+      expect(current.status).toBe('connected');
+      expect(current.lastSync).toBe('2024-01-01');
     });
   });
 });
