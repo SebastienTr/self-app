@@ -1,0 +1,38 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bodyGradient" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.5">
+      <stop offset="0%" stop-color="#E4ECF4"/>
+      <stop offset="60%" stop-color="#6B8ECC"/>
+      <stop offset="100%" stop-color="#4A6EA0"/>
+    </radialGradient>
+    <radialGradient id="innerGlowGradient" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.5">
+      <stop offset="0%" stop-color="#E4ECF4" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#E4ECF4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="auraGradient" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.5">
+      <stop offset="0%" stop-color="rgba(107, 142, 204, 0.2)"/>
+      <stop offset="100%" stop-color="rgba(107, 142, 204, 0)"/>
+    </radialGradient>
+  </defs>
+
+  <ellipse cx="60" cy="80" rx="45" ry="20" fill="url(#auraGradient)"/>
+
+  <path d="M60 20C65 35, 80 45, 100 48C80 55, 65 65, 60 90C55 65, 40 55, 20 48C40 45, 55 35, 60 20Z" fill="url(#bodyGradient)" stroke-linejoin="round" stroke-width="15" stroke="url(#bodyGradient)"/>
+
+  <circle cx="60" cy="54" r="20" fill="url(#innerGlowGradient)"/>
+
+  <g fill="#0C1420">
+    <circle cx="52" cy="50" r="2"/>
+    <circle cx="68" cy="50" r="2"/>
+    <path d="M54 60 Q60 64, 66 60" stroke="#0C1420" stroke-width="2" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <g>
+    <circle cx="30" cy="30" r="3" fill="#E4ECF4" opacity="0.8"/>
+    <circle cx="95" cy="40" r="2" fill="#E4ECF4" opacity="0.6"/>
+
+    <circle cx="85" cy="75" r="2.5" fill="#7899BB" opacity="0.5"/>
+
+    <path d="M25 70 L27 73 L30 74 L27 75 L25 78 L23 75 L20 74 L23 73 Z" fill="#E8A84C" opacity="0.9"/>
+  </g>
+</svg>

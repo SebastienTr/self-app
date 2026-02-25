@@ -1,0 +1,36 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="canopyGradient" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.5">
+      <stop offset="0%" stop-color="#7ABF8E"/>
+      <stop offset="100%" stop-color="#5CB8A0"/>
+    </radialGradient>
+    <radialGradient id="glowGradient" cx="0.5" cy="0.5" r="0.5" fx="0.5" fy="0.5">
+      <stop offset="0%" stop-color="rgba(92, 184, 160, 0.2)"/>
+      <stop offset="100%" stop-color="rgba(92, 184, 160, 0)"/>
+    </radialGradient>
+  </defs>
+
+  <ellipse cx="60" cy="95" rx="40" ry="15" fill="url(#glowGradient)"/>
+
+  <path d="M54 92C54 88 56 85 60 85C64 85 66 88 66 92C66 96 64 100 60 100C56 100 54 96 54 92Z" fill="#2A4A3A"/>
+
+  <circle cx="60" cy="60" r="35" fill="url(#canopyGradient)"/>
+  <circle cx="45" cy="78" r="12" fill="url(#canopyGradient)"/>
+  <circle cx="75" cy="78" r="12" fill="url(#canopyGradient)"/>
+  <circle cx="60" cy="82" r="10" fill="url(#canopyGradient)"/>
+
+  <g fill="none" stroke="#142A1E" stroke-width="2.5" stroke-linecap="round">
+    <path d="M48 60Q52 64 56 60"/>
+    <path d="M64 60Q68 64 72 60"/>
+    <path d="M53 70Q60 75 67 70"/>
+  </g>
+
+  <g fill="#7ABF8E">
+    <path d="M25 40 C20 35, 20 25, 25 20 C30 25, 30 35, 25 40 Z" opacity="0.6"/>
+    <path d="M95 35 C90 30, 90 20, 95 15 C100 20, 100 30, 95 35 Z" opacity="0.8"/>
+    <path d="M85 90 C82 86, 82 78, 85 75 C88 78, 88 86, 85 90 Z" opacity="0.4"/>
+  </g>
+
+  <path d="M60 15L62 19L66 20L62 21L60 25L58 21L54 20L58 19Z" fill="#E8A84C"/>
+
+</svg>
