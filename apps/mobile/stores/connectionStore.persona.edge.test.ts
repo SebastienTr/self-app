@@ -118,14 +118,15 @@ describe('connectionStore persona edge cases', () => {
 
     it('subscription for persona does not fire on unrelated changes', () => {
       let personaNotifyCount = 0;
-      const unsubscribe = useConnectionStore.subscribe(
-        (state) => state.persona,
-        () => {
+      let lastPersona = useConnectionStore.getState().persona;
+      const unsubscribe = useConnectionStore.subscribe((state) => {
+        if (state.persona !== lastPersona) {
           personaNotifyCount++;
-        },
-      );
+          lastPersona = state.persona;
+        }
+      });
 
-      // These should NOT trigger persona-specific subscription
+      // These should NOT trigger persona-specific tracking
       useConnectionStore.getState().setStatus('connecting');
       useConnectionStore.getState().incrementReconnectAttempts();
       useConnectionStore.getState().setLastSync('2026-01-01');
