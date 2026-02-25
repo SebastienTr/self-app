@@ -168,7 +168,7 @@ describe('ChatScreen', () => {
     it('hides prompt chips when messages exist', () => {
       useChatStore.setState({
         messages: [
-          { id: 'msg-1', type: 'chat', role: 'user', text: 'Hi', timestamp: new Date().toISOString() },
+          { id: 'msg-1', type: 'chat', role: 'user', content: 'Hi', timestamp: new Date().toISOString() },
         ],
       });
       const { queryByText } = render(<ChatScreen />);
