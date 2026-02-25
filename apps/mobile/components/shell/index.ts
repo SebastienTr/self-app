@@ -11,5 +11,3 @@ export { ChatInput } from './ChatInput';
 export { Orb } from './Orb';
 export { PersonaSelector } from './PersonaSelector';
 export { PromptChips } from './PromptChips';
-export { AmbientBackground } from './AmbientBackground';
-export { NudgePrompt } from './NudgePrompt';

@@ -1,8 +1,9 @@
 /**
- * Unit tests for ChatScreen (story 2-5b).
+ * Unit tests for ChatScreen (stories 2-5b, 2-4).
  *
  * Tests rendering of ChatThread + ChatInput, handleSend wiring,
- * input disabled state, and ModuleLink press navigation.
+ * input disabled state, ModuleLink press navigation,
+ * and PromptChips before first message.
  */
 
 // Suppress console output
@@ -152,6 +153,43 @@ describe('ChatScreen', () => {
       expect(messages.length).toBeGreaterThanOrEqual(1);
       const userMsg = messages.find((m: any) => m.type === 'chat' && m.role === 'user');
       expect(userMsg).toBeDefined();
+    });
+  });
+
+  describe('prompt chips (before first message)', () => {
+    it('shows prompt chips when no messages exist', () => {
+      useChatStore.setState({ messages: [] });
+      const { getByText } = render(<ChatScreen />);
+      expect(getByText("What's the weather like?")).toBeTruthy();
+      expect(getByText('Track something for me')).toBeTruthy();
+      expect(getByText('Help me organize my week')).toBeTruthy();
+    });
+
+    it('hides prompt chips when messages exist', () => {
+      useChatStore.setState({
+        messages: [
+          { id: 'msg-1', type: 'chat', role: 'user', text: 'Hi', timestamp: new Date().toISOString() },
+        ],
+      });
+      const { queryByText } = render(<ChatScreen />);
+      expect(queryByText("What's the weather like?")).toBeNull();
+    });
+
+    it('sends message when chip is pressed', () => {
+      useChatStore.setState({ messages: [] });
+      const { getByText } = render(<ChatScreen />);
+      fireEvent.press(getByText("What's the weather like?"));
+      expect(mockSend).toHaveBeenCalledWith({
+        type: 'chat',
+        payload: { message: "What's the weather like?" },
+      });
+    });
+
+    it('shows persona chip when persona is set', () => {
+      useChatStore.setState({ messages: [] });
+      useConnectionStore.setState({ status: 'connected', persona: 'flame' });
+      const { getByText } = render(<ChatScreen />);
+      expect(getByText('Automate something')).toBeTruthy();
     });
   });
 
