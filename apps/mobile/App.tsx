@@ -141,8 +141,8 @@ function AppContent() {
     >
       {/* Compact header: Orb + title + status on one line */}
       <View style={styles.header}>
-        <Orb size={32} />
-        <Text style={styles.title}>Self</Text>
+        <Orb size={26} />
+        <Text style={styles.title}>self</Text>
         <View style={styles.statusBadge}>
           <View
             style={[
@@ -186,13 +186,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    gap: tokens.spacing.sm,
+    paddingVertical: tokens.spacing.xs,
+    gap: 6,
   },
   title: {
-    ...tokens.typography.title,
+    fontSize: 18,
+    fontWeight: '600' as const,
     color: tokens.colors.text,
-    lineHeight: 32,
+    lineHeight: 26,
   },
   statusBadge: {
     flexDirection: 'row',

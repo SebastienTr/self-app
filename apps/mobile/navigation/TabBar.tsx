@@ -94,22 +94,22 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: tokens.colors.background,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: tokens.colors.border,
-    paddingTop: tokens.spacing.sm,
+    paddingTop: tokens.spacing.xs,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: tokens.spacing.xs,
-    minHeight: 48,
+    paddingVertical: 2,
+    minHeight: 42,
   },
   iconContainer: {
     position: 'relative',
   },
   icon: {
-    fontSize: 20,
+    fontSize: 16,
   },
   badge: {
     position: 'absolute',
@@ -132,9 +132,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   label: {
-    ...tokens.typography.caption,
+    fontSize: 11,
+    fontWeight: '400' as const,
     color: '#5A7A9A',
-    marginTop: 2,
+    marginTop: 1,
   },
   labelActive: {
     color: tokens.colors.accent,

@@ -84,21 +84,21 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surfaceElevated,
     borderColor: tokens.colors.border,
     borderWidth: 1,
-    borderRadius: tokens.radii.lg,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    marginHorizontal: tokens.spacing.md,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginHorizontal: 12,
   },
   input: {
     flex: 1,
-    ...tokens.typography.body,
+    ...tokens.typography.caption,
     color: tokens.colors.text,
-    minHeight: 44, // NFR33: minimum 44pt touch target
+    minHeight: 34,
     paddingVertical: 0,
   },
   sendButton: {
-    width: 44, // NFR33: minimum 44pt touch target
-    height: 44,
+    width: 34,
+    height: 34,
     borderRadius: tokens.radii.md,
     backgroundColor: tokens.colors.accent,
     alignItems: 'center',
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   sendIcon: {
     color: tokens.colors.background,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
   },
   sendIconDisabled: {
