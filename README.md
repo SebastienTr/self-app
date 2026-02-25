@@ -43,19 +43,19 @@ Most apps decide what you can do before you open them. Self flips that:
 ## Project Status
 
 ```
-[▓▓▓▓▓▓░░░░░░░░░░░░░░] 18/60 stories (30%)
+[▓▓▓▓▓▓░░░░░░░░░░░░░░] 19/60 stories (32%)
 ```
 
 Baseline metrics = `59` epic stories currently tracked in `sprint-status.yaml` (includes post-PRD additions `1.7`, `2.5`, and `2.5b`) + `Prep.1` (`60` total).
 
 | Phase | Stories | Done | Status |
 |-------|---------|------|--------|
-| First Light | 21 | 17 | **In Progress** |
+| First Light | 21 | 18 | **In Progress** |
 | Preparation | 1 | 1 | **Done** |
 | MVP | 19 | 0 | Backlog |
 | Growth | 19 | 0 | Backlog |
 
-**Current focus:** Wave 4 — Backfill First Light (stories 2.4, 4.1–4.3)
+**Current focus:** Wave 4 — Backfill First Light (stories 4.1–4.3)
 **Next milestone:** First Light Complete
 
 See the full [Roadmap](_bmad-output/implementation-artifacts/roadmap.md) for details.
@@ -206,6 +206,7 @@ See the [UX Twilight Deep Dive](_bmad-output/planning-artifacts/ux-twilight-deep
 | [Story 2.5 — Screen Mode Architecture](_bmad-output/implementation-artifacts/2-5-screen-mode-architecture.md) | Done |
 | [Story 2.5b — Tab Navigation Architecture](_bmad-output/implementation-artifacts/2-5b-tab-navigation-architecture.md) | Done |
 | [Story 2.3 — Persona Preset Selection](_bmad-output/implementation-artifacts/2-3-persona-preset-selection.md) | Done |
+| [Story 2.4 — Contextual Empty State](_bmad-output/implementation-artifacts/2-4-contextual-empty-state.md) | Done |
 | [Story Prep.1 — Agent Dev Autonomy](_bmad-output/implementation-artifacts/prep-1-agent-dev-autonomy.md) | Done |
 
 </details>
